@@ -717,3 +717,29 @@ products:
     vendor: 中国电信
     category: office
     repo: null
+
+# ---- 智能助手（DSH agent loop 双通道） ----
+# interactive = /assistant 登录后的对话窗口；internal = 站点内部按需调用（周报总结/润色/建议）。
+# API Key 放 data/assistant.env（600 权限，KEY=VALUE），不进 git。
+assistant:
+  enabled: true
+  profile: sdk-minimal            # DSH 精简运行档（实测空闲内存 ~160MB）
+  provider: deepseek-official
+  model: deepseek-v4-flash
+  api_key_env: DEEPSEEK_API_KEY
+  execution:
+    max_concurrent: 1             # 全局并发（跨进程文件锁强制）
+    memory_rss_mb: 1200           # DSH 子进程 RSS 上限，超限 SIGKILL
+    timeout_s: 300
+  internal:
+    daily_limit: 50
+    daily_tokens: 1000000
+    queue_depth: 3
+  interactive:
+    daily_limit: 100
+    daily_tokens: 2000000
+    max_message_chars: 8000
+    max_output_tokens: 4000
+  login:
+    max_failures: 5
+    lockout_minutes: 10

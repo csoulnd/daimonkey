@@ -198,6 +198,54 @@ def ensure_news_tables(c) -> None:
     c.executescript(NEWS_DDL)
 
 
+# 智能助手表同样走附加式迁移（与 NEWS_DDL 模式一致）。
+ASSISTANT_DDL = """
+CREATE TABLE IF NOT EXISTS assistant_sessions (
+    id              INTEGER PRIMARY KEY,
+    title           TEXT NOT NULL,
+    dsh_session     TEXT,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS assistant_messages (
+    id              INTEGER PRIMARY KEY,
+    session_id      INTEGER REFERENCES assistant_sessions(id) ON DELETE CASCADE,
+    role            TEXT NOT NULL,
+    content         TEXT NOT NULL,
+    channel         TEXT NOT NULL,
+    workflow        TEXT,
+    created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_asst_messages_session ON assistant_messages(session_id);
+CREATE TABLE IF NOT EXISTS assistant_usage (
+    date            TEXT NOT NULL,
+    channel         TEXT NOT NULL,
+    requests        INTEGER NOT NULL DEFAULT 0,
+    tokens_in       INTEGER NOT NULL DEFAULT 0,
+    tokens_out      INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (date, channel)
+);
+CREATE TABLE IF NOT EXISTS assistant_runs (
+    id              INTEGER PRIMARY KEY,
+    channel         TEXT NOT NULL,
+    workflow        TEXT,
+    session_id      INTEGER,
+    status          TEXT NOT NULL,
+    error           TEXT,
+    duration_s      REAL,
+    peak_rss_mb     REAL,
+    tokens_in       INTEGER,
+    tokens_out      INTEGER,
+    created_at      TEXT NOT NULL
+);
+"""
+
+
+def ensure_assistant_tables(c) -> None:
+    """助手功能上线 / serve 启动时调用，旧库在线补表。"""
+    c.executescript(ASSISTANT_DDL)
+
+
 def conn() -> sqlite3.Connection:
     c = sqlite3.connect(DB_PATH)
     c.row_factory = sqlite3.Row
@@ -211,6 +259,7 @@ def init_db() -> None:
     with conn() as c:
         c.executescript(DDL)
         ensure_news_tables(c)
+        ensure_assistant_tables(c)
 
 
 def sha256_hex(data: bytes) -> str:
