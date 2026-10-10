@@ -1,0 +1,10 @@
+{% macro directory(node, prefix='') %}
+{% for name, child in node.dirs.items() %}
+{% set path = prefix ~ name ~ '/' %}
+<details{% if note is defined and note.path.startswith(path) %} open{% endif %}><summary title="{{ path }}">{{ name }}</summary><div class="kb-tree-children">{{ directory(child, path) }}</div></details>
+{% endfor %}
+{% for item in node.notes %}
+<a href="{{ item.url }}" title="{{ item.title }} · {{ item.path }}"{% if note is defined and item.path == note.path %} class="on" aria-current="page"{% endif %}>{{ item.title }}</a>
+{% endfor %}
+{% endmacro %}
+{{ directory(kb_tree) }}

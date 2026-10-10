@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="{{ site.lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ site.name }}{% endblock %}</title>
+<script>try{if(localStorage.getItem("side")==="closed")document.documentElement.classList.add("no-side")}catch(e){}</script>
+<link rel="stylesheet" href="/assets/style.css?v={{ assets_v }}">
+</head>
+<body{% if knowledge_page %} class="knowledge-page"{% endif %}>
+{% if stale and not knowledge_page and not news_page %}<div class="stale-banner">⚠ 数据超过 48 小时未更新（{{ meta.last_collected_at | dt }}），点击右上「更新」刷新</div>{% endif %}
+<div class="layout">
+  <aside class="side" id="sidebar">
+    <div class="side-head">
+      <span class="side-cap">目录</span>
+      <button class="stg" id="side-close" type="button" title="收起侧栏">«</button>
+    </div>
+    <nav class="tree">
+      <a href="/" data-path="/"><i>├─</i>智能体热度指数</a>
+      <a href="/news" data-path="/news"><i>├─</i>AI Agent 新闻</a>
+      <a href="/knowledge" data-path="/knowledge"><i>└─</i>个人知识库</a>
+    </nav>
+    {% if knowledge_page %}
+    <div class="kb-side-nav"><a class="kb-search-link" href="/knowledge#kb-search">⌕ 搜索全部文档</a><div class="kb-tree">{% include "_knowledge_tree.html" %}</div></div>
+    {% endif %}
+    <div class="side-foot dim">{{ meta.methodology_version }} · 手动更新</div>
+  </aside>
+  <div class="main">
+    <div class="page">
+      <header class="tophead">
+        <span class="left">
+          <button class="stg hidden-default" id="side-open" type="button" title="展开侧栏">»</button>
+          <a class="brand hidden-default" href="{{ '/knowledge' if knowledge_page else '/' }}">{{ '个人知识库' if knowledge_page else '智能体热度指数' }}</a>
+        </span>
+        <span class="asof-box">
+          {% if knowledge_page %}
+          <span class="asof">仓库快照 {{ kb.updated[:10] if kb.updated else '尚未同步' }} · {{ kb.short_commit }}</span>
+          {% elif news_page %}
+          <span class="asof" title="新闻与热度数据的最后采集时间">新闻截至 {{ news_meta.last_fetched_at | dt if news_meta.last_fetched_at else '暂无' }} · 热度截至 {{ meta.last_collected_at | dt if meta.last_collected_at else '暂无数据' }}</span>
+          <button id="btn-news-update" type="button" title="仅采集新闻（约 1 分钟），不重采热度数据">⟳ 仅更新新闻</button>
+          <button id="btn-update" type="button">⟳ 全量更新</button>
+          {% else %}
+          <span class="asof" id="asof" title="数据截至（最后采集时间）">截至 {{ meta.last_collected_at | dt if meta.last_collected_at else '暂无数据' }}</span>
+          <button id="btn-update" type="button">⟳ 更新</button>
+          {% endif %}
+        </span>
+      </header>
+      <main>
+      {% block content %}{% endblock %}
+      </main>
+      <footer class="footer">
+        {% if knowledge_page %}
+        <p class="dim">内容来自 <a href="{{ kb.url }}">csoulnd / InferTechNote</a>，以 GitHub 仓库为准；本站提供只读快照。外部子模块通过原仓库链接访问。</p>
+        {% else %}
+        <p class="dim">数据为公开信息汇总；原始响应体保留期为 {{ meta.retention.raw_body_days }} 天，过期后仅保留元数据和校验值。不构成投资或采购建议。</p>
+        <p class="dim foot-end"><a href="/methodology">方法论</a> · <a href="/sources">数据源</a></p>
+        {% endif %}
+      </footer>
+    </div>
+  </div>
+</div>
+<script src="/assets/app.js?v={{ assets_v }}"></script>
+{% if knowledge_page %}<script src="/assets/knowledge.js?v={{ assets_v }}" defer></script>{% endif %}
+{% if news_page %}<script src="/assets/news.js?v={{ assets_v }}" defer></script>{% endif %}
+</body>
+</html>

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}数据源{% endblock %}
+{% block crumb %}数据源{% endblock %}
+{% block content %}
+<h1>数据源清单与健康状态</h1>
+<p class="dim">每个接入的源都在数据库 sources 表登记；本页由该表生成。不可达的源自动禁用并在此公示。</p>
+<table class="tbl">
+  <thead><tr><th>源</th><th>类型</th><th>鉴权</th><th>状态</th><th>最近成功</th><th>失败次数</th><th>限流</th><th>备注</th></tr></thead>
+  <tbody>
+  {% for s in sources %}
+  <tr>
+    <td><i class="src-tag s-{{ s.key }}">{{ s.key }}</i> {{ s.name }}</td>
+    <td>{{ s.source_type }}</td>
+    <td>{{ '需要/可选' if s.auth_required else '无需' }}</td>
+    <td>{% if not s.enabled %}<span class="chip off">已禁用</span>{% elif s.reachable == 0 %}<span class="chip bad">不可达</span>{% elif s.reachable == 1 %}<span class="chip ok">正常</span>{% else %}<span class="dim">未探测</span>{% endif %}</td>
+    <td class="dim">{{ s.last_success_at | dt if s.last_success_at else '—' }}</td>
+    <td>{{ s.failure_count }}</td>
+    <td class="dim">{{ s.rate_limit or '—' }}</td>
+    <td class="dim">{{ s.notes or '' }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="dim">采集原则：每主机请求间隔 ≥1s；429/5xx 指数退避（5/15/45s）；单源失败不影响整轮采集；
+不使用 headless 浏览器；不抓取声明禁止抓取的站点（Google Play 等）。</p>
+{% endblock %}

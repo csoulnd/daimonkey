@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}AI Agent 新闻 · {{ site.name }}{% endblock %}
+{% block content %}
+<section class="kb-intro news-intro">
+  <div class="dim">AI AGENT NEWS</div>
+  <h1>AI Agent 新闻汇总</h1>
+  <p>公开 RSS / API 源的领域新闻。分类为确定性关键词规则（无 LLM），每条可溯源到当次采集的原始响应；提到榜上产品时自动关联产品页与当前热度名次。</p>
+  <div class="dim">{{ news_meta.total }} 条（近 {{ news_lookback_days }} 天窗口滚动，保留 {{ news_retention_days }} 天）· {{ news_meta.by_source | length }} 个源 · <a href="/api/v1/news.json">API</a></div>
+</section>
+{% if news_stale %}<div class="warn-box">新闻超过 48 小时未更新（{{ news_meta.last_fetched_at | dt }}）。点击右上「仅更新新闻」可快速刷新（不重采热度数据）。</div>{% endif %}
+{% if not news_meta.total %}<div class="warn-box">尚无新闻数据：执行 <code>python -m collector --collect-news</code> 或点击右上「仅更新新闻」。</div>{% endif %}
+
+<div class="news-filter" id="news-filter">
+  <button class="chip active" data-cat="" type="button">全部 {{ news_meta.total }}</button>
+  {% for key, label in news_categories.items() %}
+  <button class="chip nc-{{ key }}" data-cat="{{ key }}" type="button">{{ label }} {{ news_meta.by_category.get(key, 0) }}</button>
+  {% endfor %}
+  <select id="news-region" aria-label="按地区筛选">
+    <option value="">全部地区</option>
+    <option value="cn">国内</option>
+    <option value="global">海外</option>
+  </select>
+  <input id="news-q" type="search" placeholder="过滤标题 / 摘要 / 产品…" autocomplete="off">
+</div>
+<p id="news-count" class="dim" aria-live="polite" data-total="{{ news_meta.total }}">显示 {{ news_items | length }} / {{ news_meta.total }} 条，按发布时间排列</p>
+
+<div id="news-list" class="news-list">
+{% for n in news_items %}
+  <article class="news-item" data-cat="{{ n.category }}" data-region="{{ n.region }}" data-text="{{ n.title }} {{ n.summary or '' }} {{ n.source_name }} {% for p in n.products %}{{ p.name }} {% endfor %}">
+    <div class="news-head">
+      <span class="chip nc-{{ n.category }}">{{ news_categories.get(n.category, n.category) }}</span>
+      <a class="news-title" href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
+      {% if n.points %}<span class="news-pts" title="Hacker News 社区热度">{{ n.points }} 分</span>{% endif %}
+    </div>
+    {% if n.summary %}<p class="news-sum dim">{{ n.summary }}</p>{% endif %}
+    <div class="news-meta dim">
+      <span>{{ (n.published_at or n.fetched_at)[:10] }}</span><span>{{ n.source_name }}</span>
+      {% for p in n.products %}
+      {%- if news_rank.get(p.slug) -%}
+      <a class="badge b-{{ news_rank[p.slug].board }}" href="/product/{{ p.slug }}" title="当前主榜名次">{{ p.name }} #{{ news_rank[p.slug].rank }}</a>
+      {%- else -%}
+      <a class="badge" href="/product/{{ p.slug }}">{{ p.name }}</a>
+      {%- endif -%}
+      {% endfor %}
+      <a class="dim" href="/raw/{{ n.raw_payload_id }}">溯源</a>
+    </div>
+  </article>
+{% endfor %}
+</div>
+
+{% if digests %}
+<h2 class="obs-h">每周周报</h2>
+<p class="dim">每周自动汇总当周全部条目与本周期被提及最多的产品。</p>
+<div class="digest-list">
+  {% for d in digests %}<a class="chip" href="/news/digest/{{ d.week }}.html">{{ d.week }}（{{ d.start[5:] }}~{{ d.end[5:] }} · {{ d.count }} 条）</a>{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

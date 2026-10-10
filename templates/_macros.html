@@ -1,0 +1,22 @@
+{# 来源标注组件（规范 9.2）：数值 + 来源 + 采集时间 + 原始数据链接，四要素齐全 #}
+{% macro mval(m) -%}
+<span class="sv">
+  <a class="sv-v" href="/raw/{{ m.raw_payload_id }}" title="{{ m.source.name }} · 采集于 {{ m.collected_at | dt }}">{% if m.unit == 'pct' %}{{ m.value | pct }}{% elif m.unit == 'rank' and m.value >= 201 %}&gt;200{% elif m.unit == 'rank' %}#{{ m.value | int }}{% else %}{{ m.value | num }}{% endif %}</a><i class="src-tag s-{{ m.source.key }}" title="{{ m.source.name }}">{{ m.source.key }}</i>
+</span>
+{%- endmacro %}
+
+{% macro cov(v) -%}
+<span class="cov" title="数据覆盖率（按权重）"><i style="width: {{ ((v or 0) * 100) | round(0) | int }}%"></i><em>{{ ((v or 0) * 100) | round(0) | int }}%</em></span>
+{%- endmacro %}
+
+{% macro delta(d) -%}
+{% if d is none %}<span class="dim">—</span>{% elif d > 0 %}<span class="up" title="名次上升">▲{{ d }}</span>{% elif d < 0 %}<span class="down" title="名次下降">▼{{ -d }}</span>{% else %}<span class="dim">—</span>{% endif %}
+{%- endmacro %}
+
+{% macro score(v, kind='heat') -%}
+{% if v is none %}<span class="dim" title="历史数据累积中（需约30天）">—</span>{% else %}<span class="score {{ kind }}">{{ '%.1f' | format(v) }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro badge(board, names) -%}
+<a class="badge b-{{ board }}" href="/rankings/{{ board }}">{{ names.get(board, board) }}</a>
+{%- endmacro %}

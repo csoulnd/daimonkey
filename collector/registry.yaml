@@ -1,0 +1,719 @@
+# =============================================================================
+# 智能体热度指数 - 运维核心配置
+# 新增产品 / 榜单 / 数据源开关：改本文件即可，不需要改代码。
+# 新增"数据源类型"才需要写新采集器模块（collector/sources/ 一源一模块）。
+# =============================================================================
+
+site:
+  name: 智能体热度指数
+  tagline: 每个数字都能溯源到原始响应的第三方智能体榜单
+  lang: zh-CN
+
+methodology:
+  version: v1.3
+  observation_threshold: 0.5    # 加权覆盖率低于该值的产品进观察区，不参与排名
+
+# ---- 历史数据 LRU 保留窗口（天）。0 = 永久保留。每次更新后执行清理 ----
+retention:
+  raw_body_days: 30        # 原始响应体文件（体积大头）：到期删文件、保留元数据行与 sha256
+  metrics_days: 180        # 指标时序
+  rankings_days: 365       # 榜单快照
+  cache_hours: 48          # GitHub 采集缓存文件
+  news_days: 180           # 新闻条目（与指标窗口对齐；每周 digest 页随窗口滚动）
+
+github:
+  token_env: GITHUB_TOKEN          # 可选；配置后配额 60次/时 -> 5000次/时
+  cache_ttl_hours: 6               # 同一 GitHub 请求在 TTL 内复用缓存（含溯源 raw id）
+  min_interval: 1.1                # 秒
+
+http:
+  timeout: 20
+  min_interval: 1.05               # 对同一主机的最小请求间隔（礼貌频率）
+  host_intervals:                  # 个别限流严格的源给更长间隔（实测 pypistats 3s 基本不触发 429）
+    pypistats.org: 3.0
+  host_backoffs:                   # 个别源的专属退避序列（pypistats 全线 429 时不再拖满 65s/包）
+    pypistats.org: [5, 15]
+  backoff: [5, 15, 45]             # 429/5xx 与网络错误的默认退避（递增重试）
+
+# ---- 指标定义：unit 参与展示，direction 参与分位数归一化 ----
+metric_definitions:
+  github_stars:             {unit: count, direction: higher}
+  github_forks:             {unit: count, direction: higher}
+  github_open_issues:       {unit: count, direction: lower}
+  github_contributors:      {unit: count, direction: higher}
+  github_commits_30d:       {unit: count, direction: higher}
+  github_releases_30d:      {unit: count, direction: higher}
+  github_stars_growth_30d:  {unit: pct,   direction: higher}
+  npm_monthly_downloads:    {unit: count, direction: higher}
+  npm_downloads_growth_30d: {unit: pct,   direction: higher}
+  pypi_monthly_downloads:   {unit: count, direction: higher}
+  pypi_downloads_growth_30d: {unit: pct,  direction: higher}
+  appstore_rank:            {unit: rank,  direction: lower}
+  appstore_rating_count:    {unit: count, direction: higher}
+  appstore_rating_growth_30d: {unit: pct, direction: higher}
+  vscode_installs:          {unit: count, direction: higher}
+
+# 由历史指标推导的增长率（评分期计算，不单独存储）
+derived_growth:
+  github_stars_growth_30d: github_stars
+  pypi_downloads_growth_30d: pypi_monthly_downloads
+  vscode_installs_growth_30d: vscode_installs
+  appstore_rating_growth_30d: appstore_rating_count
+
+# =============================================================================
+# 榜单与权重（权重改动必须递增 methodology.version）
+# =============================================================================
+boards:
+  coding:
+    name: 编码智能体
+    heat:
+      github_stars: 0.25
+      npm_monthly_downloads: 0.35
+      vscode_installs: 0.20
+      github_contributors: 0.10
+      github_forks: 0.10
+    momentum:
+      github_commits_30d: 0.30
+      github_releases_30d: 0.20
+      github_stars_growth_30d: 0.30
+      npm_downloads_growth_30d: 0.20
+  framework:
+    name: 开源框架
+    heat:
+      github_stars: 0.30
+      pypi_monthly_downloads: 0.25
+      npm_monthly_downloads: 0.20
+      github_contributors: 0.15
+      github_forks: 0.10
+    momentum:
+      github_commits_30d: 0.40
+      github_stars_growth_30d: 0.30
+      pypi_downloads_growth_30d: 0.15
+      npm_downloads_growth_30d: 0.15
+  general:
+    name: 通用智能体
+    # v1.1: 开源/闭源双轨道——GitHub 轨 0.5 / App Store 轨 0.5，
+    # 任一轨道完整即可达 50% 覆盖率入榜（开源产品无 App Store 数据，反之亦然）
+    heat:
+      github_stars: 0.50
+      appstore_rating_count: 0.25
+      appstore_rank: 0.25
+    momentum:
+      github_commits_30d: 0.50
+      github_stars_growth_30d: 0.50
+  claw:
+    name: Claw 生态
+    heat:
+      github_stars: 0.40
+      npm_monthly_downloads: 0.40
+      appstore_rank: 0.20
+    momentum:
+      github_commits_30d: 0.50
+      github_stars_growth_30d: 0.30
+      npm_downloads_growth_30d: 0.20
+  domestic:
+    name: 国产开源榜
+    overlay: true               # 地域专题榜；联合榜仅取产品主分类，避免重复入榜
+    heat:
+      github_stars: 0.65
+      github_forks: 0.35
+    momentum:
+      github_commits_30d: 0.50
+      github_stars_growth_30d: 0.50
+  domestic_app:
+    name: 国产应用榜
+    overlay: true
+    heat:
+      appstore_rating_count: 0.55
+      appstore_rank: 0.45
+    momentum:
+      appstore_rating_growth_30d: 1.00
+  unified:
+    name: 联合榜单
+    derived: true              # 主分类综合分再做分类内分位数，不直接配置指标
+  office:
+    name: 办公智能体
+    enabled: false             # 暂无可用数据源（多为闭源），Phase 2 接入
+  research:
+    name: 研究智能体
+    enabled: false
+  data:
+    name: 数据智能体
+    enabled: false
+
+# =============================================================================
+# 数据源登记表（sources 表 + /sources 页面的数据基础）
+# =============================================================================
+sources:
+  - key: github
+    name: GitHub REST API
+    type: api
+    base_url: https://api.github.com
+    auth: optional
+    rate_limit: 未认证 60 次/小时/IP；认证 5000 次/小时
+    enabled: true
+    notes: 建议配置 GITHUB_TOKEN；未认证时自动降级（跳过 contributors/releases 等）
+  - key: npm
+    name: npm Registry Downloads API
+    type: api
+    base_url: https://api.npmjs.org
+    auth: none
+    rate_limit: 宽松
+    enabled: true
+    notes: 批量端点，一次请求多个包
+  - key: pypi
+    name: PyPI 下载量 (pypistats)
+    type: api
+    base_url: https://pypistats.org
+    auth: none
+    rate_limit: 有速率限制，已实现 5/15/45s 退避
+    enabled: true
+  - key: appstore_rss
+    name: Apple App Store 榜单 RSS
+    type: rss
+    base_url: https://itunes.apple.com
+    auth: none
+    rate_limit: 未知
+    enabled: true
+    notes: 按产品所属地区采集免费总榜 Top 200；未上榜记 201+
+  - key: appstore_lookup
+    name: Apple 元数据 API
+    type: api
+    base_url: https://itunes.apple.com
+    auth: none
+    rate_limit: 宽松
+    enabled: true
+    notes: 不提供下载量，仅评分数量等
+  - key: vscode
+    name: VS Code Marketplace
+    type: api
+    base_url: https://marketplace.visualstudio.com
+    auth: none
+    rate_limit: 宽松
+    enabled: true
+    notes: POST extensionquery, flags=914
+  - key: huggingface
+    name: HuggingFace Hub API
+    type: api
+    base_url: https://huggingface.co
+    auth: none
+    rate_limit: 未知
+    enabled: false
+    notes: 2026-09-23 本机实测不可达，待网络条件变化后启用
+  - key: dockerhub
+    name: Docker Hub API
+    type: api
+    base_url: https://hub.docker.com
+    auth: none
+    rate_limit: 未知
+    enabled: false
+    notes: 2026-09-23 本机实测不可达，跳过
+  - key: news_rss
+    name: AI Agent 新闻 RSS/Atom 聚合
+    type: rss
+    auth: none
+    rate_limit: 每主机 ≥1s（http.py 统一限频）
+    enabled: true
+    notes: 源清单见下方 news.feeds（2026-10-09 逐源实测可达）；逐 feed 失败隔离并公示于运行日志
+  - key: news_hn
+    name: Hacker News（Algolia API）
+    type: api
+    base_url: https://hn.algolia.com/api/v1
+    auth: none
+    rate_limit: 宽松
+    enabled: true
+    notes: 按 AI agent 关键词检索 story，points_min 过滤低分噪声
+
+# =============================================================================
+# AI Agent 新闻汇总（第三个顶级功能 /news）
+# 分类为确定性关键词规则（先匹配先得，无 LLM）；feed 级默认分类做兜底。
+# 2026-10-09 从本机实测：HuggingFace 博客/Reddit/blog.google 超时、机器之心 RSS
+# 已失效（重定向付费服务）、Anthropic 无 RSS、VentureBeat 数据中心 IP 429，
+# 以上均未纳入；如需启用先复测可达性。
+# =============================================================================
+news:
+  lookback_days: 7           # 每轮只入库最近 N 天发布的条目（防老内容回填）
+  max_items_per_feed: 40     # 单 feed 单轮入库上限
+  digest_weeks: 8            # 生成最近 N 个 ISO 周的周报页
+  categories:
+    models: 模型与能力
+    framework: 框架与工具链
+    coding: 编码智能体
+    infra: 推理与基础设施
+    product: 产品与落地
+    safety: 安全与治理
+    research: 研究与论文
+  keyword_rules:             # 顺序即优先级：先匹配先得
+    coding:
+      [claude code, claude-code, codex, cursor, copilot, devin, windsurf,
+       cline, aider, opencode, openhands, kilo code, goose, swe agent,
+       coding agent, code agent, 编码智能体, 代码智能体, 编程助手, 代码助手, 氛围编程, vibe coding]
+    framework:
+      [langchain, langgraph, langflow, autogen, crewai, agent sdk,
+       agents sdk, agent framework, model context protocol, mcp, dify,
+       coze, 扣子, n8n, flowise, mastra, agentscope, metagpt, openmanus,
+       multi-agent, multi agent, 多智能体, 智能体框架, 编排, orchestration, agentic]
+    models:
+      [gpt-, chatgpt, o1, o3, o4, claude, gemini, deepseek, llama, qwen,
+       千问, mistral, kimi, glm, grok, 豆包, 模型发布, 新模型, 开源模型, 大模型,
+       foundation model, frontier model, reasoning model, 推理模型, 多模态,
+       multimodal, long context, 长上下文, 强化学习, reinforcement learning]
+    infra:
+      [vllm, sglang, tensorrt, triton, gpu, h100, b200, blackwell, cuda,
+       推理成本, 推理优化, inference, serving, kv cache, kv-cache, 量化,
+       quantization, 蒸馏, distill, 吞吐, throughput, 训练, training, 微调,
+       fine-tun, 算力, 数据中心, inference infra, llamafile, ollama]
+    safety:
+      [安全漏洞, 沙箱, sandbox, 提示注入, prompt injection, jailbreak, 越狱,
+       治理, governance, 监管, regulation, ai act, owasp, red team, 红队,
+       alignment, 对齐, 隐私, privacy, 安全风险, agent security, 权限管控]
+    research:
+      [arxiv, 论文, paper, benchmark, swe-bench, agentbench, gaia, tau-bench,
+       evaluation, 评测, survey, 综述, 研究者, 突破, researchers]
+    product:                  # 兜底类：也配少量词，未命中任何规则时落到 feed 默认分类
+      [融资, funding, 收购, acquisition, 估值, valuation, 发布会, 定价, pricing,
+       enterprise, 企业级, 落地, 上线, generally available, partnership, 合作]
+  feeds:
+    - {key: news_openai,  name: OpenAI News,        category: models,   region: global, enabled: true,
+       url: "https://openai.com/news/rss.xml"}
+    - {key: news_techcrunch, name: TechCrunch AI,   category: product,  region: global, enabled: true,
+       url: "https://techcrunch.com/category/artificial-intelligence/feed/"}
+    - {key: news_verge,   name: The Verge AI,       category: product,  region: global, enabled: true,
+       url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"}
+    - {key: news_mittr,   name: MIT Tech Review AI, category: product,  region: global, enabled: true,
+       url: "https://www.technologyreview.com/topic/artificial-intelligence/feed/"}
+    - {key: news_mtp,     name: MarkTechPost,      category: research, region: global, enabled: true,
+       url: "https://www.marktechpost.com/feed/"}
+    - {key: news_simonw,  name: Simon Willison,    category: framework, region: global, enabled: true,
+       url: "https://simonwillison.net/atom/everything/"}
+    - {key: news_latent,  name: Latent.Space,      category: infra,    region: global, enabled: true,
+       url: "https://www.latent.space/feed"}
+    - {key: news_arxiv,   name: ArXiv（agent 论文）, category: research, region: global, enabled: true,
+       url: "https://export.arxiv.org/api/query?search_query=all:%22AI+agent%22+OR+all:%22LLM+agent%22&sortBy=submittedDate&sortOrder=descending&max_results=25"}
+    - {key: news_qbitai,  name: 量子位,             category: models,   region: cn, enabled: true,
+       url: "https://www.qbitai.com/feed"}
+    - {key: news_infoq,   name: InfoQ 中国,         category: infra,    region: cn, enabled: true,
+       url: "https://www.infoq.cn/feed"}
+  hn:
+    points_min: 3
+    hits_per_query: 30
+    queries:
+      - {q: "AI agent",     category: product}
+      - {q: "LLM agent",    category: framework}
+      - {q: "MCP server",   category: framework}
+      - {q: "Claude Code",  category: coding}
+      - {q: "coding agent", category: coding}
+
+# =============================================================================
+# 产品清单（种子来自开发规范 15.1，2026-09-23 验证存在）
+# integration 字段为初始人工录入（保守填写），接入适配度详情见 /methodology
+# =============================================================================
+products:
+  # ---------- coding ----------
+  - slug: codex-cli
+    name: Codex CLI
+    vendor: OpenAI
+    category: coding
+    repo: openai/codex
+    npm_package: "@openai/codex"
+    license: Apache-2.0
+    integration: {has_cli: 1, has_tui: 1, has_api: 1, protocol: [openai-compat], install_difficulty: easy}
+  - slug: dsh
+    name: DSH (DeepSeek Harness)
+    vendor: DeepSeek
+    category: coding
+    board_tags: [coding, domestic]
+    repo: deepseek-ai/deepseek-harness
+    npm_package: "@deepseek-ai/dsh"
+    integration: {has_cli: 1, has_tui: 1, protocol: [mcp], install_difficulty: easy}
+  - slug: claude-code
+    name: Claude Code
+    vendor: Anthropic
+    category: coding
+    repo: anthropics/claude-code
+    npm_package: "@anthropic-ai/claude-code"
+    vscode_ext_id: anthropic.claude-code
+    license: MIT
+    integration: {has_cli: 1, has_tui: 1, has_api: 1, protocol: [mcp], install_difficulty: easy}
+  - slug: gemini-cli
+    name: Gemini CLI
+    vendor: Google
+    category: coding
+    repo: google-gemini/gemini-cli
+    npm_package: "@google/gemini-cli"
+    license: Apache-2.0
+    integration: {has_cli: 1, protocol: [openai-compat], install_difficulty: easy}
+  - slug: opencode
+    name: OpenCode
+    vendor: Anomaly
+    category: coding
+    repo: anomalyco/opencode
+    repo_aliases: [sst/opencode]
+    npm_package: opencode-ai
+    license: MIT
+    integration: {has_cli: 1, has_tui: 1, has_api: 1, protocol: [mcp, openai-compat], install_difficulty: easy}
+  - slug: cline
+    name: Cline
+    vendor: Cline
+    category: coding
+    repo: cline/cline
+    npm_package: cline
+    vscode_ext_id: saoudrizwan.claude-dev
+    license: Apache-2.0
+    integration: {has_webui: 1, has_api: 1, protocol: [mcp, openai-compat], install_difficulty: easy}
+  - slug: kilocode
+    name: Kilo Code
+    vendor: Kilo Org
+    category: coding
+    repo: Kilo-Org/kilocode
+    vscode_ext_id: kilocode.Kilo-Code
+    integration: {has_api: 1, protocol: [mcp, openai-compat], install_difficulty: easy}
+  - slug: goose
+    name: Goose
+    vendor: Block
+    category: coding
+    repo: block/goose
+    license: Apache-2.0
+    integration: {has_cli: 1, has_tui: 1, has_api: 1, protocol: [mcp], install_difficulty: medium}
+  - slug: openhands
+    name: OpenHands
+    vendor: All Hands AI
+    category: coding
+    repo: All-Hands-AI/OpenHands
+    license: MIT
+    integration: {has_cli: 1, has_webui: 1, has_api: 1, protocol: [mcp], install_difficulty: medium}
+  - slug: aider
+    name: Aider
+    vendor: Aider AI
+    category: coding
+    repo: Aider-AI/aider
+    pypi_package: aider
+    license: Apache-2.0
+    integration: {has_cli: 1, protocol: [openai-compat], install_difficulty: easy}
+  - slug: copilot
+    name: GitHub Copilot
+    vendor: GitHub
+    category: coding
+    vscode_ext_id: GitHub.copilot
+    repo: null
+    integration: {has_api: 1, protocol: [openai-compat], install_difficulty: easy}
+  - slug: cursor
+    name: Cursor
+    vendor: Anysphere
+    category: coding
+    repo: null
+    notes: 闭源，暂无公开数据口径，进观察区
+
+  # ---------- general ----------
+  - slug: openclaw
+    name: OpenClaw
+    vendor: OpenClaw
+    category: general
+    board_tags: [general, claw]
+    repo: openclaw/openclaw
+    npm_package: openclaw
+    license: MIT
+    integration: {has_cli: 1, has_tui: 1, has_api: 1, protocol: [mcp], install_difficulty: easy}
+  - slug: hermes-agent
+    name: Hermes Agent
+    vendor: NousResearch
+    category: general
+    repo: NousResearch/hermes-agent
+  - slug: autogpt
+    name: AutoGPT
+    vendor: Significant Gravitas
+    category: general
+    repo: Significant-Gravitas/AutoGPT
+    license: MIT
+  - slug: browser-use
+    name: Browser Use
+    vendor: Browser Use
+    category: general
+    repo: browser-use/browser-use
+    pypi_package: browser-use
+    license: MIT
+    integration: {has_api: 1, protocol: [openai-compat], install_difficulty: easy}
+  - slug: chatgpt
+    name: ChatGPT
+    vendor: OpenAI
+    category: general
+    repo: null
+    appstore_id: com.openai.chat
+    appstore_country: us
+    notes: 闭源 App，走 App Store 口径
+
+  # ---------- claw ----------
+  - slug: qclaw
+    name: QClaw
+    vendor: 腾讯
+    category: claw
+    board_tags: [claw, domestic_app]
+    appstore_id: "6760533871"
+    appstore_country: cn
+    repo: null
+    notes: 暂无公开仓库/包名，观察区
+  - slug: autoclaw
+    name: AutoClaw
+    vendor: 智谱
+    category: claw
+    board_tags: [claw, domestic_app]
+    appstore_id: "6761991573"
+    appstore_country: cn
+    repo: null
+    notes: 暂无公开仓库/包名，观察区
+  - slug: easyclaw
+    name: easyclaw
+    vendor: 猎豹
+    category: claw
+    repo: null
+    notes: 暂无公开仓库/包名，观察区
+  - slug: joyclaw
+    name: JoyClaw
+    vendor: 京东
+    category: claw
+    board_tags: [claw, office]
+    repo: null
+    notes: 暂无公开仓库/包名，观察区
+  - slug: lobsterai
+    name: LobsterAI
+    vendor: 网易有道
+    category: claw
+    repo: null
+    notes: 暂无公开仓库/包名，观察区
+
+  # ---------- framework ----------
+  - slug: n8n
+    name: n8n
+    vendor: n8n
+    category: framework
+    repo: n8n-io/n8n
+    npm_package: n8n
+    integration: {has_webui: 1, has_api: 1, has_docker: 1, docker_image_ref: "docker.n8n.io/n8nio/n8n", container_friendly: 5, install_difficulty: easy}
+  - slug: dify
+    name: Dify
+    vendor: LangGenius
+    category: framework
+    repo: langgenius/dify
+    board_tags: [framework, domestic]
+    integration: {has_webui: 1, has_api: 1, has_docker: 1, container_friendly: 5, install_difficulty: medium}
+  - slug: langchain
+    name: LangChain
+    vendor: LangChain
+    category: framework
+    repo: langchain-ai/langchain
+    pypi_package: langchain
+    license: MIT
+    integration: {has_api: 1, protocol: [openai-compat], container_friendly: 4, install_difficulty: easy}
+  - slug: langflow
+    name: Langflow
+    vendor: Langflow
+    category: framework
+    repo: langflow-ai/langflow
+    pypi_package: langflow
+    license: MIT
+    integration: {has_webui: 1, has_api: 1, has_docker: 1, container_friendly: 5, install_difficulty: easy}
+  - slug: crewai
+    name: crewAI
+    vendor: crewAIInc
+    category: framework
+    repo: crewAIInc/crewAI
+    pypi_package: crewai
+    license: MIT
+    integration: {has_api: 1, install_difficulty: easy}
+  - slug: autogen
+    name: AutoGen
+    vendor: Microsoft
+    category: framework
+    repo: microsoft/autogen
+    pypi_package: autogen-agentchat
+    license: MIT
+    integration: {has_api: 1, install_difficulty: easy}
+  - slug: flowise
+    name: Flowise
+    vendor: FlowiseAI
+    category: framework
+    repo: FlowiseAI/Flowise
+    npm_package: flowise
+    license: Apache-2.0
+    integration: {has_webui: 1, has_api: 1, has_docker: 1, container_friendly: 5, install_difficulty: easy}
+  - slug: mastra
+    name: Mastra
+    vendor: Mastra
+    category: framework
+    repo: mastra-ai/mastra
+    npm_package: "@mastra/core"
+  - slug: openai-agents
+    name: OpenAI Agents SDK
+    vendor: OpenAI
+    category: framework
+    repo: openai/openai-agents-python
+    pypi_package: openai-agents
+    license: MIT
+    integration: {has_api: 1, install_difficulty: easy}
+  - slug: adk-python
+    name: Google ADK
+    vendor: Google
+    category: framework
+    repo: google/adk-python
+    pypi_package: google-adk
+    license: Apache-2.0
+  - slug: mcp-servers
+    name: MCP
+    vendor: ModelContextProtocol
+    category: framework
+    repo: modelcontextprotocol/servers
+    npm_package: "@modelcontextprotocol/sdk"
+    license: MIT
+    integration: {has_api: 1, protocol: [mcp], install_difficulty: medium}
+  - slug: activepieces
+    name: Activepieces
+    vendor: Activepieces
+    category: framework
+    repo: activepieces/activepieces
+    license: MIT
+    integration: {has_webui: 1, has_api: 1, has_docker: 1, container_friendly: 5, install_difficulty: easy}
+  - slug: coze-studio
+    name: Coze Studio
+    vendor: Coze
+    category: framework
+    repo: coze-dev/coze-studio
+    board_tags: [framework, domestic]
+    license: Apache-2.0
+    integration: {has_webui: 1, has_api: 1, has_docker: 1, install_difficulty: medium}
+  - slug: qwen-agent
+    name: Qwen-Agent
+    vendor: QwenLM
+    category: framework
+    repo: QwenLM/Qwen-Agent
+    board_tags: [framework, domestic]
+    pypi_package: qwen-agent
+    license: Apache-2.0
+  - slug: fastgpt
+    name: FastGPT
+    vendor: LabRing
+    category: framework
+    board_tags: [framework, domestic]
+    repo: labring/FastGPT
+  - slug: ragflow
+    name: RAGFlow
+    vendor: InfiniFlow
+    category: framework
+    board_tags: [framework, domestic]
+    repo: infiniflow/ragflow
+  - slug: agentscope
+    name: AgentScope
+    vendor: AgentScope Team
+    category: framework
+    board_tags: [framework, domestic]
+    repo: agentscope-ai/agentscope
+  - slug: metagpt
+    name: MetaGPT
+    vendor: DeepWisdom
+    category: framework
+    board_tags: [framework, domestic]
+    repo: FoundationAgents/MetaGPT
+  - slug: openmanus
+    name: OpenManus
+    vendor: FoundationAgents
+    category: general
+    board_tags: [general, domestic]
+    repo: FoundationAgents/OpenManus
+  - slug: chatdev
+    name: ChatDev
+    vendor: OpenBMB
+    category: framework
+    board_tags: [framework, domestic]
+    repo: OpenBMB/ChatDev
+  - slug: vercel-ai
+    name: Vercel AI SDK
+    vendor: Vercel
+    category: framework
+    repo: vercel/ai
+    npm_package: ai
+    license: Apache-2.0
+    integration: {has_api: 1, install_difficulty: easy}
+
+  # ---------- office（榜单未启用，仅登记；接入数据源后自动参与） ----------
+  - slug: workbuddy
+    name: 腾讯 WorkBuddy
+    vendor: 腾讯
+    category: office
+    board_tags: [office, domestic_app]
+    appstore_id: "6761374913"
+    appstore_country: cn
+    repo: null
+  - slug: baidu-dazi
+    name: 百度搭子
+    vendor: 百度
+    category: office
+    repo: null
+  - slug: trae
+    name: Trae
+    vendor: 字节跳动
+    category: office
+    repo: null
+  - slug: coze
+    name: 扣子
+    vendor: 字节跳动
+    category: office
+    board_tags: [office, domestic_app]
+    appstore_id: "6747420043"
+    appstore_country: cn
+    repo: null
+  - slug: doubao-work
+    name: 豆包工作
+    vendor: 字节跳动
+    category: office
+    repo: null
+  - slug: qianwen-office
+    name: 千问办公
+    vendor: 阿里巴巴
+    category: office
+    repo: null
+  - slug: qianwen-app
+    name: 千问
+    vendor: 阿里巴巴
+    category: general
+    board_tags: [general, domestic_app]
+    appstore_id: "6466733523"
+    appstore_country: cn
+  - slug: qoder
+    name: Qoder
+    vendor: 阿里巴巴
+    category: office
+    repo: null
+  - slug: wukong
+    name: 悟空
+    vendor: 阿里巴巴
+    category: office
+    repo: null
+  - slug: tianxi-ai
+    name: 天禧AI
+    vendor: 联想
+    category: office
+    repo: null
+  - slug: nano-ai
+    name: 纳米AI
+    vendor: 360
+    category: office
+    repo: null
+  - slug: zcode
+    name: 智谱 ZCode
+    vendor: 智谱
+    category: office
+    repo: null
+  - slug: xiaohuanxiong
+    name: 小浣熊
+    vendor: 商汤
+    category: office
+    repo: null
+  - slug: lingxi
+    name: 金山灵犀
+    vendor: 金山
+    category: office
+    repo: null
+  - slug: teleagent
+    name: TeleAgent
+    vendor: 中国电信
+    category: office
+    repo: null

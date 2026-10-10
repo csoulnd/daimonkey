@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}原始数据 #{{ raw.id }}{% endblock %}
+{% block crumb %}原始数据 #{{ raw.id }}{% endblock %}
+{% block content %}
+<h1>原始响应 #{{ raw.id }} <span class="pill">溯源终点</span></h1>
+<table class="tbl kv">
+  <tr><th>数据源</th><td><i class="src-tag s-{{ raw.source_key }}">{{ raw.source_key }}</i> {{ raw.source_name }}</td></tr>
+  <tr><th>请求地址</th><td><a href="{{ raw.request_url }}" rel="noopener">{{ raw.request_url }}</a></td></tr>
+  <tr><th>HTTP 状态</th><td>{{ raw.http_status }}</td><th>采集时间</th><td>{{ raw.fetched_at | dt }}</td></tr>
+  <tr><th>Content-Type</th><td>{{ raw.content_type or '—' }}</td><th>响应大小</th><td>{{ raw.body_bytes | num if raw.body_bytes else '—' }} bytes</td></tr>
+  <tr><th>SHA-256</th><td colspan="3"><code class="sha">{{ raw.body_sha256 }}</code></td></tr>
+  <tr><th>解析器</th><td>{{ raw.parser_version or '—' }}</td><th>解析结果</th><td>{{ '成功' if raw.parse_ok else ('失败: ' + raw.parse_error) }}</td></tr>
+</table>
+
+{% if raw.evicted %}
+<div class="warn-box">📦 该响应体已按 <a href="/methodology#retention">LRU 保留策略</a>清理（{{ raw.body_evicted_at | dt }}）。
+元数据与 SHA-256 永久保留，指标值仍指向该次采集；点击「更新数据」可重新采集最新响应。</div>
+{% endif %}
+
+{% if raw.extracted %}
+<h2>从该响应提取的指标</h2>
+<ul class="ext-list">
+{% for e in raw.extracted %}
+<li>{% if e.slug %}<a href="/product/{{ e.slug }}">{{ e.slug }}</a> · {% endif %}{{ metric_names.get(e.metric_key, e.metric_key) }} = <b>{{ e.value | num }}</b></li>
+{% endfor %}
+</ul>
+{% endif %}
+
+<h2>响应体</h2>
+<pre class="rawbody">{{ body_txt or '（响应体已清理或为空）' }}</pre>
+{% endblock %}

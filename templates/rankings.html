@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ name }}{% endblock %}
+{% block crumb %}{{ name }}{% endblock %}
+{% block content %}
+<div class="sec-head">
+  <h1>{{ name }}{% if board == 'unified' %} <span class="pill">跨榜整合</span>{% endif %}</h1>
+  <div class="view-toggle">
+    <button class="tg active" data-view="heat" type="button">热度视图</button>
+    <button class="tg" data-view="mom" type="button">动量视图</button>
+  </div>
+</div>
+<p class="dim">快照 {{ snapshot_date }} · 口径 {{ meta.methodology_version }} ·
+  {% if board == 'unified' %}主分类综合分二次分位{% else %}榜内归一化{% endif %} ·
+  <a href="/methodology">评分方法</a> · 数字可点击查看原始响应</p>
+
+{% if history_chart %}
+<div class="metric-card">
+  <h3>近 90 天热度走势（当前 Top 5）</h3>
+  {{ history_chart | safe }}
+</div>
+{% endif %}
+
+{% macro rows(items) -%}
+{% for it in items %}
+<tr>
+  <td class="rank">{{ it.rank }}</td>
+  <td class="pname"><a href="/product/{{ it.slug }}">{{ it.name }}</a>
+    {% if board == 'unified' %}{{ m.badge(it.board, board_names) }}{% endif %}
+    {% if it.status == 'stale' %}<span class="stale-tag" title="仓库超过 90 天无推送">停滞</span>{% endif %}
+    <span class="vendor">{{ it.vendor }}</span></td>
+  <td>{{ m.score(it.heat_score, 'heat') }}</td>
+  <td>{{ m.delta(it.delta_7d) }}</td>
+  <td>{{ m.score(it.momentum_score, 'mom') }}</td>
+  <td>{{ m.cov(it.coverage) }}</td>
+  {% for mk in top_metrics %}{% set mm = it.metrics.get(mk) %}
+  <td>{% if mm %}{{ m.mval(mm) }}{% else %}<span class="dim">—</span>{% endif %}</td>
+  {% endfor %}
+</tr>
+{% endfor %}
+{%- endmacro %}
+
+<table class="tbl" id="tbl-heat">
+  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th><th>动量分</th><th>覆盖率</th>
+  {% for mk in top_metrics %}<th>{{ metric_names.get(mk, mk) }}</th>{% endfor %}</tr></thead>
+  <tbody>{{ rows(items) }}</tbody>
+</table>
+<table class="tbl hidden" id="tbl-mom">
+  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th><th>动量分</th><th>覆盖率</th>
+  {% for mk in top_metrics %}<th>{{ metric_names.get(mk, mk) }}</th>{% endfor %}</tr></thead>
+  <tbody>{{ rows(momentum_items) }}</tbody>
+</table>
+<p class="dim">动量视图按动量分降序（反映近期增长；增长类指标依赖本站自采历史，约 30 天后完整）。</p>
+
+{% if observation %}
+<h2 class="obs-h">观察区 <span class="dim">（覆盖率 &lt; {{ threshold_pct }}%，不参与排名）</span></h2>
+<table class="tbl obs">
+  <thead><tr><th>产品</th><th>覆盖率</th><th>已有指标</th></tr></thead>
+  <tbody>
+  {% for o in observation %}
+  <tr>
+    <td><a href="/product/{{ o.slug }}">{{ o.name }}</a><span class="vendor">{{ o.vendor }}</span></td>
+    <td>{{ m.cov(o.coverage or 0) }}</td>
+    <td>{% for k in o.available %}<span class="chip">{{ metric_names.get(k, k) }}</span> {% endfor %}{% if not o.available %}<span class="dim">暂无任何指标（等待数据源接入）</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ site.name }}{% endblock %}
+{% block content %}
+<section>
+  <div class="sec-head">
+    <h1>联合榜单</h1>
+    <span class="dim">{{ unified_total }} 个产品 · <a href="/methodology">方法</a></span>
+  </div>
+  <table class="tbl">
+    <thead><tr><th>#</th><th>产品</th><th>来源</th><th>热度</th><th>7d</th><th>动量</th><th>覆盖</th><th>Stars</th><th>npm 月下载</th></tr></thead>
+    <tbody>
+    {% for it in unified %}
+      <tr>
+        <td class="rank">{{ it.rank }}</td>
+        <td class="pname"><a href="/product/{{ it.slug }}">{{ it.name }}</a><span class="vendor">{{ it.vendor }}</span></td>
+        <td>{{ m.badge(it.board, board_names) }}</td>
+        <td>{{ m.score(it.heat_score, 'heat') }}</td>
+        <td>{{ m.delta(it.delta_7d) }}</td>
+        <td>{{ m.score(it.momentum_score, 'mom') }}</td>
+        <td>{{ m.cov(it.coverage) }}</td>
+        <td>{% if it.metrics.github_stars %}{{ m.mval(it.metrics.github_stars) }}{% else %}<span class="dim">—</span>{% endif %}</td>
+        <td>{% if it.metrics.npm_monthly_downloads %}{{ m.mval(it.metrics.npm_monthly_downloads) }}{% else %}<span class="dim">—</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    {% if not unified %}<tr><td colspan="9" class="dim">暂无数据，点击右上「⟳ 更新」发起首次采集。</td></tr>{% endif %}
+    </tbody>
+  </table>
+  <p class="dim">联合榜仅取产品主分类，并将分类综合分再做一次分类内分位数。国产开源榜与国产应用榜采用不同数据口径，分别排名，不重复计入联合榜。</p>
+</section>
+
+<section class="duo">
+  {% for b in blocks %}
+  <div class="blk">
+    <div class="sec-head">
+      <h2>{{ b.name }}</h2>
+      <a class="dim" href="/rankings/{{ b.key }}">完整指标 →</a>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>#</th><th>产品</th><th>热度</th><th>动量</th><th>覆盖</th></tr></thead>
+      <tbody>
+      {% for it in b.rows %}
+      <tr>
+        <td class="rank">{{ it.rank }}</td>
+        <td class="pname"><a href="/product/{{ it.slug }}">{{ it.name }}</a><span class="vendor">{{ it.vendor }}</span>
+          {% if it.status == 'stale' %}<span class="stale-tag">停滞</span>{% endif %}</td>
+        <td>{{ m.score(it.heat_score, 'heat') }}</td>
+        <td>{{ m.score(it.momentum_score, 'mom') }}</td>
+        <td>{{ m.cov(it.coverage) }}</td>
+      </tr>
+      {% endfor %}
+      {% if not b.rows %}<tr><td colspan="5" class="dim">暂无上榜产品</td></tr>{% endif %}
+      </tbody>
+    </table>
+    {% if b.obs %}<p class="dim">观察区 {{ b.obs }} 个（覆盖不足 {{ threshold_pct }}%，不参与排名）</p>{% endif %}
+  </div>
+  {% endfor %}
+</section>
+
+<p class="dim note-end">观察区共 {{ obs_total }} 个产品：数据覆盖率不足，为避免"数据少"被误判为"热度低"而不参与排名，<a href="/methodology">详见方法论</a>。数据手动更新，点右上「⟳ 更新」。</p>
+{% endblock %}

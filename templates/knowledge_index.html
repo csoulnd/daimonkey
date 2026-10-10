@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}个人知识库 · InferTechNote{% endblock %}
+{% block content %}
+<section class="kb-intro">
+  <div class="dim">INFER TECH NOTE</div>
+  <h1>个人知识库</h1>
+  <p>Agent、推理服务与基础设施的工程笔记。从业务探索到可复用的知识。</p>
+  <div class="dim">{{ kb.count }} 篇文档 · 保留仓库目录与原文内容 · <a href="{{ kb.url }}">GitHub 仓库 ↗</a></div>
+</section>
+{% if not kb.available %}<div class="warn-box">知识库快照尚未同步。</div>{% endif %}
+<div class="kb-groups">
+{% for group in kb_groups %}
+<a class="kb-group" href="{{ group.url }}"><span class="dim">{{ group.count }} 篇</span><h2>{{ group.name }}</h2><p>{{ group.description }}</p></a>
+{% endfor %}
+</div>
+<section id="kb-search" class="kb-search">
+  <label for="kb-query">搜索知识库</label>
+  <div class="kb-search-row"><input id="kb-query" type="search" placeholder="搜索标题、路径或正文，如 KV Cache、MCP、SSH" autocomplete="off"><select id="kb-group" aria-label="筛选知识分类"><option value="">全部分类</option>{% for group in kb_groups %}<option value="{{ group.key }}">{{ group.name }}</option>{% endfor %}</select></div>
+  <p id="kb-search-state" class="dim" aria-live="polite">全部 {{ kb.count }} 篇文档，按最近修改时间排列</p>
+  <div id="kb-results" class="kb-results">
+  {% for note in kb_notes %}<a class="kb-result" href="{{ note.url }}"><span class="kb-result-title">{{ note.title }}</span><span class="dim">{{ note.group_name }} · {{ note.path }}</span></a>{% endfor %}
+  </div>
+</section>
+{% endblock %}

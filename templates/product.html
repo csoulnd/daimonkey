@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ p.name }}{% endblock %}
+{% block crumb %}<a href="/rankings/{{ p.boards[0] }}">{{ board_names.get(p.boards[0], p.boards[0]) }}</a> / {{ p.name }}{% endblock %}
+{% block content %}
+<div class="sec-head">
+  <h1>{{ p.name }} <span class="vendor">{{ p.vendor }}</span>
+    {% if p.status == 'stale' %}<span class="stale-tag">仓库停滞（&gt;90 天无推送）</span>{% endif %}</h1>
+  <div>{% for b in p.boards %}{{ m.badge(b, board_names) }} {% endfor %}</div>
+</div>
+<p class="dim">
+{% if p.repo %}<a href="https://github.com/{{ p.repo }}" rel="noopener">github.com/{{ p.repo }}</a>{% if p.repo_aliases_list %}（曾用名：{{ p.repo_aliases_list | join('、') }}）{% endif %} · {% endif %}
+{% if p.license %}License {{ p.license }} · {% endif %}
+{% if p.npm_package %}npm <code>{{ p.npm_package }}</code> · {% endif %}
+{% if p.pypi_package %}PyPI <code>{{ p.pypi_package }}</code> · {% endif %}
+{% if p.appstore_id %}App Store <code>{{ p.appstore_id }}</code> · {% endif %}
+{% if p.vscode_ext_id %}VS Code <code>{{ p.vscode_ext_id }}</code>{% endif %}
+</p>
+{% if p.notes %}<p class="dim">{{ p.notes }}</p>{% endif %}
+
+{% if p.latest_ranks %}
+<h2>最新排名</h2>
+<div class="rank-cards">
+  {% for b, r in p.latest_ranks.items() %}
+  <a class="rcard" href="/rankings/{{ b }}">
+    <span class="rk">#{{ r.rank }}</span>
+    <span>{{ board_names.get(b, b) }}</span>
+    <span class="dim">热度 {{ '%.1f' | format(r.heat_score) }} · {{ r.snapshot_date }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if p.news %}
+<h2>相关新闻 <span class="dim">（按标题/摘要关键词自动关联，<a href="/news">查看全部</a>）</span></h2>
+<div class="p-news">
+  {% for n in p.news %}
+  <a class="p-news-item" href="{{ n.url }}" target="_blank" rel="noopener">
+    <span class="chip nc-{{ n.category }}">{{ news_categories.get(n.category, n.category) }}</span>
+    <span class="news-title">{{ n.title }}</span>
+    <span class="dim">{{ (n.published_at or n.fetched_at)[:10] }} · {{ n.source_name }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if p.integration %}
+<h2>接入适配度 <span class="dim">（初始人工录入，供下游 Agent 平台参考）</span></h2>
+<table class="tbl kv">
+  <tr><th>CLI</th><td>{{ '✅' if p.integration.has_cli else '—' }}</td><th>TUI</th><td>{{ '✅' if p.integration.has_tui else '—' }}</td></tr>
+  <tr><th>Web UI</th><td>{{ '✅' if p.integration.has_webui else '—' }}</td><th>API</th><td>{{ '✅' if p.integration.has_api else '—' }}</td></tr>
+  <tr><th>Docker</th><td>{{ '✅' if p.integration.has_docker else '—' }}{% if p.integration.docker_image_ref %} <code>{{ p.integration.docker_image_ref }}</code>{% endif %}</td>
+      <th>协议</th><td>{% for x in p.integration.protocol_list %}<span class="chip">{{ x }}</span> {% endfor %}</td></tr>
+  <tr><th>容器友好度</th><td>{% if p.integration.container_friendly %}{{ p.integration.container_friendly }}/5{% else %}—{% endif %}</td>
+      <th>安装难度</th><td>{{ p.integration.install_difficulty or '—' }}</td></tr>
+</table>
+{% endif %}
+
+<h2>指标时序 <span class="dim">（每个数字可点入当次采集的原始响应）</span></h2>
+{% for key, pts in p.metrics_series.items() %}
+<div class="metric-card">
+  <h3>{{ metric_names.get(key, key) }}</h3>
+  {{ charts[key] | safe }}
+  <table class="tbl mini">
+    <thead><tr><th>日期</th><th>值</th><th>来源</th><th>采集时间</th></tr></thead>
+    <tbody>
+    {% for pt in pts[-10:] | reverse %}
+    <tr>
+      <td>{{ pt.date }}</td>
+      <td>{{ m.mval(pt) }}</td>
+      <td><i class="src-tag s-{{ pt.source.key }}">{{ pt.source.key }}</i> {{ pt.source.name }}</td>
+      <td class="dim">{{ pt.collected_at | dt }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="dim">暂无采集数据。该产品可能在观察区（无公开数据口径）或等待下次更新。</p>
+{% endfor %}
+{% endblock %}

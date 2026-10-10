@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ week }} 周报 · AI Agent 新闻{% endblock %}
+{% block content %}
+<div class="kb-breadcrumb"><a href="/news">AI Agent 新闻</a> / <span>{{ week }} 周报</span></div>
+<section class="kb-intro news-intro">
+  <div class="dim">WEEKLY DIGEST</div>
+  <h1>{{ week }} 周报</h1>
+  <p class="dim">{{ week_start }} ~ {{ week_end }} · 共 {{ digest_items | length }} 条 ·
+    {% for key, n in cat_counts.items() %}<span class="chip nc-{{ key }}">{{ news_categories.get(key, key) }} {{ n }}</span> {% endfor %}
+  </p>
+</section>
+
+{% if top_products %}
+<h2>本周被提及最多的产品</h2>
+<table class="tbl mini kv">
+  <thead><tr><th>产品</th><th>提及次数</th><th>当前主榜名次</th></tr></thead>
+  <tbody>
+  {% for p in top_products %}
+  <tr>
+    <td class="pname"><a href="/product/{{ p.slug }}">{{ p.name }}</a></td>
+    <td>{{ p.mentions }}</td>
+    <td>{% if news_rank.get(p.slug) %}<a href="/rankings/{{ news_rank[p.slug].board }}">#{{ news_rank[p.slug].rank }} {{ board_names.get(news_rank[p.slug].board, news_rank[p.slug].board) }}</a>{% else %}<span class="dim">未入榜</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% for key, label in news_categories.items() %}
+  {% set week_items = digest_items | selectattr("category", "equalto", key) | list %}
+  {% if week_items %}
+  <h2 class="obs-h">{{ label }} <span class="dim">（{{ week_items | length }} 条）</span></h2>
+  <div class="news-list">
+    {% for n in week_items %}
+    <article class="news-item">
+      <div class="news-head">
+        <a class="news-title" href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
+        {% if n.points %}<span class="news-pts" title="Hacker News 社区热度">{{ n.points }} 分</span>{% endif %}
+      </div>
+      {% if n.summary %}<p class="news-sum dim">{{ n.summary }}</p>{% endif %}
+      <div class="news-meta dim">
+        <span>{{ (n.published_at or n.fetched_at)[:10] }}</span><span>{{ n.source_name }}</span>
+        {% for p in n.products %}<a class="badge" href="/product/{{ p.slug }}">{{ p.name }}</a>{% endfor %}
+        <a class="dim" href="/raw/{{ n.raw_payload_id }}">溯源</a>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endfor %}
+{% endblock %}
