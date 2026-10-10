@@ -310,3 +310,46 @@ tr:first-child .rank { color: var(--ink); }
   .kb-intro h1 { font-size: 1.6em; }
   .knowledge-page .asof { white-space: normal; }
 }
+
+/* ---- 智能助手（/assistant）：登录卡片 + 会话 + 对话 ---- */
+.assistant-wrap h1 { margin: 8px 0 4px; font-size: 1.5em; }
+.asst-card { max-width: 420px; margin: 40px auto; padding: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 12px; }
+.asst-card label { color: var(--dim); font-size: 0.9em; }
+.asst-card input { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; font-size: 1em; }
+.asst-card button { background: var(--acc); color: #08131f; border: none; border-radius: 6px; padding: 9px 0; font-size: 1em; font-weight: 600; cursor: pointer; }
+.asst-card button:disabled { opacity: 0.55; cursor: wait; }
+.asst-msg { min-height: 1.2em; color: var(--dim); font-size: 0.9em; margin: 6px 0 0; }
+.asst-msg.err { color: var(--down); }
+#asst-login-msg { color: var(--down); min-height: 1.2em; font-size: 0.9em; margin: 0; }
+.asst-columns { display: grid; grid-template-columns: 230px 1fr; gap: 16px; margin-top: 16px; align-items: start; }
+.asst-side { display: flex; flex-direction: column; gap: 10px; }
+#asst-new { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 7px 0; cursor: pointer; }
+#asst-new:hover { border-color: var(--acc); }
+.asst-session-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.asst-session-list li { display: flex; align-items: center; gap: 6px; padding: 7px 9px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.asst-session-list li:hover { border-color: var(--acc); }
+.asst-session-list li.on { border-color: var(--acc); background: var(--panel2); }
+.asst-s-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9em; }
+.asst-s-del { background: none; border: none; color: var(--dim); cursor: pointer; font-size: 1em; padding: 0 2px; }
+.asst-s-del:hover { color: var(--down); }
+.asst-usage { font-size: 0.82em; color: var(--dim); display: flex; flex-direction: column; gap: 3px; }
+.asst-usage-line.warn { color: var(--heat); }
+.asst-main { display: flex; flex-direction: column; gap: 10px; min-height: 60vh; }
+.asst-workflows { display: flex; flex-wrap: wrap; gap: 8px; }
+.asst-wf-btn { background: var(--panel); color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 0.82em; cursor: pointer; }
+.asst-wf-btn:hover { color: var(--ink); border-color: var(--acc); }
+.asst-messages { flex: 1; overflow-y: auto; max-height: 52vh; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
+.asst-bubble { max-width: 86%; padding: 9px 13px; border-radius: 10px; white-space: pre-wrap; word-break: break-word; font-size: 0.95em; line-height: 1.55; }
+.asst-bubble.u { align-self: flex-end; background: #16303f; border: 1px solid #1e4257; }
+.asst-bubble.a { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); }
+.asst-wf-tag { color: var(--mom); font-size: 0.78em; margin-bottom: 4px; }
+.asst-form { display: flex; gap: 10px; align-items: flex-end; }
+.asst-form textarea { flex: 1; resize: vertical; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 0.95em; font-family: inherit; }
+.asst-form textarea:focus { outline: none; border-color: var(--acc); }
+#asst-send { background: var(--acc); color: #08131f; border: none; border-radius: 8px; padding: 10px 22px; font-weight: 600; cursor: pointer; }
+#asst-send:disabled { opacity: 0.55; cursor: wait; }
+@media (max-width: 880px) {
+  .asst-columns { grid-template-columns: 1fr; }
+  .asst-session-list { max-height: 160px; overflow-y: auto; }
+  .asst-messages { max-height: 44vh; }
+}

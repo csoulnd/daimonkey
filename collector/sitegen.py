@@ -189,6 +189,7 @@ def build() -> None:
                retention=reg.get("retention", {}))
         render("sources.html", "sources.html", sources=queries.sources_health(c))
         render("api.html", "api.html")
+        render("assistant.html", "assistant.html", assistant_page=True)
         knowledge.build(env, common, kb_notes)
 
         # ---- AI Agent 新闻（第三入口 /news + 每周 digest）----
