@@ -25,6 +25,17 @@
 
 与热度指数、知识库同级入口：`/news`。配置全部集中在 `registry.yaml → news`（源清单、分类关键词规则、HN 查询词、保留窗口）。
 
+## 智能助手（第四个功能，`/assistant`）
+
+DSH（DeepSeek Harness）agent loop 驱动的单用户助手，**双通道、配额隔离**：
+
+- **对外助手窗口**：`/assistant` 登录（复用更新密码）后对话，支持多会话与 DSH 原生 `session_id` 续聊；签名 Cookie（HttpOnly + SameSite=Strict，7 天），登录失败 5 次锁 10 分钟。
+- **内部通道**：站点进程按需调用（周报 AI 摘要 / 文案润色 / 优化建议），CLI：`.venv/bin/python -m collector --assistant news-digest`。
+- **资源护栏**（`registry.yaml → assistant`）：全局并发 1（跨进程文件锁 `data/assistant.lock`）、DSH 子进程 RSS ≤1200MB 守护（超限 SIGKILL）、单次超时 300s、每通道独立每日请求数 / token 硬顶；每次运行落 `assistant_runs` 审计表。
+- **安全边界**：AI 产出一律带标记（`insights.llm_generated=1` 或 `assistant_messages.workflow`），确定性管线（榜单评分 / 新闻分类）不受影响；API Key 放 `data/assistant.env`（600 权限，`DEEPSEEK_API_KEY=sk-...`），遥测已关闭。
+- **扩展**：新工作流 = `collector/workflows.py` 里一个 `WorkflowSpec` + 注册（build_task 组装提示词、store 决定产物去向）。
+- 表结构：`assistant_sessions / assistant_messages / assistant_usage / assistant_runs`（附加式迁移，`db.ensure_assistant_tables`）。
+
 - **数据源（2026-10-09 逐源实测可达）**：OpenAI News、TechCrunch AI、The Verge AI、MIT Tech Review AI、MarkTechPost、Simon Willison、Latent.Space、ArXiv API、量子位、InfoQ 中国 + Hacker News（Algolia API）。HF 博客 / Reddit / blog.google 超时、机器之心 RSS 失效、Anthropic 无 RSS、VentureBeat 429，均未纳入（复测可达后可在 registry 一行启用）。
 - **七个领域分类**：模型与能力 / 框架与工具链 / 编码智能体 / 推理与基础设施 / 产品与落地 / 安全与治理 / 研究与论文；国内/海外为筛选维度而非独立分类。分类为 `keyword_rules` 关键词规则（先匹配先得）+ 源级默认分类兜底，无 LLM、可复现。
 - **去重**：URL 规范化（剥 `utm_*`/fragment、统一大小写与末尾斜杠）后 sha256 唯一约束；仅入库最近 `lookback_days` 天发布的条目。
@@ -111,7 +122,8 @@ agent-heat-index/
 `GET /api/v1/boards.json` · `/rankings/{board}.json`（board ∈ unified/coding/framework/general/claw/domestic/domestic_app）
 · `/rankings/{board}/history.json` · `/products/{slug}.json`（含相关新闻） · `/raw/{id}.json`
 · `/insights.json` · `/news.json`（最近 200 条 + 分类计数） · `/meta.json`；
-动态端点（仅本地服务）：`POST /api/v1/update`、`POST /api/v1/update/news`、`GET /api/v1/update/status`、`GET /api/v1/knowledge/search`。
+动态端点（仅本地服务）：`POST /api/v1/update`、`POST /api/v1/update/news`、`GET /api/v1/update/status`、`GET /api/v1/knowledge/search`；
+助手端点（登录 Cookie）：`GET/POST /api/v1/assistant/session|login|logout`、`GET sessions|sessions/{id}/messages|status|usage|workflows`、`POST sessions|chat|workflows/{name}`、`DELETE sessions/{id}`。
 
 ## 扩展方式
 
