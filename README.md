@@ -36,6 +36,16 @@ DSH（DeepSeek Harness）agent loop 驱动的单用户助手，**双通道、配
 - **扩展**：新工作流 = `collector/workflows.py` 里一个 `WorkflowSpec` + 注册（build_task 组装提示词、store 决定产物去向）。
 - 表结构：`assistant_sessions / assistant_messages / assistant_usage / assistant_runs`（附加式迁移，`db.ensure_assistant_tables`）。
 
+## AI 接入（第五个功能，v1.4 方法论）
+
+- **三板块 AI 摘要**：首页 / 新闻页 / 知识库顶部统一格式的 AI 摘要卡片（`🤖 AI 摘要` + 内容 + AI 生成标注 + 数据指纹）。随数据刷新自动生成、首次启用自动补齐；摘要带数据指纹，同一份数据不重复生成（不烧配额）。配置 `registry.yaml → assistant.ai.summaries`。
+- **榜单 AI 分析分**：全量更新后按榜生成 AI 分析分（0-100 + 一句话理由），存 `ai_scores` 表、与规则分**平行**存储——默认仅展示（榜单 AI 列悬停看理由、产品页徽章），排序仍由规则分决定；`assistant.ai.scoring.ai_weight > 0` 时启用加权融合（需同步升级方法论版本）。配置 `assistant.ai.scoring`（top_n 每榜送审前 N 名）。
+- **周报 AI 段**：周报页顶部展示该周已发布的 AI 总结（insights 表 `llm_generated=1` 且 `status='published'` 才渲染，草稿不上线）。
+- **触发链路**：AI 评分在 `pipeline._collect()` 评分后（仅全量更新）；AI 摘要在建站前 `pipeline.run_build()`（覆盖全量更新 / 仅新闻更新 / 单独 `--build` 三条路径）。
+- **降级原则**：AI 步骤失败（缺 Key / 配额 / 超时 / 解析失败）只记 notes、不影响更新状态，旧摘要与旧 AI 分继续渲染；`--update` 输出与 `update_status.json` 的 `ai` 字段可查简况。
+- 表结构：`ai_summaries(page 主键) / ai_scores(board+date+product 主键)`（附加式迁移，`db.ensure_ai_tables`），随榜单快照窗口清理。
+- 实现入口：`collector/ai.py`（指纹/编排/JSON 容错）、`collector/workflows.py` 的 `page_summary` 与 `board_ai_analysis`。
+
 - **数据源（2026-10-09 逐源实测可达）**：OpenAI News、TechCrunch AI、The Verge AI、MIT Tech Review AI、MarkTechPost、Simon Willison、Latent.Space、ArXiv API、量子位、InfoQ 中国 + Hacker News（Algolia API）。HF 博客 / Reddit / blog.google 超时、机器之心 RSS 失效、Anthropic 无 RSS、VentureBeat 429，均未纳入（复测可达后可在 registry 一行启用）。
 - **七个领域分类**：模型与能力 / 框架与工具链 / 编码智能体 / 推理与基础设施 / 产品与落地 / 安全与治理 / 研究与论文；国内/海外为筛选维度而非独立分类。分类为 `keyword_rules` 关键词规则（先匹配先得）+ 源级默认分类兜底，无 LLM、可复现。
 - **去重**：URL 规范化（剥 `utm_*`/fragment、统一大小写与末尾斜杠）后 sha256 唯一约束；仅入库最近 `lookback_days` 天发布的条目。

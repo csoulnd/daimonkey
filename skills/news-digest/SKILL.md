@@ -17,9 +17,12 @@ description: 本站新闻汇总与周报。适用场景：调整新闻源、分�
 
 ## AI 摘要（智能助手内部工作流，可选增强）
 
-- 触发：CLI `.venv/bin/python -m collector --assistant news-digest`，或智能助手面板工作流按钮 `news_digest_summary`；
-- 产物：**落 `insights` 表且 `llm_generated=1`、status='draft' 草稿态**——与确定性数据严格隔离，页面上线需人工确认；
-- 依赖：`data/assistant.env` 里的 `DEEPSEEK_API_KEY`（600 权限）；走 internal 通道配额（每日 50 次 / 100 万 token）。
+- **三板块 AI 摘要（v1.4）**：首页/新闻/知识库顶部卡片，随 `--build`（含全部更新链路）按数据指纹自动生成，实现见 `collector/ai.py → refresh_summaries_if_stale`，落 `ai_summaries` 表；失败保留旧摘要并在 notes 记原因。
+- **榜单 AI 分（v1.4）**：全量更新后 `ai.score_boards` 逐榜调用 `board_ai_analysis`（严格 JSON、解析失败重试一次），落 `ai_scores` 表，**与规则分平行、默认不影响排序**；开关 `registry.yaml → assistant.ai.scoring`。
+- **周报 AI 总结段**：周报页展示该周 `insights` 表已发布（`llm_generated=1, status='published'`）的总结；草稿不上线。
+- 手动触发周报总结：CLI `.venv/bin/python -m collector --assistant news-digest`，或智能助手面板工作流按钮 `news_digest_summary`；
+- 依赖：`data/assistant.env` 里的 `DEEPSEEK_API_KEY`（600 权限）；AI 工作流走 internal 通道配额（每日 50 次 / 100 万 token）。
+- **降级原则**：AI 步骤任何失败（含意外异常）只记 notes、不阻断采集/建站、不影响更新状态——这是硬约束，新增 AI 工作流必须遵守。
 
 ## 常见调整
 
