@@ -365,10 +365,48 @@ def _run_sdk(task: str, *, dsh_session: str | None, max_tokens: int,
         raise AssistantError(f"{type(e).__name__}: {e}") from e
 
 
+def _run_resident(task: str, dsh_session: str | None) -> tuple[str, str | None, int, int, float]:
+    """长驻 runtime 路径（聊天通道）：复用 runtime.get_harness() 的常驻进程。
+
+    与一次性 _run_sdk 相比：无冷启动、DSH 原生保持多轮上下文；
+    出错由 runtime.mark_broken() 触发下次重建。max_tokens 在 runtime
+    启动时按 interactive.max_output_tokens 固定。
+    """
+    from . import runtime
+
+    conf = cfg()
+    timeout_s = int(conf["execution"]["timeout_s"])
+    guard = _RssGuard(float(conf["execution"]["memory_rss_mb"]))
+    guard.start()
+    started = time.monotonic()
+    try:
+        harness = runtime.get_harness()
+        result = harness.run(task, session_id=dsh_session)
+        reply = (result.final_response or "").strip()
+        if not reply:
+            raise AssistantError(f"DSH 未返回内容（finish_reason={result.finish_reason}）")
+        tokens_in, tokens_out, _ = _tokens(result, task, reply)
+        return reply, result.session_id, tokens_in, tokens_out, guard.peak_mb
+    except AssistantError:
+        runtime.mark_broken()
+        raise
+    except Exception as e:  # SDK / 网络错误：标记重建并归类
+        runtime.mark_broken()
+        if guard.killed:
+            raise AssistantError(f"内存超限被终止（上限 {guard.limit_mb:.0f}MB）") from e
+        if time.monotonic() - started > timeout_s:
+            raise AssistantError("执行超时") from e
+        raise AssistantError(f"{type(e).__name__}: {e}") from e
+
+
 def _execute(channel: str, task: str, *, session_id: int | None,
              dsh_session: str | None, workflow: str | None,
-             max_tokens: int) -> dict:
-    """配额检查 + 加锁执行 + 落库（消息 / 用量 / 审计）。"""
+             max_tokens: int, resident: bool = False) -> dict:
+    """配额检查 + 加锁执行 + 落库（消息 / 用量 / 审计）。
+
+    resident=True 走长驻 runtime（聊天，多轮上下文由 DSH 保持）；
+    默认一次性 SDK 上下文（内部工作流，用完即退、内存即时归还）。
+    """
     check_quota(channel)
     conf = cfg()
     timeout_s = int(conf["execution"]["timeout_s"])
@@ -380,9 +418,13 @@ def _execute(channel: str, task: str, *, session_id: int | None,
     new_dsh: str | None = None
     try:
         with _execution_lock():
-            reply, new_dsh, tokens_in, tokens_out, peak_rss = _run_sdk(
-                task, dsh_session=dsh_session, max_tokens=max_tokens,
-                timeout_s=timeout_s)
+            if resident:
+                reply, new_dsh, tokens_in, tokens_out, peak_rss = _run_resident(
+                    task, dsh_session)
+            else:
+                reply, new_dsh, tokens_in, tokens_out, peak_rss = _run_sdk(
+                    task, dsh_session=dsh_session, max_tokens=max_tokens,
+                    timeout_s=timeout_s)
     except AssistantBusy:
         raise
     except AssistantError as e:
@@ -416,7 +458,7 @@ def run_chat(session_id: int, message: str) -> dict:
         _append_message(c, session_id, "user", message, "interactive", None)
     return _execute("interactive", message, session_id=session_id,
                     dsh_session=dsh, workflow=None,
-                    max_tokens=int(conf["max_output_tokens"]))
+                    max_tokens=int(conf["max_output_tokens"]), resident=True)
 
 
 def run_internal(workflow_name: str, payload: dict | None = None,

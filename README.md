@@ -29,7 +29,7 @@
 
 DSH（DeepSeek Harness）agent loop 驱动的单用户助手，**双通道、配额隔离**：
 
-- **对外助手窗口**：`/assistant` 登录（复用更新密码）后对话，支持多会话与 DSH 原生 `session_id` 续聊；签名 Cookie（HttpOnly + SameSite=Strict，7 天），登录失败 5 次锁 10 分钟。
+- **对外助手窗口**：全站悬浮宠物 🐱 点开即聊（面板支持最小化/大窗/会话重命名与删除），未登录浏览不受影响、权限动作按需登录；DSH 原生多轮上下文由**长驻 runtime**（`collector/runtime.py`）保持——懒启动复用、空闲 30 分钟自动回收、故障自动重建；登录复用更新密码，签名 Cookie（HttpOnly + SameSite=Strict，7 天），失败 5 次锁 10 分钟。
 - **内部通道**：站点进程按需调用（周报 AI 摘要 / 文案润色 / 优化建议），CLI：`.venv/bin/python -m collector --assistant news-digest`。
 - **资源护栏**（`registry.yaml → assistant`）：全局并发 1（跨进程文件锁 `data/assistant.lock`）、DSH 子进程 RSS ≤1200MB 守护（超限 SIGKILL）、单次超时 300s、每通道独立每日请求数 / token 硬顶；每次运行落 `assistant_runs` 审计表。
 - **安全边界**：AI 产出一律带标记（`insights.llm_generated=1` 或 `assistant_messages.workflow`），确定性管线（榜单评分 / 新闻分类）不受影响；API Key 放 `data/assistant.env`（600 权限，`DEEPSEEK_API_KEY=sk-...`），遥测已关闭。

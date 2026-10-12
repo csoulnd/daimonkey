@@ -731,6 +731,7 @@ assistant:
     max_concurrent: 1             # 全局并发（跨进程文件锁强制）
     memory_rss_mb: 1200           # DSH 子进程 RSS 上限，超限 SIGKILL
     timeout_s: 300
+    idle_recycle_s: 1800          # 聊天长驻 runtime 空闲 30 分钟自动回收（内存归还系统）
   internal:
     daily_limit: 50
     daily_tokens: 1000000
