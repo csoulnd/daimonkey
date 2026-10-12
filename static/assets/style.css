@@ -759,3 +759,9 @@ tr:first-child .rank { color: var(--ink); }
 .sc-inner .sc-col-head { font-size: 15px; font-weight: 600; fill: var(--ink); }
 .sc-inner .sc-stage { fill: var(--dim); font-size: 12.5px; text-anchor: end; letter-spacing: 0.1em; }
 .sc-inner .sc-divider { stroke: var(--line); stroke-width: 1; stroke-dasharray: 6 6; }
+
+/* 附件下载条（报告摘要之后） */
+.sc-attach { margin: calc(-1 * var(--sp-4)) 0 var(--sp-6); font-size: var(--fs-sm); }
+.sc-attach-item { display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  border: 1px solid var(--line); border-radius: var(--r-m); padding: 6px 14px; background: var(--panel); }
+.sc-attach-item .dim { font-size: var(--fs-xs); }

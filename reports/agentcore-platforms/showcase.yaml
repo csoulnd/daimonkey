@@ -11,6 +11,12 @@
 showcase:
   title: AgentCore 平台汇报
 
+  # 附件：原始演示文稿（2026-10-09 版）。早期版本，页面内容以 10-12 修订的文档为准
+  attachments:
+    - label: 原始演示文稿（2026-10-09 · PPTX）
+      file: 01-AgentCore-20261009.pptx
+      note: 早期版本，结论已按 2026-10-12 修订的调研文档更新；本页内容以文档为准
+
   notes: notes.md          # 讲稿（渲染到 /notes/agentcore-platforms，登录可见）
   sources_folds:           # 参考来源折叠表（两个产品的原始来源清单）
     - {label: "Amazon 来源表（B1–B8）", from: amazon_detail, heading: 参考来源}

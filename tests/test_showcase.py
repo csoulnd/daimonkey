@@ -294,6 +294,26 @@ class ShowcaseFixture(unittest.TestCase):
         self.assertIn("托管循环或自带框架", both)
         self.assertIn("<br>", both)
 
+    def test_attachments(self):
+        """附件（原始演示文稿）：存在则生成下载条信息，缺失只警告。"""
+        (self.report_dir / "deck.pptx").write_bytes(b"PK" + b"0" * 3000)
+        self.write_conf("""
+            showcase:
+              title: T
+              docs: {detail: agent/detail.md}
+              attachments:
+                - {label: 原始演示文稿, file: deck.pptx, note: 早期版本}
+                - {label: 缺失件, file: none.pptx}
+              chapters: []
+        """)
+        ctx, warnings = self.mod.load_showcase(self.report_dir)
+        self.assertEqual(len(ctx["attachments"]), 1)
+        att = ctx["attachments"][0]
+        self.assertEqual(att["label"], "原始演示文稿")
+        self.assertIn("/reports/report/deck.pptx", att["url"])
+        self.assertGreaterEqual(att["size_kb"], 2)
+        self.assertTrue(any("附件不存在" in w for w in warnings))
+
     def test_render_notes(self):
         notes = self.report_dir / "notes.md"
         notes.write_text("# 讲稿\n\n开场白。\n\n<script>alert(1)</script>\n", encoding="utf-8")

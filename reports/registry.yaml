@@ -14,10 +14,10 @@
 # 登记后运行一次建站即可发布（任意更新按钮或 --build）。
 reports:
   - slug: agentcore-platforms
-    title: AgentCore 平台调研展示
+    title: AgentCore 平台汇报
     date: 2026-10-12
-    summary: 基于 InferTechNote 产品调研文档的展示首版——Amazon Bedrock AgentCore 的定位、软件架构与研究状态（内容构建时从知识库导入）；阿里云与平台对比待迭代。
-    tags: [调研展示, AgentCore, 构建时导入]
+    summary: 四段式汇报——阿里云与 Amazon AgentCore 的定位、架构与核心流程，两解法对比，平台核心能力 7 项检查表（内容构建时从知识库导入）；附 2026-10-09 原始演示文稿。
+    tags: [汇报, AgentCore, 构建时导入]
   - slug: hello-report
     title: 报告厅框架示例
     date: 2026-10-12

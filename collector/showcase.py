@@ -532,6 +532,22 @@ def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
                               "html": render_md(MERMAID_RE.sub("", seg).strip(),
                                                 doc["rel"], known, commit)})
 
+    # 附件（如原始演示文稿）：注册为报告页的下载条，注明版本口径
+    attachments = []
+    for att in conf.get("attachments") or []:
+        fname = str(att.get("file", ""))
+        fpath = report_dir / fname
+        if not fname or not fpath.is_file():
+            warnings.append(f"[showcase] 附件不存在: {fname}")
+            continue
+        attachments.append({
+            "label": str(att.get("label", fname)),
+            "note": str(att.get("note", "")),
+            "file": fname,
+            "url": f"/reports/{report_dir.name}/{quote(fname)}",
+            "size_kb": max(1, round(fpath.stat().st_size / 1024)),
+        })
+
     fingerprint = hashlib.sha256()
     for d in docs.values():
         fingerprint.update((KB_REPO / d["rel"]).read_bytes())
@@ -547,6 +563,7 @@ def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
         },
         "arch_overview": arch_overview,
         "chapters": chapters,
+        "attachments": attachments,
         "sources": {"links": sources_links, "folds": sources_folds},
         "notes_url": f"/notes/{report_dir.name}",
         "short_commit": commit[:8],

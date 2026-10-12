@@ -74,6 +74,9 @@ description: 把 InferTechNote 产品调研文档接成报告厅展示的重复�
   `.agents/`）→ GitHub **版本固定**链接（commit 取自构建时的知识库快照）；
   外部来源原样保留。
 - 页脚固定提供：摘要/详细文档（知识库）、GitHub 原文（固定 commit）、产品对照。
+- **附件**（原始演示文稿等）：以 `attachments:` 注册（label/file/note），下载条渲染在
+  报告摘要之后；`note` 必须写版本口径（如"早期版本，结论以修订文档为准"），
+  避免旧版材料被当成现行结论。
 - 研究判断样式化区分（段首整段 `mark-judgment`；段中 `mark-judgment-inline`），
   待验证事项区独立边框——**样式只标注，不改文案**。
 

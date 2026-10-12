@@ -78,6 +78,15 @@
       </ul>
     </section>
 
+    {% if attachments %}
+    <div class="sc-attach">
+      {% for a in attachments %}
+      <span class="sc-attach-item">📎 <a href="{{ a.url }}" download>{{ a.label }}</a>
+        <span class="dim">· {{ a.size_kb }} KB{% if a.note %} · {{ a.note }}{% endif %}</span></span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     {% if arch_overview %}
     <section class="sc-sec sc-arch-overview" id="sec-arch-overview">
       <h3 class="sc-sec-title">{{ arch_overview.title }}</h3>
