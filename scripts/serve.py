@@ -10,6 +10,7 @@
     GET  /api/v1/update/status            -> 更新状态（never/running/success/partial/failed）
     POST /api/v1/update                   -> 触发一次完整更新（子进程 python3 -m collector --update）
     POST /api/v1/update/news              -> 仅更新新闻（子进程 python3 -m collector --collect-news）
+    POST /api/v1/update/knowledge         -> 同步知识库代码仓并重建（子进程 scripts/sync_knowledge.py）
     智能助手（单用户登录，签名 Cookie）：
     GET/POST /api/v1/assistant/session|login|logout、GET sessions|sessions/{id}/messages|
     status|usage|workflows、POST chat|workflows/{name}、DELETE sessions/{id}
@@ -70,13 +71,17 @@ CONTENT_TYPES = {
 }
 
 _lock = threading.Lock()
-_proc: dict = {"running": None}
+_proc: dict = {"running": None, "kind": None}
 
 
 def status_payload() -> dict:
     p = _proc.get("running")
     if p is not None and p.poll() is None:
-        return {"state": "running", "note": "采集进行中，通常需要 1-5 分钟"}
+        kind = _proc.get("kind")
+        note = {"knowledge": "知识库同步中，通常需要 10~60 秒",
+                "news": "新闻采集中，通常需要约 1 分钟"}.get(
+                    kind, "采集进行中，通常需要 1-5 分钟")
+        return {"state": "running", "kind": kind, "note": note}
     if STATUS_FILE.exists():
         try:
             return json.loads(STATUS_FILE.read_text(encoding="utf-8"))
@@ -342,7 +347,8 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path.startswith("/api/v1/assistant/"):
             self._assistant_post(parsed.path)
             return
-        if parsed.path not in ("/api/v1/update", "/api/v1/update/news"):
+        if parsed.path not in ("/api/v1/update", "/api/v1/update/news",
+                               "/api/v1/update/knowledge"):
             self._json({"error": "not found"}, 404)
             return
         # 一次登录完全权限：已持有助手会话 Cookie 或提供正确密码均可触发更新
@@ -350,6 +356,12 @@ class Handler(BaseHTTPRequestHandler):
         if not (self._assistant_authed() or password_valid(supplied)):
             self._json({"error": "未登录或更新密码错误"}, 401)
             return
+        if parsed.path.endswith("/knowledge"):
+            kind = "knowledge"
+        elif parsed.path.endswith("/news"):
+            kind = "news"
+        else:
+            kind = "full"
         with _lock:
             p = _proc.get("running")
             if p is not None and p.poll() is None:
@@ -358,13 +370,17 @@ class Handler(BaseHTTPRequestHandler):
             log_dir = ROOT / "data" / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
             log = log_dir / f"update-{time.strftime('%Y%m%d-%H%M%S')}.log"
-            cmd = ["-m", "collector",
-                   "--collect-news" if parsed.path.endswith("/news") else "--update"]
+            if kind == "knowledge":
+                cmd = [str(ROOT / "scripts" / "sync_knowledge.py")]
+            else:
+                cmd = ["-m", "collector",
+                       "--collect-news" if kind == "news" else "--update"]
             proc = subprocess.Popen(
                 [sys.executable, *cmd],
                 cwd=str(ROOT), stdout=open(log, "w"), stderr=subprocess.STDOUT)
             _proc["running"] = proc
-        self._json({"state": "running", "log": str(log)}, 202)
+            _proc["kind"] = kind
+        self._json({"state": "running", "kind": kind, "log": str(log)}, 202)
 
     def _assistant_post(self, path: str) -> None:
         rest = path[len("/api/v1/assistant/"):]

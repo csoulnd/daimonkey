@@ -122,7 +122,8 @@
           } else {
             btn.disabled = false;
             btn.textContent = orig;
-            alert("更新结束：" + s.state + (s.build_error ? "\n" + s.build_error : "\n详见 data/logs/"));
+            var detail = s.build_error || s.error;
+            alert("更新结束：" + s.state + (detail ? "\n" + detail : "\n详见 data/logs/"));
           }
         })
         .catch(function () { /* 瞬时网络问题，下个周期重试 */ });
@@ -177,4 +178,6 @@
   if (btnMain) bindUpdate(btnMain, "/api/v1/update");
   var btnNews = document.getElementById("btn-news-update");
   if (btnNews) bindUpdate(btnNews, "/api/v1/update/news");
+  var btnKb = document.getElementById("btn-kb-update");
+  if (btnKb) bindUpdate(btnKb, "/api/v1/update/knowledge");
 })();

@@ -1,6 +1,7 @@
 """验证更新密码鉴权；不启动真实采集任务。"""
 import hashlib
 import importlib.util
+import sys
 import tempfile
 import threading
 import unittest
@@ -49,6 +50,50 @@ class UpdateAuthTests(unittest.TestCase):
                     httpd.shutdown()
                     httpd.server_close()
                     thread.join()
+
+    def test_knowledge_update_spawns_sync_script(self):
+        """知识库按钮：202 且子进程命令指向 scripts/sync_knowledge.py。"""
+        with tempfile.TemporaryDirectory() as directory:
+            password_file = Path(directory) / "password.sha256"
+            password_file.write_text(hashlib.sha256(b"test-password").hexdigest())
+            fake_root = Path(directory) / "root"
+            with patch.object(server, "PASSWORD_FILE", password_file), \
+                    patch.object(server, "ROOT", fake_root), \
+                    patch.dict(server._proc, {"running": None, "kind": None}), \
+                    patch.object(server.subprocess, "Popen") as spawn:
+                spawn.return_value = Mock()
+                httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+                thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    conn = HTTPConnection(*httpd.server_address)
+                    conn.request("POST", "/api/v1/update/knowledge",
+                                 headers={"X-Update-Password": "test-password"})
+                    response = conn.getresponse()
+                    self.assertEqual(response.status, 202)
+                    response.read()
+                    conn.close()
+                finally:
+                    httpd.shutdown()
+                    httpd.server_close()
+                    thread.join()
+                spawn.assert_called_once()
+                cmd = spawn.call_args[0][0]
+                self.assertEqual(cmd[0], sys.executable)
+                self.assertTrue(str(cmd[1]).endswith("sync_knowledge.py"),
+                                f"应按知识库脚本执行: {cmd}")
+
+    def test_status_note_by_kind(self):
+        """运行中状态按 kind 标注（知识库/新闻/全量各自的提示语）。"""
+        running = Mock()
+        running.poll.return_value = None
+        cases = [("knowledge", "知识库"), ("news", "新闻"), ("full", "采集"), (None, "采集")]
+        for kind, expect in cases:
+            with self.subTest(kind=kind), \
+                    patch.dict(server._proc, {"running": running, "kind": kind}):
+                s = server.status_payload()
+                self.assertEqual(s["state"], "running")
+                self.assertIn(expect, s["note"])
 
     def test_assistant_session_cookie_grants_update(self):
         """一次登录完全权限：合法助手 Cookie 可直接触发更新（免密码）。"""

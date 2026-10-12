@@ -36,6 +36,7 @@
         <span class="asof-box">
           {% if knowledge_page %}
           <span class="asof">仓库快照 {{ kb.updated[:10] if kb.updated else '尚未同步' }} · {{ kb.short_commit }}</span>
+          <button id="btn-kb-update" type="button" title="从 GitHub 同步知识库代码仓（约 10~60 秒），不重采热度数据">⟳ 同步知识库</button>
           {% elif news_page %}
           <span class="asof" title="新闻与热度数据的最后采集时间">新闻截至 {{ news_meta.last_fetched_at | dt if news_meta.last_fetched_at else '暂无' }} · 热度截至 {{ meta.last_collected_at | dt if meta.last_collected_at else '暂无数据' }}</span>
           <button id="btn-news-update" type="button" title="仅采集新闻（约 1 分钟），不重采热度数据">⟳ 仅更新新闻</button>

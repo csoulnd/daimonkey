@@ -19,7 +19,9 @@ import yaml
 from .config import DATA_DIR, DIST_DIR
 
 REPO_DIR = DATA_DIR / "knowledge-repo"
-REPO_URL = "https://github.com/csoulnd/InferTechNote"
+REPO_URL = "https://github.com/csoulnd/InferTechNote"   # 展示链接（浏览器可访问）
+# 服务端 git 拉取地址：本机 HTTPS git 协议被阻断（ls-remote 超时），走 SSH（实测 ~5s）
+GIT_URL = "git@github.com:csoulnd/InferTechNote.git"
 GROUPS = {
     "agent": ("Agent", "业务设计、调研、实践报告与学习笔记"),
     "infra": ("Infra", "推理服务与基础设施工程"),

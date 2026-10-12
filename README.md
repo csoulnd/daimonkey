@@ -13,13 +13,14 @@
 
 与智能体热度指数同级入口：`/knowledge`。以 `csoulnd/InferTechNote` 为唯一内容源，提供目录树、全文搜索、Markdown 文章、图片、Mermaid 图表、本文目录与版本固定的 GitHub 原文链接。仅展示仓库概览、`agent/`、`infra/` 和 `knowledge/`；`templates/` 与隐藏配置不展示，仓库原文件保留；外部子模块不自动导入。
 
-快照位于 `data/knowledge-repo`。手动同步并重建（不采集热度数据）：
+快照位于 `data/knowledge-repo`。同步方式二选一：
 
-```bash
-.venv/bin/python scripts/sync_knowledge.py
-```
+- **网页按钮**：知识库页右上「⟳ 同步知识库」（登录态/密码同其他更新按钮，约 10~60 秒，不重采热度数据）；
+- **CLI**：`.venv/bin/python scripts/sync_knowledge.py`
 
-普通 `collector --build` / 热度更新会保留并重建已有知识库快照，不自动拉取 GitHub；服务器无法直连 GitHub 时可传入已核对 commit 的 Git 工作区快照，再执行 `collector --build`。同步失败时保留旧快照。
+两条路径都会写更新状态（mode=knowledge）、随 commit 变化刷新知识库 AI 摘要、失败保留旧快照并记录错误。**服务端 git 拉取走 SSH**（`collector/knowledge.py → GIT_URL`，本机 HTTPS git 协议被阻断实测超时；旧 HTTPS 工作区首次同步时自动迁移 remote）。
+
+普通 `collector --build` / 热度更新会保留并重建已有知识库快照，不自动拉取 GitHub。同步失败时保留旧快照。
 
 ## AI Agent 新闻汇总（第三个功能）
 
