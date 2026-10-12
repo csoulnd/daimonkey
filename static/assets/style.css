@@ -559,8 +559,8 @@ tr:first-child .rank { color: var(--ink); }
 .asst-s-acts button:last-child:hover { color: var(--down); }
 .asst-s-empty { color: var(--dim); font-size: var(--fs-xs); cursor: default; }
 .asst-side-col .asst-usage {
-  flex-direction: column; gap: 2px; border-top: 1px solid var(--line);
-  padding-top: 6px; border-top: 1px solid var(--line);
+  flex-direction: column; gap: 2px;
+  border-top: 1px solid var(--line); padding-top: 6px;
 }
 .asst-chat-col {
   display: flex; flex-direction: column; gap: var(--sp-2); min-height: 0;

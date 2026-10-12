@@ -92,15 +92,7 @@
     state.open = true;
     $("asst-panel").hidden = false;
     $("asst-pet").classList.add("hide");
-    refreshAll();
-    if (!state.sessionId) {
-      api("/sessions").then(function (res) {
-        if (res.status === 401) return; // 未登录也能看面板，动作时再登录
-        if (res.ok && res.body.sessions && res.body.sessions.length) {
-          selectSession(res.body.sessions[0].id);
-        }
-      });
-    }
+    refreshAll();  // refreshSessions 在无当前会话时自动选中最近一个
     $("asst-input").focus();
   }
   function closePanel() {
@@ -126,6 +118,7 @@
       var sessions = res.body.sessions || [];
       sessions.forEach(function (s) {
         var li = el("li", s.id === state.sessionId ? "on" : "");
+        li.dataset.sid = String(s.id);  // selectSession 高亮同步依赖此标记
         var title = el("span", "asst-s-title", (s.title || ("会话 " + s.id)));
         title.title = s.title || "";
         li.appendChild(title);
@@ -155,9 +148,21 @@
       }
     });
   }
+  /* 会话切换：高亮同步 + 异步竞态防护（晚到的旧响应不再覆盖新内容） */
+  var selectGeneration = 0;
+
+  function highlightSession() {
+    document.querySelectorAll("#asst-session-list li").forEach(function (li) {
+      li.classList.toggle("on", li.dataset.sid === String(state.sessionId));
+    });
+  }
+
   function selectSession(id) {
     state.sessionId = id;
+    highlightSession();
+    var generation = ++selectGeneration;
     api("/sessions/" + id + "/messages").then(function (res) {
+      if (generation !== selectGeneration) return;  // 已切走，丢弃过期响应
       if (res.ok) renderMessages(res.body.messages || []);
     });
   }
