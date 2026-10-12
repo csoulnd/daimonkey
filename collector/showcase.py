@@ -1,23 +1,21 @@
-"""产品调研展示（showcase）：构建时从知识库快照导入 Markdown 的报告形态。
+"""产品调研展示（showcase）：汇报型展示页——构建时从知识库快照导入 Markdown。
 
-定位：InferTechNote 是研究内容的唯一来源；本模块只做"呈现"。页面内容在构建
-时从 data/knowledge-repo 导入（章节级抽取 + 链接重写 + 事实/判断标记），不在
-网站侧另行维护一套文案；文档更新经知识库同步 + 建站后自动反映到页面。
+定位：InferTechNote 是研究内容的唯一来源；本模块把多份调研文档**选材、提炼、
+聚合**为一页汇报（四段式：产品 A → 产品 B → 对比 → 架构提炼）。事实内容全部
+构建时导入；呈现层（开篇概览、章要点、讲稿）只做提炼与组织，不新造事实。
 
 报告目录（reports/{slug}/）：
-    showcase.yaml      清单映射：源文档、章节选择、交互图组件、步骤高亮
-    diagram.svg        交互架构图（呈现层资产；研究出处为文档 Mermaid 研究视图）
+    showcase.yaml   汇报结构：chapters（章）/ docs（源文档表）/ diagrams（交互图表）
+    diagram*.svg    各交互图（呈现层研究视图）
+    notes.md        讲稿（逐章口播稿，渲染到 /notes/{slug}，登录可见）
+    content-issues.md  内容问题记录（交回研究侧）
 
-导入规则：
-- 章节抽取：按 Markdown 标题文本（## 或 ###）模糊匹配定位，缺章节只警告并
-  在页面标注"文档已变更"，不阻断建站；
-- 链接重写：仓库内相对链接 → /knowledge/notes 页面；库外链接（如 .agents/）
-  → 版本固定的 GitHub 链接；外部链接原样保留；
-- Mermaid 代码块不入页面（由交互视图承载），原图入口指向知识库原文；
-- "**研究判断：**" 段落加显著样式，与事实陈述区分；待验证事项区独立标注。
-
-内容问题（发现源文档的笔误/引用问题）记录在本报告目录的 content-issues.md，
-交回研究侧处理，本模块不改动源文档。
+导入规则（与 research→presentation 边界一致）：
+- 章节抽取：标题模糊匹配，缺章节只警告并在页面标注，不阻断建站；
+- table_filter：对比类表格按行收窄（只保留指定产品行）；
+- flow 模式：图 + 执行步骤合并为一个卡片（点步骤高亮同图节点，点节点看说明）；
+- 链接重写：库内 → /knowledge/notes；库外 → GitHub 版本固定链接；外链保留；
+- Mermaid 不入页面（交互图承载），判断标记样式化，「研究阶段」小节不展示。
 """
 from __future__ import annotations
 
@@ -41,24 +39,6 @@ MERMAID_RE = re.compile(r"```mermaid\b[\s\S]*?```\n?")
 HEADING_RE = re.compile(r"^(#{2,4})\s+(.+?)\s*$", re.M)
 JUDGMENT_MARK = "<strong>研究判断：</strong>"
 PARA_RE = re.compile(r"<p>(.*?)</p>", re.S)
-
-
-def _mark_judgments(html: str) -> str:
-    """让「研究判断」与事实陈述视觉区分（只加样式，不改文案）。
-
-    段落以标记开头 → 整段标记；标记在段落中间（前有事实句）→ 仅标记判断
-    部分，避免把事实句也罩进判断样式。
-    """
-    def one(match: re.Match) -> str:
-        inner = match.group(1)
-        if JUDGMENT_MARK not in inner:
-            return match.group(0)
-        if inner.startswith(JUDGMENT_MARK):
-            return f'<p class="mark-judgment">{inner}</p>'
-        before, _, after = inner.partition(JUDGMENT_MARK)
-        return (f'<p>{before}<span class="mark-judgment-inline">{JUDGMENT_MARK}'
-                f'{after}</span></p>')
-    return PARA_RE.sub(one, html)
 
 
 def _norm_heading(text: str) -> str:
@@ -92,6 +72,34 @@ def extract_section(body: str, heading: str) -> tuple[str | None, str | None]:
     return None, f"未找到章节「{heading}」"
 
 
+# ---- 表格行收窄（对比章只保留目标产品行） ----
+
+def filter_table_rows(md_text: str, keywords: list[str]) -> str:
+    """按首列关键词过滤 Markdown 表格数据行（表头与分隔行保留）。"""
+    lines = md_text.splitlines()
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        if not lines[i].strip().startswith("|"):
+            out.append(lines[i])
+            i += 1
+            continue
+        block = []
+        while i < len(lines) and lines[i].strip().startswith("|"):
+            block.append(lines[i])
+            i += 1
+        if len(block) < 2:
+            out.extend(block)
+            continue
+        kept = [block[0], block[1]]
+        for row in block[2:]:
+            first_cell = row.strip().strip("|").split("|")[0].strip()
+            if any(kw in first_cell for kw in keywords):
+                kept.append(row)
+        out.extend(kept)
+    return "\n".join(out)
+
+
 # ---- 链接重写：仓库内 → 知识库页面；库外 → 版本固定 GitHub ----
 
 def _github_blob(rel_path: str, commit: str) -> str:
@@ -123,7 +131,6 @@ class _LinkRewriter(HTMLParser):
             return note_url(target) + suffix
         if target.rstrip("/") + "/README.md" in self.known:
             return note_url(target.rstrip("/") + "/README.md") + suffix
-        # 库内但不在展示范围（如 .agents/），或库外路径：给版本固定的原文链接
         return _github_blob(target, self.commit) + suffix
 
     def handle_starttag(self, tag, attrs):
@@ -152,9 +159,22 @@ class _LinkRewriter(HTMLParser):
         self.output.append("&#" + name + ";")
 
 
-def render_md(text: str, doc_rel: str, known: set[str], commit: str,
-              *, keep_ids: bool = True) -> str:
-    """Markdown → 清洗后的 HTML（含链接重写与研究判断标记）。"""
+def _mark_judgments(html: str) -> str:
+    """「研究判断」与事实陈述视觉区分（只加样式，不改文案）。"""
+    def one(match: re.Match) -> str:
+        inner = match.group(1)
+        if JUDGMENT_MARK not in inner:
+            return match.group(0)
+        if inner.startswith(JUDGMENT_MARK):
+            return f'<p class="mark-judgment">{inner}</p>'
+        before, _, after = inner.partition(JUDGMENT_MARK)
+        return (f'<p>{before}<span class="mark-judgment-inline">{JUDGMENT_MARK}'
+                f'{after}</span></p>')
+    return PARA_RE.sub(one, html)
+
+
+def render_md(text: str, doc_rel: str, known: set[str], commit: str) -> str:
+    """Markdown → 清洗后的 HTML（链接重写 + 研究判断标记）。"""
     md = markdown.Markdown(
         extensions=["fenced_code", "tables", "sane_lists", "footnotes"],
         extension_configs={})
@@ -170,15 +190,21 @@ def render_md(text: str, doc_rel: str, known: set[str], commit: str,
     return _mark_judgments("".join(rewrite.output))
 
 
+def render_inline(text: str, doc_rel: str, known: set[str], commit: str) -> str:
+    """行内片段（要点卡文字）：渲染后去掉外层 <p>。"""
+    out = render_md(text, doc_rel, known, commit).strip()
+    if out.startswith("<p>") and out.endswith("</p>") and out.count("<p>") == 1:
+        out = out[3:-4]
+    return out
+
+
 # ---- 结构化抽取：组件表 / 步骤列表 ----
 
-def parse_component_table(body: str) -> dict[str, str]:
-    """从「## 软件架构」首个含"关键部分"的表提取组件职责：{行首列: 职责描述}。"""
-    seg, _ = extract_section(body, "软件架构")
-    source = seg if seg is not None else body
+def parse_component_table(body: str, header_keyword: str = "关键部分") -> dict[str, str]:
+    """提取组件/职责表：{行首列: 其余列合并}（说明引自文档、单一来源）。"""
     rows: dict[str, str] = {}
     header_seen = False
-    for line in source.splitlines():
+    for line in body.splitlines():
         stripped = line.strip()
         if not stripped.startswith("|"):
             header_seen = False if stripped else header_seen
@@ -187,17 +213,18 @@ def parse_component_table(body: str) -> dict[str, str]:
         if len(cells) < 2:
             continue
         if not header_seen:
-            if "关键部分" in cells[0]:
+            if header_keyword in cells[0]:
                 header_seen = True
             continue
-        if set(cells[0]) <= set("-: "):      # 分隔行
+        if set(cells[0]) <= set("-: "):
             continue
-        rows[cells[0]] = cells[1]
+        rows[cells[0]] = " ｜ ".join(cells[1:])
     return rows
 
 
-def extract_steps(section_md: str) -> list[str]:
-    """从章节 md 中提取有序列表步骤（含续行），返回 md 段落列表。"""
+def extract_steps(section_md: str, known: set[str], doc_rel: str,
+                  commit: str) -> list[str]:
+    """从章节 md 提取有序列表步骤（含续行），返回渲染后的 HTML 列表。"""
     steps: list[str] = []
     current: list[str] = []
     for line in section_md.splitlines():
@@ -213,13 +240,12 @@ def extract_steps(section_md: str) -> list[str]:
                 current = []
     if current:
         steps.append("\n".join(current).strip())
-    return steps
+    return [render_md(s, doc_rel, known, commit) for s in steps]
 
 
-# ---- 主入口 ----
+# ---- 知识库环境 ----
 
 def _known_paths() -> set[str]:
-    """知识库展示范围内的全部 .md 路径（文件系统枚举，不逐文件跑 git）。"""
     known: set[str] = set()
     if not KB_REPO.is_dir():
         return known
@@ -244,8 +270,91 @@ def _commit() -> str:
         return "main"
 
 
+# ---- 主入口 ----
+
+def _load_docs(conf: dict, known: set[str], commit: str) -> tuple[dict, list[str]]:
+    """加载 docs 注册表中的全部源文档：{key: {rel, body, meta}}。"""
+    from .knowledge import split_frontmatter
+    docs: dict[str, dict] = {}
+    warnings: list[str] = []
+    for key, rel in (conf.get("docs") or {}).items():
+        path = KB_REPO / str(rel)
+        if not path.is_file():
+            warnings.append(f"[showcase] 源文档不存在: {rel}（先同步知识库）")
+            continue
+        meta, body = split_frontmatter(path.read_text(encoding="utf-8"))
+        docs[str(key)] = {"rel": str(rel), "body": body, "meta": meta,
+                          "kb_url": note_url(str(rel)),
+                          "gh_url": _github_blob(str(rel), commit)}
+    return docs, warnings
+
+
+def _load_diagrams(conf: dict, report_dir: Path, docs: dict,
+                   known: set[str], commit: str) -> tuple[dict, list[str]]:
+    """加载 diagrams 注册表：svg 内容 + 组件说明（desc_key → 文档表行）。"""
+    diagrams: dict[str, dict] = {}
+    warnings: list[str] = []
+    for key, spec in (conf.get("diagrams") or {}).items():
+        key = str(key)
+        d = dict(spec)
+        svg_file = report_dir / str(d.get("file", "diagram.svg"))
+        d["svg"] = svg_file.read_text(encoding="utf-8") if svg_file.is_file() else ""
+        if not d["svg"]:
+            warnings.append(f"[showcase] 缺少交互图文件: {d.get('file')}")
+        table: dict[str, str] = {}
+        table_doc = docs.get(str(d.get("desc_table_from", "")))
+        if table_doc:
+            table = parse_component_table(
+                table_doc["body"], str(d.get("desc_table_header", "关键部分")))
+        components = []
+        for comp in d.get("components") or []:
+            ckey = comp.get("desc_key")
+            desc_html = ""
+            if ckey and table:
+                row = table.get(str(ckey)) or next(
+                    (v for k, v in table.items()
+                     if _norm_heading(str(ckey)) in _norm_heading(k)), None)
+                if row is None:
+                    warnings.append(f"[showcase] 组件表未找到行: {ckey}")
+                elif table_doc:
+                    desc_html = render_inline(row, table_doc["rel"], known, commit)
+            components.append({**comp, "desc_html": desc_html,
+                               "desc_source": "doc-table" if desc_html else "view-note"})
+        d["components"] = components
+        d["doc_url"] = table_doc["kb_url"] if table_doc else ""
+        diagrams[key] = d
+    return diagrams, warnings
+
+
+def _render_points(points: list | None, docs: dict, known: set[str], commit: str,
+                   warnings: list[str]) -> list[dict]:
+    """要点卡：呈现层提炼；文本为行内 Markdown，可附 ★ 原文锚点。"""
+    out = []
+    for p in points or []:
+        if isinstance(p, str):
+            p = {"text": p}
+        anchor = p.get("anchor")  # "doc_key#标题"
+        href = ""
+        if anchor:
+            key, _, heading = str(anchor).partition("#")
+            doc = docs.get(key)
+            if doc and heading:
+                href = doc["kb_url"] + "#" + quote(slugify_unicode(heading, "-"), safe="")
+            elif doc:
+                href = doc["kb_url"]
+            else:
+                warnings.append(f"[showcase] 要点锚点引用了未知文档: {key}")
+        rel = docs.get(str(anchor).partition("#")[0], {}).get("rel", "")
+        out.append({
+            "html": render_inline(str(p.get("text", "")), rel, known, commit),
+            "kind": str(p.get("kind", "plain")),
+            "href": href,
+        })
+    return out
+
+
 def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
-    """读取报告目录的 showcase.yaml，导入内容；返回 (模板上下文, 警告列表)。"""
+    """读取报告目录的 showcase.yaml，导入并组织汇报内容。"""
     warnings: list[str] = []
     conf_file = report_dir / "showcase.yaml"
     try:
@@ -255,99 +364,143 @@ def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
     conf = conf.get("showcase") or {}
     commit = _commit()
     known = _known_paths()
+    docs, w = _load_docs(conf, known, commit)
+    warnings.extend(w)
+    if not docs:
+        return {"showcase_error": "未配置可用的源文档（先同步知识库）"}, warnings
+    diagrams, w = _load_diagrams(conf, report_dir, docs, known, commit)
+    warnings.extend(w)
 
-    # 源文档（当前活跃产品；pending 产品只作进度展示）
-    products = conf.get("products") or []
-    active = next((p for p in products if p.get("status") == "ready"), None)
-    if active is None:
-        return ({"showcase_error": "showcase.yaml 未配置 status: ready 的产品",
-                 "products": products}, [])
-    detail_rel = str(active.get("detail_doc", ""))
-    summary_rel = str(active.get("summary_doc", ""))
-    detail_path = KB_REPO / detail_rel
-    if not detail_path.is_file():
-        msg = f"源文档不存在: {detail_rel}（先同步知识库）"
-        return {"showcase_error": msg, "products": products}, [msg]
-    detail_body = detail_path.read_text(encoding="utf-8")
-    # 去 frontmatter
-    from .knowledge import split_frontmatter
-    _, detail_body = split_frontmatter(detail_body)
+    def section_source(doc_key: str, heading: str) -> dict:
+        doc = docs.get(doc_key, {})
+        return {
+            "kb_url": doc.get("kb_url", ""),
+            "gh_url": doc.get("gh_url", ""),
+            "anchor": quote(slugify_unicode(heading, "-"), safe="") if heading else "",
+        }
 
-    fingerprint = hashlib.sha256()
-    for rel in (detail_rel, summary_rel):
-        p = KB_REPO / rel
-        if p.is_file():
-            fingerprint.update(p.read_bytes())
-    fp = fingerprint.hexdigest()[:10]
+    chapters = []
+    for ch_spec in conf.get("chapters") or []:
+        chapter = {"id": str(ch_spec["id"]), "num": str(ch_spec.get("num", "")),
+                   "title": str(ch_spec.get("title", "")),
+                   "gist": str(ch_spec.get("gist", "")),
+                   "lead": str(ch_spec.get("lead", "")),
+                   "points": _render_points(ch_spec.get("points"), docs, known,
+                                            commit, warnings),
+                   "sections": []}
+        used_docs: list[str] = []
+        for spec in ch_spec.get("sections") or []:
+            doc_key = str(spec.get("from", ""))
+            doc = docs.get(doc_key)
+            if doc is None:
+                warnings.append(f"[showcase] 章节引用了未知文档: {doc_key}")
+                continue
+            if doc_key not in used_docs:
+                used_docs.append(doc_key)
+            heading = str(spec.get("heading", ""))
+            item = {"id": str(spec["id"]), "title": str(spec.get("title", "")),
+                    "mode": str(spec.get("mode", "full")),
+                    "auxiliary": bool(spec.get("auxiliary")),
+                    "missing": None, "src": section_source(doc_key, heading)}
+            rel, body = doc["rel"], doc["body"]
+            if item["mode"] == "fold":
+                items = []
+                for fold in spec.get("items") or []:
+                    fdoc = docs.get(str(fold.get("from", "")))
+                    if fdoc is None:
+                        warnings.append(f"[showcase] 折叠项引用未知文档: {fold.get('from')}")
+                        continue
+                    seg, warn = extract_section(fdoc["body"], str(fold.get("heading", "")))
+                    if warn:
+                        warnings.append(f"[showcase] {warn}（文档可能已变更）")
+                        continue
+                    items.append({"label": str(fold.get("label", "")),
+                                  "html": render_md(MERMAID_RE.sub("", seg).strip(),
+                                                    fdoc["rel"], known, commit)})
+                item["folds"] = items
+            elif item["mode"] in ("diagram", "flow"):
+                dkey = str(spec.get("diagram", ""))
+                diagram = diagrams.get(dkey)
+                if diagram is None:
+                    warnings.append(f"[showcase] 章节引用了未知图: {dkey}")
+                    item["missing"] = f"未知图 {dkey}"
+                else:
+                    item["diagram"] = diagram
+                if item["mode"] == "flow":
+                    seg, warn = extract_section(body, heading)
+                    if warn:
+                        warnings.append(f"[showcase] {warn}（文档可能已变更）")
+                        item["steps"] = []
+                    else:
+                        item["steps"] = extract_steps(
+                            MERMAID_RE.sub("", seg).strip(), known, rel, commit)
+            else:
+                seg, warn = extract_section(body, heading)
+                if warn:
+                    warnings.append(f"[showcase] {warn}（文档可能已变更）")
+                    item["missing"] = warn
+                else:
+                    md_text = MERMAID_RE.sub("", seg).strip()
+                    flt = spec.get("table_filter")
+                    if flt:
+                        md_text = filter_table_rows(md_text, [str(k) for k in flt])
+                    if spec.get("compact"):
+                        # 精简节：去掉首行导语（文档的"阅读路线"类句子）
+                        lines = md_text.splitlines()
+                        if lines and not lines[0].strip().startswith(("|", "#", "-", "*")):
+                            md_text = "\n".join(lines[1:]).strip()
+                    item["html"] = render_md(md_text, rel, known, commit)
+            chapter["sections"].append(item)
+        chapter["src_links"] = [{"label": docs[k]["rel"].split("/")[-2],
+                                 "kb_url": docs[k]["kb_url"],
+                                 "gh_url": docs[k]["gh_url"]} for k in used_docs]
+        chapters.append(chapter)
 
-    # 章节导入
-    sections = []
-    for spec in conf.get("sections") or []:
-        heading = str(spec.get("heading", ""))
-        seg, warn = extract_section(detail_body, heading)
+    # 参考来源：链接行 + 折叠表
+    sources_links = [{"label": f"{Path(d['rel']).parent.name}/{Path(d['rel']).name}",
+                      "kb_url": d["kb_url"], "gh_url": d["gh_url"]}
+                     for d in docs.values()]
+    sources_folds = []
+    for fold in conf.get("sources_folds") or []:
+        doc = docs.get(str(fold.get("from", "")))
+        if doc is None:
+            warnings.append(f"[showcase] 来源折叠引用未知文档: {fold.get('from')}")
+            continue
+        seg, warn = extract_section(doc["body"], str(fold.get("heading", "参考来源")))
         if warn:
             warnings.append(f"[showcase] {warn}（文档可能已变更）")
-            sections.append({**spec, "missing": warn})
             continue
-        md_text = MERMAID_RE.sub("", seg).strip()
-        item = {**spec, "missing": None}
-        if spec.get("mode") == "steps":
-            raw_steps = extract_steps(md_text)
-            item["steps"] = [render_md(s, detail_rel + "#" + heading, known, commit)
-                             for s in raw_steps]
-            item["step_count"] = len(raw_steps)
-        else:
-            item["html"] = render_md(md_text, detail_rel + "#" + heading,
-                                     known, commit)
-        sections.append(item)
+        sources_folds.append({"label": str(fold.get("label", "来源表")),
+                              "html": render_md(MERMAID_RE.sub("", seg).strip(),
+                                                doc["rel"], known, commit)})
 
-    # 交互图：组件说明来自文档组件表（desc_key）。「关键部分」表在 summary，
-    # 七维模型表在 detail——两张表都尝试提取，按行首列建索引。
-    diagram = conf.get("diagram") or {}
-    table = parse_component_table(detail_body)
-    summary_body = ""
-    summary_path = KB_REPO / summary_rel
-    if summary_path.is_file():
-        from .knowledge import split_frontmatter as _sf
-        _, summary_body = _sf(summary_path.read_text(encoding="utf-8"))
-    for key, desc in parse_component_table(summary_body).items():
-        table.setdefault(key, desc)
-    components = []
-    for comp in diagram.get("components") or []:
-        desc_html = ""
-        key = comp.get("desc_key")
-        if key:
-            row = table.get(key)
-            if row is None:
-                row = next((v for k, v in table.items()
-                            if _norm_heading(str(key)) in _norm_heading(k)), None)
-            if row is None:
-                warnings.append(f"[showcase] 组件表未找到行: {key}")
-            else:
-                desc_html = render_md(row, detail_rel, known, commit)
-        components.append({**comp, "desc_html": desc_html,
-                           "desc_source": "doc-table" if desc_html else "view-note"})
-    diagram["components"] = components
-    svg_file = report_dir / str(diagram.get("file", "diagram.svg"))
-    diagram["svg"] = svg_file.read_text(encoding="utf-8") if svg_file.is_file() else ""
-    if not diagram["svg"]:
-        warnings.append("[showcase] 缺少交互图文件 diagram.svg")
+    fingerprint = hashlib.sha256()
+    for d in docs.values():
+        fingerprint.update((KB_REPO / d["rel"]).read_bytes())
 
     ctx = {
         "showcase_error": None,
-        "conf": conf,
-        "products": products,
-        "baseline": active.get("baseline", ""),
-        "product_name": active.get("name", ""),
-        "sections": sections,
-        "diagram": diagram,
-        "fingerprint": fp,
-        "detail_rel": detail_rel,
-        "summary_rel": summary_rel,
-        "detail_kb_url": note_url(detail_rel),
-        "summary_kb_url": note_url(summary_rel),
-        "detail_github_url": _github_blob(detail_rel, commit),
-        "summary_github_url": _github_blob(summary_rel, commit),
+        "sc_title": str(conf.get("title", "调研展示")),
+        "sc_subtitle": str(conf.get("subtitle", "")),
+        "overview": {
+            "title": str((conf.get("overview") or {}).get("title", "一页看懂")),
+            "points": _render_points((conf.get("overview") or {}).get("points"),
+                                     docs, known, commit, warnings),
+        },
+        "chapters": chapters,
+        "sources": {"links": sources_links, "folds": sources_folds},
+        "notes_url": f"/notes/{report_dir.name}",
         "short_commit": commit[:8],
     }
     return ctx, warnings
+
+
+def render_notes(notes_file: Path, known: set[str], commit: str) -> str:
+    """讲稿 Markdown → HTML（不重写链接，讲稿允许直接出现裸链接）。"""
+    md = markdown.Markdown(extensions=["fenced_code", "tables", "sane_lists"],
+                           extension_configs={})
+    fragment = md.convert(notes_file.read_text(encoding="utf-8"))
+    return bleach.clean(fragment, tags=TAGS, attributes={
+        "*": ["id", "class"], "a": ["href", "title"],
+        "th": ["align"], "td": ["align"], "ol": ["start"],
+    }, protocols={"http", "https", "mailto"}, strip=True)

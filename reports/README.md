@@ -30,7 +30,10 @@ reports/
 | `.pptx` | 演示文稿原件下载（网页化在线预览为 Roadmap 项） | 正式 PPT 汇报 |
 | `showcase.yaml` | **调研展示**：构建时从知识库快照导入 Markdown 生成交互式展示页 | 产品调研文档的网页化呈现（见 `agentcore-platforms/`） |
 
-**调研展示（showcase）**：内容唯一来源是知识库里的研究文档，构建时导入、不在网站侧另写文案；支持章节映射、交互架构图（缩放/组件说明/步骤联动/全屏）、事实与研究判断的样式区分、来源与版本固定链接。落地与巡检规则见 `skills/product-showcase/SKILL.md`；引擎在 `collector/showcase.py`。展示侧不改源文档，内容问题记入报告的 `content-issues.md` 交回研究侧。
+**调研展示（showcase）**：汇报型展示页。内容唯一来源是知识库里的研究文档，构建时导入、不在网站侧另写文案；事实/研究判断样式区分、来源与版本固定链接保留。落地与巡检规则见 `skills/product-showcase/SKILL.md`；引擎在 `collector/showcase.py`。展示侧不改源文档，内容问题记入报告的 `content-issues.md` 交回研究侧。
+
+- **`showcase.yaml` 结构**：`docs`（源文档注册表）→ `chapters`（汇报章节：导语/要点卡/小节）→ `diagrams`（多张交互图）→ `overview`（开篇概览）→ `sources_folds`（折叠来源表）。小节支持 `table_filter`（对比表按产品行收窄）、`compact`（去掉由图承载的引导句）、`mode: flow`（图+步骤同屏闭环）、`mode: fold`（折叠块）；要点卡 `points` 每条带 `kind`（fact/judgment/plain）与 ★ 原文锚点。
+- **讲稿页**：报告目录放 `notes.md`（逐章口播稿），构建时渲染到 `/notes/{slug}`——**登录可见**（serve.py 对 `/notes/` 前缀复用助手会话鉴权，未登录 401 提示页，响应带 `X-Robots-Tag: noindex`）；公开演示页不放入口。
 
 ## 新增一份报告
 

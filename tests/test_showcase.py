@@ -1,6 +1,6 @@
-"""调研展示（showcase）：章节抽取、链接重写、判断标记、步骤/组件表解析、端到端导入。
+"""调研展示（showcase）汇报结构：章节/表格收窄/flow 合并/要点卡/折叠来源/讲稿。
 
-全部使用临时目录 fixture（patch KB_REPO），不依赖真实知识库快照。
+全部临时目录 fixture（patch KB_REPO），不依赖真实知识库快照。
 """
 import sys
 import tempfile
@@ -27,10 +27,6 @@ DETAIL_FIXTURE = textwrap.dedent("""\
     **研究判断：**整段判断。
 
     ## 软件架构
-
-    ### “七层”实际上对应两种不同表述
-
-    两种表述说明段。
 
     ### 执行关系
 
@@ -61,12 +57,35 @@ SUMMARY_FIXTURE = textwrap.dedent("""\
     ---
     # 测试摘要
 
-    ## 软件架构：按需组合
-
     | 关键部分 | 职责与关系 |
     |---|---|
     | Runtime | 承载执行环境与会话生命周期 |
     | Harness / 用户应用 | 托管循环或自带框架 |
+""")
+
+COMPARISON_FIXTURE = textwrap.dedent("""\
+    ---
+    title: 对照
+    ---
+    # 对照
+
+    ## 产品定位怎样影响软件架构
+
+    | 产品 | 核心问题 | 架构重点 |
+    |---|---|---|
+    | 阿里云 AgentCore | 统一接入与管理 | Workspace 资产 |
+    | Amazon AgentCore | 接入运行与治理 | 服务原语组合 |
+    | Dify | 做成业务流程 | 应用定义与流程 |
+    | Pi Agent | 改造嵌入循环 | 组件拆分 |
+
+    表后说明段。
+
+    ## 从产品中提炼的软件职责
+
+    | 职责 | 需要回答的问题 | 可借鉴的产品方向 |
+    |---|---|---|
+    | 产品接入 | 谁能调用 | 云平台 Endpoint |
+    | 运行基础设施 | 谁负责隔离 | Runtime、沙箱 |
 """)
 
 
@@ -79,9 +98,10 @@ class ShowcaseFixture(unittest.TestCase):
         (self.kb / "agent").mkdir(parents=True)
         (self.kb / "agent" / "detail.md").write_text(DETAIL_FIXTURE, encoding="utf-8")
         (self.kb / "agent" / "summary.md").write_text(SUMMARY_FIXTURE, encoding="utf-8")
-        (self.kb / "README.md").write_text("# 索引\n", encoding="utf-8")
+        (self.kb / "agent" / "comparison.md").write_text(COMPARISON_FIXTURE, encoding="utf-8")
         self.report_dir = base / "report"
         self.report_dir.mkdir()
+        (self.report_dir / "diagram.svg").write_text("<svg></svg>", encoding="utf-8")
         import collector.showcase as showcase
         self.mod = importlib.reload(showcase)
         self._patches = [
@@ -96,123 +116,139 @@ class ShowcaseFixture(unittest.TestCase):
             p.stop()
         self._tmp.cleanup()
 
-    # ---- 章节抽取 ----
+    def write_conf(self, text: str):
+        (self.report_dir / "showcase.yaml").write_text(
+            textwrap.dedent(text), encoding="utf-8")
 
-    def test_extract_section_with_quotes_and_nesting(self):
-        seg, warn = self.mod.extract_section(DETAIL_FIXTURE, "“七层”实际上对应两种不同表述")
+    # ---- 基础抽取与渲染 ----
+
+    def test_extract_and_mark(self):
+        seg, warn = self.mod.extract_section(DETAIL_FIXTURE, "产品定位与边界")
         self.assertIsNone(warn)
-        self.assertIn("两种表述说明段", seg)
-        self.assertNotIn("图后解释段", seg)      # 在下一同级标题处截断
-        # 二级标题抽取到全部子节
-        seg2, _ = self.mod.extract_section(DETAIL_FIXTURE, "软件架构")
-        self.assertIn("执行关系", seg2)
+        html = self.mod.render_md(seg, "agent/detail.md", set(), "abc")
+        self.assertIn("mark-judgment-inline", html)   # 段中判断
+        self.assertIn('class="mark-judgment"', html)  # 段首整段判断
 
-    def test_extract_section_missing_returns_warning(self):
-        seg, warn = self.mod.extract_section(DETAIL_FIXTURE, "不存在的章节")
-        self.assertIsNone(seg)
-        self.assertIn("未找到章节", warn)
-
-    # ---- 渲染：判断标记 / 链接重写 / mermaid 剥离 ----
-
-    def test_render_marks_judgments_both_positions(self):
-        html = self.mod.render_md(
-            "事实句。[B1](https://x.com) **研究判断：**句尾判断。\n\n"
-            "**研究判断：**整段判断。", "agent/detail.md", set(), "abc")
-        self.assertIn('<span class="mark-judgment-inline">', html)   # 段中
-        self.assertIn('<p class="mark-judgment">', html)             # 段首整段
-        self.assertIn("事实句", html)                                  # 事实句未被罩入样式
+    def test_table_filter_keeps_only_target_rows(self):
+        seg, _ = self.mod.extract_section(COMPARISON_FIXTURE, "产品定位怎样影响软件架构")
+        filtered = self.mod.filter_table_rows(seg, ["阿里云 AgentCore", "Amazon AgentCore"])
+        self.assertIn("阿里云 AgentCore", filtered)
+        self.assertIn("Amazon AgentCore", filtered)
+        self.assertNotIn("Dify", filtered)
+        self.assertNotIn("Pi Agent", filtered)
+        self.assertIn("表后说明段", filtered)          # 非表格内容不受影响
 
     def test_render_rewrites_links(self):
-        known = {"agent/detail.md", "agent/summary.md", "README.md"}
+        known = {"agent/detail.md", "agent/summary.md"}
         html = self.mod.render_md(
-            "[摘要](summary.md) [索引](../README.md) [外部](https://example.com) "
+            "[摘要](summary.md) [外部](https://example.com) "
             "[库外](../../.agents/skills/x/SKILL.md)",
             "agent/detail.md", known, "abc123")
         self.assertIn('/knowledge/notes/agent/summary.html', html)
-        self.assertIn('/knowledge/notes/README.html', html)
         self.assertIn('href="https://example.com"', html)
-        self.assertIn('github.com/csoulnd/InferTechNote/blob/abc123/', html)  # 库外 → 固定链接
+        self.assertIn('github.com/csoulnd/InferTechNote/blob/abc123/', html)
 
-    def test_mermaid_stripped_in_import(self):
-        report_conf = self.report_dir / "showcase.yaml"
-        report_conf.write_text(textwrap.dedent("""\
-            showcase:
-              title: t
-              products:
-                - {key: k, name: N, status: ready,
-                   detail_doc: agent/detail.md, summary_doc: agent/summary.md}
-              sections:
-                - {id: rel, title: 执行关系, heading: 执行关系, mode: diagram}
-              diagram:
-                components: []
-        """), encoding="utf-8")
-        (self.report_dir / "diagram.svg").write_text("<svg></svg>", encoding="utf-8")
-        ctx, warnings = self.mod.load_showcase(self.report_dir)
-        self.assertEqual(warnings, [])
-        # 抽取的来源 markdown 中 mermaid 已剥离（html 不入页面，由交互图承载）
-        self.assertNotIn("flowchart", str(ctx["sections"]))
-
-    # ---- 步骤与组件表 ----
-
-    def test_extract_steps_with_continuation(self):
+    def test_extract_steps(self):
         seg, _ = self.mod.extract_section(DETAIL_FIXTURE, "一次请求如何执行")
-        steps = self.mod.extract_steps(seg)
+        steps = self.mod.extract_steps(seg, set(), "agent/detail.md", "abc")
         self.assertEqual(len(steps), 3)
         self.assertIn("续行", steps[1])
 
-    def test_parse_component_table(self):
-        rows = self.mod.parse_component_table(SUMMARY_FIXTURE)
-        self.assertEqual(rows["Runtime"], "承载执行环境与会话生命周期")
-        self.assertIn("Harness / 用户应用", rows)
+    # ---- 汇报结构端到端 ----
 
-    # ---- 端到端导入 ----
-
-    def test_load_showcase_end_to_end(self):
-        (self.report_dir / "diagram.svg").write_text("<svg data-x='1'></svg>", encoding="utf-8")
-        (self.report_dir / "showcase.yaml").write_text(textwrap.dedent("""\
+    def test_load_chapters_flow_and_points(self):
+        self.write_conf("""
             showcase:
-              title: 测试展示
-              stage_note: 测试
-              products:
-                - {key: k, name: 测试产品, status: ready, baseline: 基线 2026-10-10,
-                   detail_doc: agent/detail.md, summary_doc: agent/summary.md}
-              sections:
-                - {id: pos, title: 定位, heading: 产品定位与边界, group: 定位}
-                - {id: flow, title: 执行, heading: 一次请求如何执行, mode: steps, group: 执行路径}
-                - {id: gone, title: 缺失, heading: 不存在章节}
-              diagram:
-                file: diagram.svg
-                components:
-                  - {id: runtime, label: Runtime, desc_key: Runtime}
-                  - {id: caller, label: 调用方, desc_note: 视图定位}
-                step_highlights: {"1": [runtime]}
-        """), encoding="utf-8")
+              title: 测试汇报
+              subtitle: 两种解法
+              docs:
+                detail: agent/detail.md
+                comparison: agent/comparison.md
+              overview:
+                points:
+                  - {text: "命题句。", kind: judgment, anchor: "detail#产品定位与边界"}
+              diagrams:
+                amz:
+                  file: diagram.svg
+                  desc_table_from: comparison
+                  desc_table_header: 职责
+                  components:
+                    - {id: access, label: 产品接入, desc_key: 产品接入}
+                    - {id: runtime, label: 运行基础设施, desc_key: 运行基础设施}
+                  step_highlights: {"1": [runtime]}
+              chapters:
+                - id: ch-a
+                  num: "一"
+                  title: 产品 A
+                  gist: 测试
+                  lead: 导语
+                  points:
+                    - {text: "要点。", kind: fact, anchor: "detail#执行关系"}
+                  sections:
+                    - {id: a-pos, title: 定位, from: detail, heading: 产品定位与边界}
+                    - {id: a-flow, title: 执行, mode: flow, from: detail,
+                       heading: 一次请求如何执行, diagram: amz}
+                    - {id: a-cut, title: 对比节, from: comparison,
+                       heading: 产品定位怎样影响软件架构,
+                       table_filter: ["阿里云 AgentCore", "Amazon AgentCore"]}
+              sources_folds:
+                - {label: 来源表, from: detail, heading: 参考来源}
+        """)
+        ctx, warnings = self.mod.load_showcase(self.report_dir)
+        self.assertEqual(warnings, [])
+        self.assertEqual(ctx["sc_title"], "测试汇报")
+        # 开篇要点带锚点（URL 编码后指向原文段落）
+        from urllib.parse import unquote
+        self.assertTrue(unquote(ctx["overview"]["points"][0]["href"]).endswith(
+            "/knowledge/notes/agent/detail.html#产品定位与边界"))
+        ch = ctx["chapters"][0]
+        secs = {s["id"]: s for s in ch["sections"]}
+        # flow：图 + 步骤同在一个章节项内
+        self.assertEqual(secs["a-flow"]["mode"], "flow")
+        self.assertEqual(len(secs["a-flow"]["steps"]), 3)
+        self.assertEqual(secs["a-flow"]["diagram"]["components"][0]["desc_source"],
+                         "doc-table")
+        self.assertEqual(secs["a-flow"]["diagram"]["step_highlights"], {"1": ["runtime"]})
+        # table_filter 生效
+        self.assertNotIn("Dify", secs["a-cut"]["html"])
+        # 每节带来源（知识库锚点 + GitHub 固定链接）
+        self.assertIn("/knowledge/notes/agent/detail.html", secs["a-pos"]["src"]["kb_url"])
+        self.assertIn("blob/abc123def", secs["a-pos"]["src"]["gh_url"])
+        # 折叠来源（表格渲染为 HTML，链接保留）
+        self.assertEqual(ctx["sources"]["folds"][0]["label"], "来源表")
+        self.assertIn("example.com/doc1", ctx["sources"]["folds"][0]["html"])
+
+    def test_missing_heading_warns_not_crashes(self):
+        self.write_conf("""
+            showcase:
+              docs: {detail: agent/detail.md}
+              chapters:
+                - id: ch
+                  title: T
+                  sections:
+                    - {id: x, title: 缺, from: detail, heading: 不存在的章节}
+        """)
         ctx, warnings = self.mod.load_showcase(self.report_dir)
         self.assertEqual(ctx["showcase_error"], None)
-        self.assertEqual(len(warnings), 1)                      # 缺失章节警告
-        self.assertIn("未找到章节", warnings[0])
-        by_id = {s["id"]: s for s in ctx["sections"]}
-        self.assertIn("mark-judgment", by_id["pos"]["html"])
-        self.assertEqual(by_id["flow"]["step_count"], 3)
-        self.assertTrue(by_id["gone"]["missing"])
-        comps = {c["id"]: c for c in ctx["diagram"]["components"]}
-        self.assertEqual(comps["runtime"]["desc_source"], "doc-table")
-        self.assertIn("承载执行环境", comps["runtime"]["desc_html"])
-        self.assertEqual(comps["caller"]["desc_source"], "view-note")
-        self.assertEqual(ctx["fingerprint"], ctx["fingerprint"][:10])
-        self.assertIn("blob/abc123def/", ctx["detail_github_url"])
+        self.assertTrue(any("未找到章节" in w for w in warnings))
+        self.assertTrue(ctx["chapters"][0]["sections"][0]["missing"])
 
-    def test_load_showcase_missing_doc(self):
-        (self.report_dir / "showcase.yaml").write_text(textwrap.dedent("""\
+    def test_missing_doc_error(self):
+        self.write_conf("""
             showcase:
-              products:
-                - {key: k, name: N, status: ready,
-                   detail_doc: agent/not-there.md, summary_doc: agent/summary.md}
-              sections: []
-        """), encoding="utf-8")
+              docs: {detail: agent/not-there.md}
+              chapters: []
+        """)
         ctx, warnings = self.mod.load_showcase(self.report_dir)
-        self.assertIn("源文档不存在", ctx["showcase_error"])
+        self.assertIn("showcase_error", ctx)
         self.assertTrue(warnings)
+
+    def test_render_notes(self):
+        notes = self.report_dir / "notes.md"
+        notes.write_text("# 讲稿\n\n开场白。\n\n<script>alert(1)</script>\n", encoding="utf-8")
+        html = self.mod.render_notes(notes, set(), "abc")
+        self.assertIn("开场白", html)
+        self.assertNotIn("<script>", html)
 
 
 class ReportsIntegrationTests(unittest.TestCase):
@@ -225,7 +261,7 @@ class ReportsIntegrationTests(unittest.TestCase):
             reports_dir = base / "reports"
             (reports_dir / "demo").mkdir(parents=True)
             (reports_dir / "demo" / "showcase.yaml").write_text(
-                "showcase:\n  products: []\n", encoding="utf-8")
+                "showcase:\n  chapters: []\n", encoding="utf-8")
             (reports_dir / "registry.yaml").write_text(
                 "reports:\n  - {slug: demo, title: 展示, date: 2026-10-12}\n",
                 encoding="utf-8")

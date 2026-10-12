@@ -262,6 +262,13 @@ def build(env, common: dict) -> int:
                 print(f"[reports] {w}")
             render("report_showcase.html", f"reports/{report['slug']}.html",
                    r={k: v for k, v in report.items() if k != "content"}, **ctx)
+            # 讲稿页（登录可见，serve.py 对 /notes/ 前缀做鉴权；公开页不放入口）
+            notes_file = REPORTS_DIR / report["slug"] / "notes.md"
+            if notes_file.is_file():
+                notes_html = showcase_lib.render_notes(notes_file, set(), "build")
+                render("report_notes.html", f"notes/{report['slug']}.html",
+                       notes_title=ctx.get("sc_title", report["title"]),
+                       notes_html=notes_html)
             _copy_assets(report["slug"])
             published.add(report["slug"])
             continue
@@ -289,3 +296,12 @@ def _remove_stale_pages(published: set[str]) -> None:
     for d in root.iterdir():
         if d.is_dir() and d.name not in published:
             shutil.rmtree(d, ignore_errors=True)
+    # 讲稿页（dist/notes/）：与已发布集合同步清理
+    notes_root = DIST_DIR / "notes"
+    if notes_root.is_dir():
+        for f in notes_root.glob("*.html"):
+            if f.stem not in published:
+                f.unlink()
+                gz = f.with_name(f.name + ".gz")
+                if gz.exists():
+                    gz.unlink()

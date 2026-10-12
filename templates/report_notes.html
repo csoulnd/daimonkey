@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ notes_title }} · 讲稿{% endblock %}
+{% block content %}
+<div class="kb-breadcrumb"><a href="/reports">报告厅</a> / <span>{{ notes_title }} · 讲稿</span></div>
+<section class="sc-head notes-head">
+  <h1>{{ notes_title }} · 讲稿</h1>
+  <p class="sc-subtitle">仅登录可见（serve.py 对 /notes/ 前缀鉴权）· 公开演示页不放入口</p>
+</section>
+<article class="markdown-body notes-body">{{ notes_html | safe }}</article>
+{% endblock %}

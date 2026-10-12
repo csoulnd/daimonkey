@@ -264,6 +264,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(304 if not_modified else 200)
         self.send_header("Cache-Control", cache)
         self.send_header("Vary", "Accept-Encoding")
+        if getattr(self, "_noindex", False):
+            self.send_header("X-Robots-Tag", "noindex")
         self.send_header("ETag", etag)
         self.send_header("Last-Modified", formatdate(f.stat().st_mtime, usegmt=True))
         if not not_modified:
@@ -298,9 +300,39 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/v1/update"):
             self._json({"error": "use POST to trigger update"}, 405)
             return
+        if path == "/notes" or path.startswith("/notes/"):
+            # 讲稿页：仅登录可见（复用助手会话 Cookie），响应带 noindex
+            if not self._assistant_authed():
+                self._notes_denied()
+                return
+            self._noindex = True
+            self._file(path)
+            return
         if self._assistant_get(path):
             return
         self._file(path)
+
+    def _notes_denied(self) -> None:
+        body = ("<!doctype html><html lang=\"zh-CN\"><meta charset=\"utf-8\">"
+                "<meta name=\"robots\" content=\"noindex\">"
+                "<title>需要登录</title>"
+                "<body style=\"font-family:system-ui,sans-serif;max-width:520px;"
+                "margin:14vh auto;padding:0 24px;line-height:1.8;color:#556\">"
+                "<h2>需要登录</h2>"
+                "<p>讲稿页仅登录可见。请到任意页面右下角点击 🐱 输入密码完成登录，"
+                "然后返回本页刷新。</p>"
+                "<p><a href=\"/reports\">← 返回报告厅</a></p></body></html>").encode("utf-8")
+        self.send_response(401)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Robots-Tag", "noindex")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            try:
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
 
     def _assistant_get(self, path: str) -> bool:
         """助手 GET 路由；已处理返回 True。/session 公开，其余需登录。"""

@@ -95,6 +95,48 @@ class UpdateAuthTests(unittest.TestCase):
                 self.assertEqual(s["state"], "running")
                 self.assertIn(expect, s["note"])
 
+    def test_notes_page_requires_login(self):
+        """讲稿页（/notes/）不登录 401 提示页；合法会话 Cookie 才可读。"""
+        with tempfile.TemporaryDirectory() as directory:
+            password_file = Path(directory) / "password.sha256"
+            password_file.write_text(hashlib.sha256(b"test-password").hexdigest())
+            secret_file = Path(directory) / "assistant_secret"
+            fake_dist = Path(directory) / "dist"
+            (fake_dist / "notes").mkdir(parents=True)
+            (fake_dist / "notes" / "demo.html").write_text(
+                "<html>讲稿正文</html>", encoding="utf-8")
+            with patch.object(server, "PASSWORD_FILE", password_file), \
+                    patch.object(server, "ASSISTANT_SECRET_FILE", secret_file), \
+                    patch.object(server, "DIST", fake_dist):
+                httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+                thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    # 未登录 → 401 提示页（含 noindex，不含讲稿内容）
+                    conn = HTTPConnection(*httpd.server_address)
+                    conn.request("GET", "/notes/demo")
+                    response = conn.getresponse()
+                    body = response.read().decode("utf-8")
+                    self.assertEqual(response.status, 401)
+                    self.assertIn("需要登录", body)
+                    self.assertNotIn("讲稿正文", body)
+                    self.assertEqual(response.getheader("X-Robots-Tag"), "noindex")
+                    conn.close()
+                    # 合法会话 Cookie → 200 内容 + noindex
+                    cookie = f"assistant_session={server.make_cookie_value()}"
+                    conn = HTTPConnection(*httpd.server_address)
+                    conn.request("GET", "/notes/demo", headers={"Cookie": cookie})
+                    response = conn.getresponse()
+                    body = response.read().decode("utf-8")
+                    self.assertEqual(response.status, 200)
+                    self.assertIn("讲稿正文", body)
+                    self.assertEqual(response.getheader("X-Robots-Tag"), "noindex")
+                    conn.close()
+                finally:
+                    httpd.shutdown()
+                    httpd.server_close()
+                    thread.join()
+
     def test_assistant_session_cookie_grants_update(self):
         """一次登录完全权限：合法助手 Cookie 可直接触发更新（免密码）。"""
         with tempfile.TemporaryDirectory() as directory:
