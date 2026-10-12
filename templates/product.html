@@ -26,6 +26,7 @@
     <span class="rk">#{{ r.rank }}</span>
     <span>{{ board_names.get(b, b) }}</span>
     <span class="dim">热度 {{ '%.1f' | format(r.heat_score) }} · {{ r.snapshot_date }}</span>
+    {% if p.latest_ai.get(b) %}<span class="ai-score" title="AI 分析分：{{ p.latest_ai[b].rationale or '基于规则分与指标的分析' }}（不影响排序）">AI {{ p.latest_ai[b].ai_score | round | int }}</span>{% endif %}
   </a>
   {% endfor %}
 </div>

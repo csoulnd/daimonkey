@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 from jinja2 import Environment, FileSystemLoader
 
+from . import ai as ai_mod
 from . import db, queries, svgchart, knowledge, news as newslib
 from .config import (DIST_DIR, STATIC_DIR, TEMPLATES_DIR, ensure_dirs, now_iso,
                      registry, today_utc)
@@ -121,6 +122,10 @@ def build() -> None:
             "assets_v": _assets_version(),
             "kb": kb_meta,
             "news_categories": reg.get("news", {}).get("categories", {}),
+            # AI 摘要（v1.4）：三板块顶部卡片；缺失时宏静默不渲染
+            "ai_home": ai_mod.summary_of(c, "home"),
+            "ai_news": ai_mod.summary_of(c, "news"),
+            "ai_knowledge": ai_mod.summary_of(c, "knowledge"),
         }
 
         def render(tpl: str, out: str, **ctx) -> None:
@@ -231,6 +236,7 @@ def build() -> None:
                    week_start=start, week_end=end,
                    digest_items=queries._attach_products(c, d["items"]),
                    cat_counts=cat_counts, top_products=top_list,
+                   ai_digest=queries.published_digest_summary(c, d["week"]),
                    news_rank=rank_of)
             digest_outputs.add(d["week"])
         # 周报随保留窗口滚动，过期文件清理（不触碰 dist 其他内容）

@@ -2,13 +2,14 @@
 {% import "_macros.html" as m %}
 {% block title %}{{ site.name }}{% endblock %}
 {% block content %}
+{{ m.ai_summary_card(ai_home) }}
 <section>
   <div class="sec-head">
     <h1>联合榜单</h1>
     <span class="dim">{{ unified_total }} 个产品 · <a href="/methodology">方法</a></span>
   </div>
   <table class="tbl">
-    <thead><tr><th>#</th><th>产品</th><th>来源</th><th>热度</th><th>7d</th><th>动量</th><th>覆盖</th><th>Stars</th><th>npm 月下载</th></tr></thead>
+    <thead><tr><th>#</th><th>产品</th><th>来源</th><th>热度</th><th>7d</th><th>动量</th><th>覆盖</th><th>AI</th><th>Stars</th><th>npm 月下载</th></tr></thead>
     <tbody>
     {% for it in unified %}
       <tr>
@@ -19,14 +20,15 @@
         <td>{{ m.delta(it.delta_7d) }}</td>
         <td>{{ m.score(it.momentum_score, 'mom') }}</td>
         <td>{{ m.cov(it.coverage) }}</td>
+        <td>{{ m.ai_cell(it) }}</td>
         <td>{% if it.metrics.github_stars %}{{ m.mval(it.metrics.github_stars) }}{% else %}<span class="dim">—</span>{% endif %}</td>
         <td>{% if it.metrics.npm_monthly_downloads %}{{ m.mval(it.metrics.npm_monthly_downloads) }}{% else %}<span class="dim">—</span>{% endif %}</td>
       </tr>
     {% endfor %}
-    {% if not unified %}<tr><td colspan="9" class="dim">暂无数据，点击右上「⟳ 更新」发起首次采集。</td></tr>{% endif %}
+    {% if not unified %}<tr><td colspan="10" class="dim">暂无数据，点击右上「⟳ 更新」发起首次采集。</td></tr>{% endif %}
     </tbody>
   </table>
-  <p class="dim">联合榜仅取产品主分类，并将分类综合分再做一次分类内分位数。国产开源榜与国产应用榜采用不同数据口径，分别排名，不重复计入联合榜。</p>
+  <p class="dim">联合榜仅取产品主分类，并将分类综合分再做一次分类内分位数。国产开源榜与国产应用榜采用不同数据口径，分别排名，不重复计入联合榜。<strong>AI 列</strong>为 AI 分析分（v1.4 新增，默认仅展示、不参与排序）。</p>
 </section>
 
 <section class="duo">

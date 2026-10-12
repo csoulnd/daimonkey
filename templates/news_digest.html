@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_macros.html" as m %}
 {% block title %}{{ week }} 周报 · AI Agent 新闻{% endblock %}
 {% block content %}
 <div class="kb-breadcrumb"><a href="/news">AI Agent 新闻</a> / <span>{{ week }} 周报</span></div>
@@ -9,6 +10,14 @@
     {% for key, n in cat_counts.items() %}<span class="chip nc-{{ key }}">{{ news_categories.get(key, key) }} {{ n }}</span> {% endfor %}
   </p>
 </section>
+
+{% if ai_digest %}
+<section class="ai-summary" aria-label="AI 周报总结">
+  <div class="ai-summary-head"><span class="ai-badge">🤖 AI 总结</span><span class="ai-tag">AI 生成 · 非确定性数据</span></div>
+  <p class="ai-summary-body">{{ ai_digest.summary }}</p>
+  <div class="ai-summary-foot dim">由 DSH agent 生成于 {{ ai_digest.created_at | dt }}</div>
+</section>
+{% endif %}
 
 {% if top_products %}
 <h2>本周被提及最多的产品</h2>

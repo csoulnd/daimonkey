@@ -20,3 +20,19 @@
 {% macro badge(board, names) -%}
 <a class="badge b-{{ board }}" href="/rankings/{{ board }}">{{ names.get(board, board) }}</a>
 {%- endmacro %}
+
+{# AI 分析分单元格（v1.4）：悬停显示一句话理由；未生成时显 — #}
+{% macro ai_cell(it) -%}
+{% if it.ai_score is not none %}<span class="ai-score" title="AI 分析分：{{ it.ai_rationale or '基于规则分与指标的分析' }}（不影响排序）">{{ it.ai_score | round | int }}</span>{% else %}<span class="dim" title="AI 分析分（随下一次全量更新生成）">—</span>{% endif %}
+{%- endmacro %}
+
+{# 板块顶部 AI 摘要卡片（三页统一格式）：显著标注 AI 生成与非确定性 #}
+{% macro ai_summary_card(summary) -%}
+{% if summary %}
+<section class="ai-summary" aria-label="AI 摘要">
+  <div class="ai-summary-head"><span class="ai-badge">🤖 AI 摘要</span><span class="ai-tag">AI 生成 · 非确定性数据</span></div>
+  <p class="ai-summary-body">{{ summary.content }}</p>
+  <div class="ai-summary-foot dim">由 DSH agent 于 {{ summary.created_at | dt }} 生成 · 依据 {{ summary.data_signature }}</div>
+</section>
+{% endif %}
+{%- endmacro %}

@@ -33,6 +33,7 @@
   <td>{{ m.delta(it.delta_7d) }}</td>
   <td>{{ m.score(it.momentum_score, 'mom') }}</td>
   <td>{{ m.cov(it.coverage) }}</td>
+  <td>{{ m.ai_cell(it) }}</td>
   {% for mk in top_metrics %}{% set mm = it.metrics.get(mk) %}
   <td>{% if mm %}{{ m.mval(mm) }}{% else %}<span class="dim">—</span>{% endif %}</td>
   {% endfor %}
@@ -41,16 +42,16 @@
 {%- endmacro %}
 
 <table class="tbl" id="tbl-heat">
-  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th><th>动量分</th><th>覆盖率</th>
+  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th><th>动量分</th><th>覆盖率</th><th>AI</th>
   {% for mk in top_metrics %}<th>{{ metric_names.get(mk, mk) }}</th>{% endfor %}</tr></thead>
   <tbody>{{ rows(items) }}</tbody>
 </table>
 <table class="tbl hidden" id="tbl-mom">
-  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th><th>动量分</th><th>覆盖率</th>
+  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th><th>动量分</th><th>覆盖率</th><th>AI</th>
   {% for mk in top_metrics %}<th>{{ metric_names.get(mk, mk) }}</th>{% endfor %}</tr></thead>
   <tbody>{{ rows(momentum_items) }}</tbody>
 </table>
-<p class="dim">动量视图按动量分降序（反映近期增长；增长类指标依赖本站自采历史，约 30 天后完整）。</p>
+<p class="dim">动量视图按动量分降序（反映近期增长；增长类指标依赖本站自采历史，约 30 天后完整）。AI 列为 AI 分析分（悬停理由；不影响排序）。</p>
 
 {% if observation %}
 <h2 class="obs-h">观察区 <span class="dim">（覆盖率 &lt; {{ threshold_pct }}%，不参与排名）</span></h2>

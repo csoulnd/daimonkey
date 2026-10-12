@@ -44,8 +44,11 @@ def metric_details(pm: dict) -> dict:
 def board_items(c, board: str, snap_date: str, latest: dict) -> list[dict]:
     rows = c.execute(
         "SELECT r.product_id, r.rank, r.heat_score, r.momentum_score, r.delta_7d,"
-        " r.delta_30d, r.coverage, p.slug, p.name, p.vendor, p.category, p.status"
+        " r.delta_30d, r.coverage, p.slug, p.name, p.vendor, p.category, p.status,"
+        " a.ai_score, a.rationale AS ai_rationale"
         " FROM rankings r JOIN products p ON p.id = r.product_id"
+        " LEFT JOIN ai_scores a ON a.board = r.board"
+        "  AND a.snapshot_date = r.snapshot_date AND a.product_id = r.product_id"
         " WHERE r.board=? AND r.snapshot_date=? ORDER BY r.rank",
         (board, snap_date)).fetchall()
     items = []
@@ -58,6 +61,7 @@ def board_items(c, board: str, snap_date: str, latest: dict) -> list[dict]:
             "heat_score": r["heat_score"], "momentum_score": r["momentum_score"],
             "delta_7d": r["delta_7d"], "delta_30d": r["delta_30d"],
             "coverage": r["coverage"],
+            "ai_score": r["ai_score"], "ai_rationale": r["ai_rationale"],
             "metrics": metric_details(latest.get(r["product_id"], {})),
             "product_id": r["product_id"],
         })
@@ -147,6 +151,15 @@ def product_detail(c, slug: str) -> dict | None:
         "SELECT board, rank, heat_score, momentum_score, coverage, snapshot_date"
         " FROM rankings WHERE product_id=? ORDER BY snapshot_date DESC, board",
         (p["id"],))]
+    p["ai_scores"] = [dict(r) for r in c.execute(
+        "SELECT board, snapshot_date, ai_score, rationale FROM ai_scores"
+        " WHERE product_id=? ORDER BY snapshot_date DESC, board",
+        (p["id"],))]
+    # 各榜最新一条 AI 分（产品页徽章用）
+    latest_ai: dict[str, dict] = {}
+    for row in p["ai_scores"]:
+        latest_ai.setdefault(row["board"], row)
+    p["latest_ai"] = latest_ai
     p["raw_ids"] = [r["id"] for r in c.execute(
         "SELECT DISTINCT id FROM raw_payloads WHERE product_id=? ORDER BY id DESC",
         (p["id"],))]
@@ -202,6 +215,18 @@ def _attach_products(c, rows: list) -> list[dict]:
         d["products"] = [names[i] for i in _product_ids_of(r) if i in names]
         out.append(d)
     return out
+
+
+def published_digest_summary(c, week: str) -> dict | None:
+    """某 ISO 周的已发布 AI 周报总结（insights 表 llm_generated=1 且 status=published）。
+
+    草稿态（draft）不展示——AI 产物需人工确认发布后才上线。
+    """
+    row = c.execute(
+        "SELECT summary, created_at FROM insights WHERE llm_generated = 1"
+        " AND status = 'published' AND tags LIKE '%news-digest%'"
+        " AND published_at = ? ORDER BY id DESC LIMIT 1", (week,)).fetchone()
+    return dict(row) if row else None
 
 
 def news_meta(c) -> dict:

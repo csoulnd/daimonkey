@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_macros.html" as m %}
 {% block title %}个人知识库 · InferTechNote{% endblock %}
 {% block content %}
 <section class="kb-intro">
@@ -7,6 +8,7 @@
   <p>Agent、推理服务与基础设施的工程笔记。从业务探索到可复用的知识。</p>
   <div class="dim">{{ kb.count }} 篇文档 · 保留仓库目录与原文内容 · <a href="{{ kb.url }}">GitHub 仓库 ↗</a></div>
 </section>
+{{ m.ai_summary_card(ai_knowledge) }}
 {% if not kb.available %}<div class="warn-box">知识库快照尚未同步。</div>{% endif %}
 <div class="kb-groups">
 {% for group in kb_groups %}

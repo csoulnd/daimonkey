@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_macros.html" as m %}
 {% block title %}AI Agent 新闻 · {{ site.name }}{% endblock %}
 {% block content %}
 <section class="kb-intro news-intro">
@@ -7,6 +8,7 @@
   <p>公开 RSS / API 源的领域新闻。分类为确定性关键词规则（无 LLM），每条可溯源到当次采集的原始响应；提到榜上产品时自动关联产品页与当前热度名次。</p>
   <div class="dim">{{ news_meta.total }} 条（近 {{ news_lookback_days }} 天窗口滚动，保留 {{ news_retention_days }} 天）· {{ news_meta.by_source | length }} 个源 · <a href="/api/v1/news.json">API</a></div>
 </section>
+{{ m.ai_summary_card(ai_news) }}
 {% if news_stale %}<div class="warn-box">新闻超过 48 小时未更新（{{ news_meta.last_fetched_at | dt }}）。点击右上「仅更新新闻」可快速刷新（不重采热度数据）。</div>{% endif %}
 {% if not news_meta.total %}<div class="warn-box">尚无新闻数据：执行 <code>python -m collector --collect-news</code> 或点击右上「仅更新新闻」。</div>{% endif %}
 
