@@ -47,7 +47,7 @@ REPORTS_DIR = ROOT / "reports"
 REGISTRY_FILE = REPORTS_DIR / "registry.yaml"
 REQUIRED_FIELDS = ("slug", "title", "date")
 KIND_BY_SUFFIX = {".md": "md", ".html": "html", ".htm": "html", ".pptx": "ppt"}
-KIND_NAMES = {"md": "网页", "html": "网页", "ppt": "PPT"}
+KIND_NAMES = {"md": "网页", "html": "网页", "ppt": "PPT", "showcase": "展示"}
 DEFAULT_FILES = ("report.md", "index.html", "report.html", "deck.pptx")
 
 
@@ -156,20 +156,24 @@ def load_registry() -> tuple[list[dict], list[str]]:
             warnings.append(f"{slug}: 目录 reports/{slug}/ 不存在，跳过")
             continue
         content = resolve_content(slug, entry.get("file"))
-        if content is None:
+        showcase_file = (REPORTS_DIR / slug / "showcase.yaml")
+        if content is None and not showcase_file.is_file():
             if entry.get("file"):
                 hint = f"file: {entry['file']} 不存在"
             else:
                 existing = sorted(f.name for f in (REPORTS_DIR / slug).iterdir()
                                   if f.is_file() and not f.name.startswith("."))
-                hint = (f"未找到内容文件（{'/'.join(DEFAULT_FILES)}）"
+                hint = (f"未找到内容文件（{'/'.join(DEFAULT_FILES)} 或 showcase.yaml）"
                         + (f"；目录现有: {', '.join(existing)}" if existing else ""))
             warnings.append(f"{slug}: {hint}，跳过")
             continue
-        kind = KIND_BY_SUFFIX.get(content.suffix.lower())
+        if content is None:                      # 展示型报告：内容由 showcase 模块导入
+            kind, content = "showcase", showcase_file
+        else:
+            kind = KIND_BY_SUFFIX.get(content.suffix.lower())
         if kind is None:
             warnings.append(f"{slug}: 不支持的内容格式 {content.suffix}"
-                            f"（支持 .md / .html / .pptx），跳过")
+                            f"（支持 .md / .html / .pptx / showcase.yaml），跳过")
             continue
         seen.add(slug)
         reports.append({
@@ -211,13 +215,17 @@ def _prepare_detail(report: dict) -> tuple[dict, str, str]:
 def _copy_assets(slug: str) -> None:
     """报告目录内资源原样拷贝到 dist/reports/{slug}/（图片、pptx、原样 html 等）。
 
-    仅 .md 不拷贝（构建期已渲染为页面）；目录内的任何文件（含 html 及其配套资源）
-    全部保留，保证原样网页的报告完整性。
+    仅构建配置与内部文件不拷贝：.md（构建期渲染）、showcase.yaml（构建映射）、
+    content-issues.md（.md 已排除，交回研究侧的内部记录）。
     """
     src = REPORTS_DIR / slug
     dst = DIST_DIR / "reports" / slug
+    if dst.exists():
+        shutil.rmtree(dst)   # 从零重建，避免已删除/改名资源在 dist 残留
     for f in src.rglob("*"):
         if not f.is_file() or f.suffix.lower() == ".md" or f.is_symlink():
+            continue
+        if f.name == "showcase.yaml":
             continue
         target = dst / f.relative_to(src)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -246,6 +254,17 @@ def build(env, common: dict) -> int:
                     DIST_DIR / "reports.html")
     published: set[str] = set()
     for report in reports:
+        if report["kind"] == "showcase":
+            # 产品调研展示：内容在构建时从知识库快照导入（collector/showcase.py）
+            from . import showcase as showcase_lib
+            ctx, warnings = showcase_lib.load_showcase(REPORTS_DIR / report["slug"])
+            for w in warnings:
+                print(f"[reports] {w}")
+            render("report_showcase.html", f"reports/{report['slug']}.html",
+                   r={k: v for k, v in report.items() if k != "content"}, **ctx)
+            _copy_assets(report["slug"])
+            published.add(report["slug"])
+            continue
         r, body_html, toc = _prepare_detail(report)
         render("report_detail.html", f"reports/{report['slug']}.html",
                r=r, body_html=body_html, article_toc=toc)

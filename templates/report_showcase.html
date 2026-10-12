@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ conf.title }} · 报告厅{% endblock %}
+{% block content %}
+<div class="kb-breadcrumb"><a href="/reports">报告厅</a> / <span>{{ conf.title }}</span></div>
+
+{% if showcase_error %}
+<div class="warn-box">展示内容暂不可用：{{ showcase_error }}（先同步知识库并重建站点）</div>
+{% else %}
+
+<header class="sc-head">
+  <div class="dim">调研展示 · {{ product_name }}</div>
+  <h1>{{ conf.title }}</h1>
+  <p class="sc-baseline dim">{{ baseline }}</p>
+  <div class="sc-product-chips">
+    {% for p in products %}
+    <span class="sc-chip {% if p.status == 'ready' %}on{% else %}pending{% endif %}">
+      {{ p.name }}{% if p.status != 'ready' %} · 待接入{% endif %}
+    </span>
+    {% endfor %}
+  </div>
+  <p class="sc-stage dim">{{ conf.stage_note }}</p>
+  <div class="sc-meta">
+    <span class="dim">构建时导入知识库快照 <code>{{ short_commit }}</code> · 内容指纹 <code>{{ fingerprint }}</code></span>
+    <button id="sc-present" class="sc-btn" type="button" title="全屏演示模式（Esc 退出）">⛶ 演示模式</button>
+  </div>
+  <nav class="sc-nav">
+    {% for s in sections %}
+    <a href="#sec-{{ s.id }}">{{ s.title }}</a>
+    {% if not loop.last %}<i>·</i>{% endif %}
+    {% endfor %}
+  </nav>
+</header>
+
+<main class="sc-main" id="sc-main">
+  {% for s in sections %}
+  <section class="sc-sec{% if s.auxiliary %} auxiliary{% endif %}" id="sec-{{ s.id }}">
+    <div class="sc-sec-head">
+      <span class="dim sc-group">{{ s.group }}</span>
+      <h2>{{ s.title }}</h2>
+      <span class="sc-src-links dim">
+        <a href="{{ detail_kb_url }}#{{ s.heading }}" title="知识库对应章节">知识库原文</a>
+        <a href="{{ detail_github_url }}" target="_blank" rel="noopener" title="GitHub 版本固定链接">GitHub ↗</a>
+      </span>
+    </div>
+
+    {% if s.missing %}
+    <div class="warn-box">文档已变更：未找到章节「{{ s.heading }}」，请检查 showcase.yaml 映射（研究文档可能调整了标题）。</div>
+    {% elif s.mode == 'diagram' %}
+    <div class="sc-diagram-wrap">
+      <div class="sc-diagram-bar">
+        <span class="dim">{{ diagram.caption }}</span>
+        <span class="sc-zoom">
+          <button class="sc-btn" type="button" data-zoom="out" title="缩小">－</button>
+          <button class="sc-btn" type="button" data-zoom="reset" title="复位">复位</button>
+          <button class="sc-btn" type="button" data-zoom="in" title="放大">＋</button>
+          <button class="sc-btn" type="button" data-zoom="full" title="全屏查看架构图">⛶</button>
+        </span>
+      </div>
+      <div class="sc-diagram-viewport" id="sc-viewport">
+        <div class="sc-diagram-inner" id="sc-diagram-inner">{{ diagram.svg | safe }}</div>
+      </div>
+      <p class="dim sc-diagram-note">{{ diagram.doc_note }}</p>
+    </div>
+    <aside class="sc-component-panel" id="sc-component-panel" aria-live="polite">
+      <div class="sc-panel-hint dim">点击图中组件查看职责说明（说明引自调研文档组件表）</div>
+      <div class="sc-panel-body" id="sc-panel-body" hidden>
+        <h3 id="sc-panel-title"></h3>
+        <div id="sc-panel-desc" class="sc-panel-desc"></div>
+        <div class="dim sc-panel-src" id="sc-panel-src"></div>
+      </div>
+    </aside>
+    {% elif s.mode == 'steps' %}
+    <div class="sc-steps" data-steps>
+      <div class="sc-steps-nav">
+        <button class="sc-btn" type="button" data-step-prev>‹ 上一步</button>
+        <span class="sc-steps-dots" id="sc-steps-dots">
+          {% for i in range(s.step_count) %}<button class="sc-dot" type="button" data-step="{{ loop.index0 }}" title="第 {{ loop.index }} 步">{{ loop.index }}</button>{% endfor %}
+        </span>
+        <button class="sc-btn" type="button" data-step-next>下一步 ›</button>
+        <span class="dim" id="sc-steps-count">{{ s.step_count }} 步</span>
+      </div>
+      <div class="sc-step-bodies">
+        {% for body in s.steps %}<div class="sc-step-body{% if not loop.first %} hidden{% endif %}" data-step-body="{{ loop.index0 }}">{{ body | safe }}</div>{% endfor %}
+      </div>
+      <p class="dim">步骤解释依据公开职责组织，非抓包结果或内部调用栈；图中高亮为对应组件。</p>
+    </div>
+    {% elif s.mode == 'verify' %}
+    <div class="markdown-body sc-verify">{{ s.html | safe }}</div>
+    {% else %}
+    <div class="markdown-body sc-body">{{ s.html | safe }}</div>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <footer class="sc-foot">
+    <p class="dim">内容为构建时从知识库导入的研究文档呈现，非独立调研；事实、研究判断与待验证事项的区分沿用原文。
+    完整来源与调查日期见上方「参考来源」与各章节链接。</p>
+    <p class="dim">
+      <a href="{{ summary_kb_url }}">摘要文档（知识库）</a> ·
+      <a href="{{ detail_kb_url }}">详细文档（知识库）</a> ·
+      <a href="{{ detail_github_url }}" target="_blank" rel="noopener">GitHub 原文（{{ short_commit }}）↗</a> ·
+      <a href="/knowledge/notes/agent/investigations/products/comparison.html">产品对照（知识库）</a>
+    </p>
+  </footer>
+</main>
+
+<script src="/assets/showcase.js?v={{ assets_v }}" defer></script>
+<script type="application/json" id="sc-data">{{ {"step_highlights": diagram.step_highlights or {}, "components": diagram.components or [], "doc_url": detail_kb_url} | tojson }}</script>
+{% endif %}
+{% endblock %}

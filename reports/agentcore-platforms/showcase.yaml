@@ -1,0 +1,61 @@
+# AgentCore 平台调研展示 · 映射清单
+#
+# 内容来源：InferTechNote 知识库快照（data/knowledge-repo/），构建时导入，
+# 不在网站侧另行维护文案。文档更新 → 知识库同步 → 建站后自动反映到本页。
+# 章节按标题文本匹配；文档改标题时构建日志会给出警告，页面标注「文档已变更」。
+#
+# 工作方式（2026-10-12）：先接入 Amazon 完成端到端可预览，验证阅读结构与
+# 架构表达后，再接入阿里云与对比章节（页面组织待讨论）。
+showcase:
+  title: AgentCore 平台调研展示
+  stage_note: 首版接入 Amazon Bedrock AgentCore；阿里云与平台对比章节待后续迭代
+  products:
+    - key: amazon
+      name: Amazon Bedrock AgentCore
+      status: ready
+      baseline: 证据基线 2026-10-10 · 2026-10-12 复核 Harness 与 Runtime 关系 · 未做部署实测
+      summary_doc: agent/investigations/products/amazon-agentcore/summary.md
+      detail_doc: agent/investigations/products/amazon-agentcore/detail.md
+    - key: alibaba
+      name: 阿里云 AgentCore
+      status: pending
+    - key: compare
+      name: 平台对比与核心能力提炼
+      status: pending
+
+  # 章节选择（按标题匹配；mode: steps 走步骤切换器，mode: diagram 由交互图承载）
+  sections:
+    - {id: positioning, title: 产品定位与边界, heading: 产品定位与边界, group: 定位}
+    - {id: seven, title: "「七层」的两种表述", heading: "“七层”实际上对应两种不同表述", group: 架构}
+    - {id: relations, title: 执行关系（研究视图）, heading: 执行关系, mode: diagram, group: 架构}
+    - {id: design, title: 设计取舍与实现基础, heading: 架构如何支撑产品定位, group: 架构}
+    - {id: flow, title: 一次请求如何执行, heading: 一次请求如何执行, mode: steps, group: 执行路径}
+    - {id: ops, title: 定制与运行边界, heading: 定制与运行边界, auxiliary: true, group: 辅助}
+    - {id: verify, title: 待验证事项, heading: 待验证事项, mode: verify, group: 研究状态}
+    - {id: sources, title: 参考来源, heading: 参考来源, group: 研究状态}
+
+  # 交互架构图：呈现层视图（研究出处为文档 Mermaid「执行关系」图）
+  # 组件说明 desc_key 引用 detail.md 组件表行（构建时提取，单一来源）；
+  # 无表行对应的节点用展示定位注释（view-note），不给研究结论。
+  diagram:
+    file: diagram.svg
+    caption: 研究视图——依据公开职责重构，不表示 AWS 内部微服务结构
+    doc_note: 文档中的 Mermaid 研究视图以本交互图呈现；原文见知识库详细文档
+    components:
+      - {id: caller, label: 业务调用方, desc_note: 位于平台之外的调用来源（研究视图定位）}
+      - {id: endpoint, label: Runtime Endpoint, desc_note: 调用入口，关联 Agent 版本与配置（研究视图定位）}
+      - {id: runtime, label: 托管运行环境, desc_key: Runtime}
+      - {id: harness, label: 托管 Harness / Strands, desc_key: "Harness / 用户应用"}
+      - {id: userapp, label: 用户 Agent 代码 / 自选框架, desc_key: "Harness / 用户应用"}
+      - {id: model, label: 模型服务, desc_note: 外部依赖；Runtime 不限定单一模型（研究视图定位）}
+      - {id: tools, label: 工具与记忆服务, desc_key: "Memory / Gateway / 执行工具服务"}
+      - {id: gateway, label: Gateway / Browser / Code Interpreter / Memory, desc_key: "Memory / Gateway / 执行工具服务"}
+      - {id: identity, label: Identity / Policy, desc_key: "Identity / Policy", side: true}
+      - {id: observability, label: Observability / Evaluations, desc_key: "Observability / Evaluations 等", side: true}
+    # 步骤 ↔ 组件联动（对应文档「一次请求如何执行」的 5 步）
+    step_highlights:
+      "1": [userapp, harness]
+      "2": [endpoint, runtime]
+      "3": [harness, userapp, model, tools]
+      "4": [tools, gateway, observability]
+      "5": [endpoint]
