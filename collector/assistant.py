@@ -285,6 +285,18 @@ def delete_session(session_id: int) -> bool:
         return cur.rowcount > 0
 
 
+def rename_session(session_id: int, title: str) -> bool:
+    """会话改名（截断 80 字符，空标题拒绝改为空串）。"""
+    title = (title or "").strip()
+    if not title:
+        return False
+    with _connect() as c:
+        cur = c.execute(
+            "UPDATE assistant_sessions SET title = ?, updated_at = ? WHERE id = ?",
+            (title[:80], _now(), session_id))
+        return cur.rowcount > 0
+
+
 def _append_message(c, session_id: int | None, role: str, content: str,
                     channel: str, workflow: str | None = None) -> None:
     c.execute(

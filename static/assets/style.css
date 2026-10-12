@@ -487,3 +487,12 @@ tr:first-child .rank { color: var(--ink); }
   width: 26px; padding: 3px 0; text-align: center; font-size: var(--fs-sm);
   line-height: 1;
 }
+
+/* 工具栏图标按钮（✎ 重命名 / 🗑 删除）与窗口控件同样式 */
+.asst-toolbar button.icon {
+  width: 30px; padding: 5px 0; text-align: center; font-size: var(--fs-xs);
+  background: var(--panel2); color: var(--dim);
+  border: 1px solid var(--line); border-radius: var(--r-s); cursor: pointer;
+}
+.asst-toolbar button.icon:hover { color: var(--ink); border-color: var(--line-strong); }
+.asst-toolbar button.icon.danger:hover { color: var(--down); border-color: var(--down); }

@@ -36,6 +36,14 @@ class AssistantCoreTests(unittest.TestCase):
         sessions = a.list_sessions()
         self.assertEqual(len(sessions), 1)
         self.assertEqual(sessions[0]["title"], "测试会话")
+        # 重命名：成功 / 空标题拒绝 / 不存在的会话
+        self.assertTrue(a.rename_session(sid, "新名字"))
+        self.assertEqual(a.list_sessions()[0]["title"], "新名字")
+        self.assertFalse(a.rename_session(sid, "   "))
+        self.assertFalse(a.rename_session(99999, "不存在"))
+        # 超长标题截断到 80 字符
+        self.assertTrue(a.rename_session(sid, "长" * 200))
+        self.assertEqual(len(a.list_sessions()[0]["title"]), 80)
         # 消息追加（直接走内部 API，绕过 DSH）
         import collector.db as db
         with db.conn() as c:

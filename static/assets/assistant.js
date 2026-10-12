@@ -122,9 +122,9 @@
       if (!res.ok) return;
       var sel = $("asst-session-select");
       sel.textContent = "";
-      (res.body.sessions || []).forEach(function (s) {
-        var opt = el("option", null,
-          (s.title || ("会话 " + s.id)).slice(0, 24));
+      var sessions = res.body.sessions || [];
+      sessions.forEach(function (s) {
+        var opt = el("option", null, (s.title || ("会话 " + s.id)).slice(0, 24));
         opt.value = String(s.id);
         if (s.id === state.sessionId) opt.selected = true;
         sel.appendChild(opt);
@@ -133,6 +133,12 @@
         var opt = el("option", null, "（无会话，点 ＋ 新建）");
         opt.value = "";
         sel.appendChild(opt);
+        return;
+      }
+      // 当前会话被删除后自动切换到最近的一个
+      if (!state.sessionId || !sessions.some(function (s) { return s.id === state.sessionId; })) {
+        state.sessionId = sessions[0].id;
+        selectSession(state.sessionId);
       }
     });
   }
@@ -154,6 +160,37 @@
           renderMessages([]);
           refreshSessions();
         } else { msg(res.body.error || "创建失败", true); }
+      });
+    });
+  }
+  function renameSession() {
+    if (!state.sessionId) { msg("没有可重命名的会话", true); return; }
+    withAuth(function () {
+      var sel = $("asst-session-select");
+      var current = sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text : "";
+      var title = window.prompt("会话标题：", current);
+      if (!title || !title.trim()) return null;
+      return api("/sessions/" + state.sessionId + "/rename", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title.trim() })
+      }).then(function (res) {
+        if (res.ok) { msg("已重命名"); refreshSessions(); }
+        else { msg(res.body.error || "重命名失败", true); }
+      });
+    });
+  }
+  function deleteSession() {
+    if (!state.sessionId) { msg("没有可删除的会话", true); return; }
+    withAuth(function () {
+      if (!window.confirm("删除当前会话及其全部消息？此操作不可恢复。")) return null;
+      return api("/sessions/" + state.sessionId, { method: "DELETE" }).then(function (res) {
+        if (res.ok) {
+          state.sessionId = null;
+          renderMessages([]);
+          refreshSessions();
+          msg("会话已删除");
+        } else { msg(res.body.error || "删除失败", true); }
       });
     });
   }
@@ -334,6 +371,8 @@
       });
     });
     $("asst-new").addEventListener("click", newSession);
+    $("asst-rename").addEventListener("click", renameSession);
+    $("asst-delete").addEventListener("click", deleteSession);
     $("asst-session-select").addEventListener("change", function () {
       if (this.value) selectSession(parseInt(this.value, 10));
     });

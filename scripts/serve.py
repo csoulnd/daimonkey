@@ -404,6 +404,15 @@ class Handler(BaseHTTPRequestHandler):
                 body = self._read_json() or {}
                 sid = assistant.create_session(str(body.get("title", "")))
                 self._json({"session_id": sid}, 201)
+            elif rest.startswith("sessions/") and rest.endswith("/rename"):
+                sid = rest[len("sessions/"):-len("/rename")]
+                if not sid.isdigit():
+                    self._json({"error": "bad session id"}, 400)
+                    return
+                body = self._read_json() or {}
+                ok = assistant.rename_session(int(sid), str(body.get("title", "")))
+                self._json({"ok": bool(ok)} if ok else {"error": "会话不存在或标题为空"},
+                           200 if ok else 404)
             elif rest == "chat":
                 body = self._read_json() or {}
                 sid, message = body.get("session_id"), str(body.get("message", ""))
