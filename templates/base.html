@@ -62,7 +62,7 @@
   </div>
 </div>
 
-<!-- 悬浮智能助手（全站入口） -->
+<!-- 悬浮智能助手（全站入口，仿 DSH 布局：左侧会话栏 + 右侧对话区） -->
 <div class="asst-pet" id="asst-pet" title="智能助手" role="button" tabindex="0" aria-label="打开智能助手">🐱</div>
 <section class="asst-panel" id="asst-panel" hidden aria-label="智能助手">
   <div class="asst-panel-head">
@@ -73,33 +73,35 @@
       <button id="asst-min" class="icon" type="button" title="最小化（变回宠物，Esc 同效）">─</button>
     </span>
   </div>
-  <div class="asst-toolbar">
-    <select id="asst-session-select" title="切换会话" aria-label="会话"></select>
-    <button id="asst-new" type="button" title="新会话">＋</button>
-    <button id="asst-rename" class="icon" type="button" title="重命名当前会话">✎</button>
-    <button id="asst-delete" class="icon danger" type="button" title="删除当前会话">🗑</button>
+  <div class="asst-body">
+    <aside class="asst-side-col">
+      <button id="asst-new" type="button" title="新会话">＋ 新会话</button>
+      <ul id="asst-session-list" class="asst-session-list"></ul>
+      <div class="asst-usage" id="asst-usage"></div>
+    </aside>
+    <div class="asst-chat-col">
+      <div class="asst-workflows" id="asst-workflows"></div>
+      <div class="asst-inline-row" id="asst-rename-row" hidden>
+        <input type="text" id="asst-rename-input" placeholder="会话标题" maxlength="80">
+        <button id="asst-rename-ok" type="button">确定</button>
+        <button id="asst-rename-cancel" type="button" class="muted">取消</button>
+      </div>
+      <div class="asst-inline-row confirm" id="asst-delete-row" hidden>
+        <span class="asst-confirm-text">删除该会话及全部消息？不可恢复。</span>
+        <button id="asst-delete-ok" type="button" class="danger">删除</button>
+        <button id="asst-delete-cancel" type="button" class="muted">取消</button>
+      </div>
+      <div class="asst-inline-row" id="asst-login-row" hidden>
+        <input type="password" id="asst-password" placeholder="输入密码，回车登录" maxlength="128" autocomplete="current-password">
+      </div>
+      <div id="asst-messages" class="asst-messages" aria-live="polite"></div>
+      <form id="asst-form" class="asst-form">
+        <textarea id="asst-input" rows="2" maxlength="8000" placeholder="输入消息，Ctrl+Enter 发送"></textarea>
+        <button id="asst-send" type="submit">发送</button>
+      </form>
+      <div class="asst-msg" id="asst-msg"></div>
+    </div>
   </div>
-  <div class="asst-inline-row" id="asst-rename-row" hidden>
-    <input type="text" id="asst-rename-input" placeholder="会话标题" maxlength="80">
-    <button id="asst-rename-ok" type="button">确定</button>
-    <button id="asst-rename-cancel" type="button" class="muted">取消</button>
-  </div>
-  <div class="asst-inline-row confirm" id="asst-delete-row" hidden>
-    <span class="asst-confirm-text">删除当前会话及全部消息？不可恢复。</span>
-    <button id="asst-delete-ok" type="button" class="danger">删除</button>
-    <button id="asst-delete-cancel" type="button" class="muted">取消</button>
-  </div>
-  <div class="asst-workflows" id="asst-workflows"></div>
-  <div class="asst-inline-row" id="asst-login-row" hidden>
-    <input type="password" id="asst-password" placeholder="输入密码，回车登录" maxlength="128" autocomplete="current-password">
-  </div>
-  <div id="asst-messages" class="asst-messages" aria-live="polite"></div>
-  <form id="asst-form" class="asst-form">
-    <textarea id="asst-input" rows="2" maxlength="8000" placeholder="输入消息，Ctrl+Enter 发送"></textarea>
-    <button id="asst-send" type="submit">发送</button>
-  </form>
-  <div class="asst-msg" id="asst-msg"></div>
-  <div class="asst-usage" id="asst-usage"></div>
 </section>
 
 <script src="/assets/app.js?v={{ assets_v }}"></script>

@@ -518,3 +518,55 @@ tr:first-child .rank { color: var(--ink); }
 .asst-inline-row.confirm .asst-confirm-text {
   flex: 1; font-size: var(--fs-xs); color: var(--down);
 }
+
+/* ---- DSH 风格布局：左侧会话栏 + 右侧对话区 ---- */
+.asst-body {
+  display: grid; grid-template-columns: 138px 1fr;
+  gap: var(--sp-3); min-height: 0; flex: 1; overflow: hidden;
+}
+.asst-side-col {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  min-height: 0; border-right: 1px solid var(--line); padding-right: var(--sp-2);
+}
+#asst-new {
+  background: var(--panel2); color: var(--ink); border: 1px dashed var(--line-strong);
+  border-radius: var(--r-s); padding: 7px 0; cursor: pointer;
+  font-size: var(--fs-xs); font-family: inherit; white-space: nowrap;
+}
+#asst-new:hover { border-color: var(--acc); color: var(--acc); }
+.asst-session-list {
+  list-style: none; margin: 0; padding: 0; flex: 1; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 3px; min-height: 0;
+}
+.asst-session-list li {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 7px; border-radius: var(--r-s); cursor: pointer;
+  border: 1px solid transparent;
+}
+.asst-session-list li:hover { background: var(--panel2); }
+.asst-session-list li.on { background: var(--panel2); border-color: var(--line-strong); }
+.asst-s-title {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: var(--fs-xs);
+}
+.asst-s-acts { display: none; gap: 2px; }
+.asst-session-list li:hover .asst-s-acts { display: inline-flex; }
+.asst-s-acts button {
+  background: none; border: none; color: var(--dim); cursor: pointer;
+  font-size: var(--fs-xs); padding: 1px 2px; line-height: 1;
+}
+.asst-s-acts button:hover { color: var(--ink); }
+.asst-s-acts button:last-child:hover { color: var(--down); }
+.asst-s-empty { color: var(--dim); font-size: var(--fs-xs); cursor: default; }
+.asst-side-col .asst-usage {
+  flex-direction: column; gap: 2px; border-top: 1px solid var(--line);
+  padding-top: 6px; border-top: 1px solid var(--line);
+}
+.asst-chat-col {
+  display: flex; flex-direction: column; gap: var(--sp-2); min-height: 0;
+}
+.asst-chat-col .asst-messages { flex: 1; min-height: 80px; max-height: none; }
+.asst-panel.max .asst-body { grid-template-columns: 190px 1fr; }
+@media (max-width: 880px) {
+  .asst-body { grid-template-columns: 104px 1fr; }
+}

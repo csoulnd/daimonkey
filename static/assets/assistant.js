@@ -3,7 +3,8 @@
   "use strict";
 
   var API = "/api/v1/assistant";
-  var state = { authed: false, sessionId: null, running: false, pollTimer: null, open: false };
+  var state = { authed: false, sessionId: null, running: false, pollTimer: null,
+                open: false, renameTarget: null, deleteTarget: null };
 
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) {
@@ -120,25 +121,37 @@
     api("/sessions").then(function (res) {
       if (res.status === 401) { state.authed = false; return; }
       if (!res.ok) return;
-      var sel = $("asst-session-select");
-      sel.textContent = "";
+      var list = $("asst-session-list");
+      list.textContent = "";
       var sessions = res.body.sessions || [];
       sessions.forEach(function (s) {
-        var opt = el("option", null, (s.title || ("会话 " + s.id)).slice(0, 24));
-        opt.value = String(s.id);
-        if (s.id === state.sessionId) opt.selected = true;
-        sel.appendChild(opt);
+        var li = el("li", s.id === state.sessionId ? "on" : "");
+        var title = el("span", "asst-s-title", (s.title || ("会话 " + s.id)));
+        title.title = s.title || "";
+        li.appendChild(title);
+        var acts = el("span", "asst-s-acts");
+        var btnRename = el("button", null, "✎");
+        btnRename.type = "button";
+        btnRename.title = "重命名";
+        btnRename.onclick = function (ev) { ev.stopPropagation(); openRename(s); };
+        var btnDel = el("button", null, "🗑");
+        btnDel.type = "button";
+        btnDel.title = "删除";
+        btnDel.onclick = function (ev) { ev.stopPropagation(); openDelete(s); };
+        acts.appendChild(btnRename);
+        acts.appendChild(btnDel);
+        li.appendChild(acts);
+        li.onclick = function () { selectSession(s.id); };
+        list.appendChild(li);
       });
-      if (!sel.options.length) {
-        var opt = el("option", null, "（无会话，点 ＋ 新建）");
-        opt.value = "";
-        sel.appendChild(opt);
+      if (!sessions.length) {
+        var empty = el("li", "asst-s-empty", "（无活跃会话）");
+        list.appendChild(empty);
         return;
       }
       // 当前会话被删除后自动切换到最近的一个
       if (!state.sessionId || !sessions.some(function (s) { return s.id === state.sessionId; })) {
-        state.sessionId = sessions[0].id;
-        selectSession(state.sessionId);
+        selectSession(sessions[0].id);
       }
     });
   }
@@ -174,59 +187,63 @@
     });
   }
 
-  function renameSession() {
-    if (!state.sessionId) { msg("没有可重命名的会话", true); return; }
+  function openRename(session) {
     var row = $("asst-rename-row");
     var input = $("asst-rename-input");
-    if (!row.hidden) { row.hidden = true; return; }  // 再点一次 ✎ 收起
-    var sel = $("asst-session-select");
-    input.value = sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text : "";
+    hideInlineRows();
+    state.renameTarget = session.id;
+    input.value = session.title || "";
     row.hidden = false;
     input.focus();
     input.select();
-    function submit() {
-      var title = input.value.trim();
-      row.hidden = true;
-      if (!title) return;
-      withAuth(function () {
-        return api("/sessions/" + state.sessionId + "/rename", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: title })
-        }).then(function (res) {
-          if (res.ok) { msg("已重命名"); refreshSessions(); }
-          else { msg(res.body.error || "重命名失败", true); }
-        });
-      });
-    }
-    input.onkeydown = function (ev) {
-      if (ev.key === "Enter") { ev.preventDefault(); submit(); }
-      else if (ev.key === "Escape") { ev.stopPropagation(); row.hidden = true; }
-    };
-    $("asst-rename-ok").onclick = submit;
-    $("asst-rename-cancel").onclick = function () { row.hidden = true; };
   }
 
-  function deleteSession() {
-    if (!state.sessionId) { msg("没有可删除的会话", true); return; }
+  function submitRename() {
+    var row = $("asst-rename-row");
+    var input = $("asst-rename-input");
+    var sid = state.renameTarget;
+    row.hidden = true;
+    state.renameTarget = null;
+    if (!sid) return;
+    var title = input.value.trim();
+    if (!title) return;
+    withAuth(function () {
+      return api("/sessions/" + sid + "/rename", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title })
+      }).then(function (res) {
+        if (res.ok) { msg("已重命名"); refreshSessions(); }
+        else { msg(res.body.error || "重命名失败", true); }
+      });
+    });
+  }
+
+  function openDelete(session) {
     var row = $("asst-delete-row");
-    if (!row.hidden) { row.hidden = true; return; }  // 再点一次 🗑 收起
     hideInlineRows();
+    state.deleteTarget = session.id;
     row.hidden = false;
-    $("asst-delete-ok").onclick = function () {
-      row.hidden = true;
-      withAuth(function () {
-        return api("/sessions/" + state.sessionId, { method: "DELETE" }).then(function (res) {
-          if (res.ok) {
+  }
+
+  function submitDelete() {
+    var row = $("asst-delete-row");
+    var sid = state.deleteTarget;
+    row.hidden = true;
+    state.deleteTarget = null;
+    if (!sid) return;
+    withAuth(function () {
+      return api("/sessions/" + sid, { method: "DELETE" }).then(function (res) {
+        if (res.ok) {
+          if (state.sessionId === sid) {
             state.sessionId = null;
             renderMessages([]);
-            refreshSessions();
-            msg("会话已删除");
-          } else { msg(res.body.error || "删除失败", true); }
-        });
+          }
+          refreshSessions();
+          msg("会话已删除");
+        } else { msg(res.body.error || "删除失败", true); }
       });
-    };
-    $("asst-delete-cancel").onclick = function () { row.hidden = true; };
+    });
   }
 
   function renderMessages(items) {
@@ -407,10 +424,18 @@
       });
     });
     $("asst-new").addEventListener("click", newSession);
-    $("asst-rename").addEventListener("click", renameSession);
-    $("asst-delete").addEventListener("click", deleteSession);
-    $("asst-session-select").addEventListener("change", function () {
-      if (this.value) selectSession(parseInt(this.value, 10));
+    // 行内重命名 / 删除确认（侧栏每项的 ✎/🗑 触发 openRename/openDelete）
+    $("asst-rename-ok").addEventListener("click", submitRename);
+    $("asst-rename-cancel").addEventListener("click", function () {
+      $("asst-rename-row").hidden = true;
+    });
+    $("asst-rename-input").addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); submitRename(); }
+      else if (ev.key === "Escape") { ev.stopPropagation(); $("asst-rename-row").hidden = true; }
+    });
+    $("asst-delete-ok").addEventListener("click", submitDelete);
+    $("asst-delete-cancel").addEventListener("click", function () {
+      $("asst-delete-row").hidden = true;
     });
     $("asst-form").addEventListener("submit", function (ev) {
       ev.preventDefault();
