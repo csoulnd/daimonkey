@@ -1,26 +1,20 @@
-# AgentCore 平台汇报 · 结构与映射清单
+# AgentCore 平台汇报 · 撰写中（骨架）
 #
-# 四段式：① 产品 A 阿里云 ② 产品 B Amazon ③ 对比 ④ 架构提炼（核心能力检查表）。
-# 事实内容构建时从知识库导入（docs 表），呈现层只做选材/提炼/组织：
-#   - points：报告摘要与章要点卡，每条可在文档找到出处（anchor 指向原文段落）；
-#     kind: fact（文档事实）/ judgment（研究判断）/ plain（组织性说明）。
-#   - flow 卡：每个产品一张（图 + 核心流程步骤在同一张卡内，全屏可演示）；
-#     同一产品的图不再别处重复出现。
-#   - table_filter：对比表只保留目标产品行；compact：去掉已由图承载的引导句。
-# 文档改标题时构建警告、页面标注「文档已变更」，按警告更新 heading 即可。
+# 新结构（2026-10-12 起，按需求方指示重写，仅两章）：
+#   第一章 · 平台定义  —— 重点介绍阿里云 AgentCore 是什么、面向谁、解决什么
+#   第二章 · 架构      —— 重点介绍平台架构（参考官方博客与调研文档）
+# 逐步补充：每章 = lead（导语）+ points（要点卡，带原文锚点）+ sections（导入/图）。
+# 事实内容仍按"构建时从知识库导入"原则；外部参考（官方博客等）进页面前需登记来源。
 showcase:
   title: AgentCore 平台汇报
 
-  # 附件：原始演示文稿（2026-10-09 版）。早期版本，页面内容以 10-12 修订的文档为准
+  # 附件：原始演示文稿（2026-10-09 版）。早期版本，页面内容以最新文档为准
   attachments:
     - label: 原始演示文稿（2026-10-09 · PPTX）
       file: 01-AgentCore-20261009.pptx
-      note: 早期版本，结论已按 2026-10-12 修订的调研文档更新；本页内容以文档为准
+      note: 早期版本，结论以修订后的调研文档为准
 
   notes: notes.md          # 讲稿（渲染到 /notes/agentcore-platforms，登录可见）
-  sources_folds:           # 参考来源折叠表（两个产品的原始来源清单）
-    - {label: "Amazon 来源表（B1–B8）", from: amazon_detail, heading: 参考来源}
-    - {label: "阿里云来源表（A1–A6）", from: alibaba_detail, heading: 参考来源}
 
   docs:
     amazon_detail: agent/investigations/products/amazon-agentcore/detail.md
@@ -31,161 +25,6 @@ showcase:
 
   overview:
     title: 报告摘要
-    points:
-      - text: "命题：把 Agent 带进受治理的企业运行环境。"
-        kind: judgment
-        anchor: alibaba_detail#产品定位与边界
-      - text: "阿里云 = 统一组织：Workspace 资产与治理为中心。"
-        kind: judgment
-        anchor: alibaba_detail#产品定位与边界
-      - text: "Amazon = 可组合运行：Runtime 承载执行，Harness 与服务按需组合。"
-        kind: judgment
-        anchor: amazon_detail#产品定位与边界
+    points: []             # 待撰写
 
-  diagrams:
-    amazon:
-      file: diagram.svg
-      desc_table_from: amazon_summary
-      caption: 研究视图——依据公开职责重构，不表示 AWS 内部微服务结构
-      doc_note: 文档中的 Mermaid 研究视图以本交互图呈现；原文见知识库详细文档
-      components:
-        - {id: caller, label: 业务调用方, desc_note: 位于平台之外的调用来源（研究视图定位）}
-        - {id: endpoint, label: Runtime Endpoint, desc_note: 调用入口，关联 Agent 版本与配置（研究视图定位）}
-        - {id: runtime, label: 托管运行环境, desc_key: Runtime}
-        - {id: harness, label: 托管 Harness / Strands, desc_key: "Harness / 用户应用"}
-        - {id: userapp, label: 用户 Agent 代码 / 自选框架, desc_key: "Harness / 用户应用"}
-        - {id: model, label: 模型服务, desc_note: 外部依赖；Runtime 不限定单一模型（研究视图定位）}
-        - {id: tools, label: 工具与记忆服务, desc_key: "Memory / Gateway / 执行工具服务"}
-        - {id: gateway, label: Gateway / Browser / Code Interpreter / Memory, desc_key: "Memory / Gateway / 执行工具服务"}
-        - {id: identity, label: Identity / Policy, desc_key: "Identity / Policy", side: true}
-        - {id: observability, label: Observability / Evaluations, desc_key: "Observability / Evaluations 等", side: true}
-      step_highlights:
-        "1": [userapp, harness]
-        "2": [endpoint, runtime]
-        "3": [harness, userapp, model, tools]
-        "4": [tools, gateway, observability]
-        "5": [endpoint]
-    alibaba:
-      file: alibaba-diagram.svg
-      desc_table_from: alibaba_summary
-      caption: 研究视图——依据公开职责重构，不是厂商内部架构图
-      doc_note: 文档中的 Mermaid 研究视图以本交互图呈现；原文见知识库详细文档
-      components:
-        - {id: caller, label: 业务应用或 IM 渠道, desc_note: 业务侧发起调用（研究视图定位）}
-        - {id: endpoint, label: Agent Endpoint, desc_note: 调用入口（研究视图定位）}
-        - {id: workspace, label: Workspace 资源管理, desc_key: "Workspace / Agent / Team"}
-        - {id: team, label: Team 协作, desc_key: "Workspace / Agent / Team"}
-        - {id: agent, label: Agent 定义, desc_key: "Workspace / Agent / Team"}
-        - {id: runtime, label: 托管实例与 Session, desc_key: "实例 / Session / Endpoint"}
-        - {id: harness, label: QwenPaw / Qoder 或自定义应用, desc_key: "QwenPaw / Qoder 或自定义应用"}
-        - {id: model, label: 模型连接与模型, desc_key: "模型、Skill、MCP、凭证"}
-        - {id: skills, label: Skill 与 MCP 工具, desc_key: "模型、Skill、MCP、凭证"}
-        - {id: storage, label: 工作目录与 OSS, desc_note: 会话文件与持久存储（研究视图定位）}
-        - {id: observability, label: AgentLoop 观测, desc_key: "观测及网络等云依赖", side: true}
-      step_highlights:
-        "1": [workspace, agent]
-        "2": [caller, endpoint, runtime]
-        "3": [harness, model, skills]
-        "4": [runtime, storage]
-    capability:
-      file: capability.svg
-      desc_table_from: comparison
-      desc_table_header: 职责
-      caption: 研究框架——本批调研提炼的七项软件职责，非任一厂商官方「七层」
-      doc_note: 职责定义与「需要回答的问题」引自对照文档；两产品对应物为研究视图标注
-      components:
-        - {id: access, label: 产品接入, desc_key: 产品接入}
-        - {id: assets, label: 定义与资产, desc_key: 定义与资产}
-        - {id: orchestration, label: Harness 与编排, desc_key: "Harness 与编排"}
-        - {id: tools, label: 工具与上下文, desc_key: "工具与上下文"}
-        - {id: runtime, label: 运行基础设施, desc_key: "运行基础设施"}
-        - {id: state, label: 状态与恢复, desc_key: "状态与恢复"}
-        - {id: governance, label: 治理与运营, desc_key: "治理与运营"}
-
-  chapters:
-    - id: ch-a
-      num: "一"
-      title: 产品 A · 阿里云 AgentCore
-      gist: 统一组织 —— 先管理、后运行
-      lead: 先看「组织」这条路线：阿里云把多来源 Agent 当作一类企业资产来统一管理。
-      points:
-        - text: "官方定位是智能体构建和治理平台；Workspace、Agent、Team 与实例／Session 是其核心对象。"
-          kind: fact
-          anchor: alibaba_detail#产品定位与边界
-        - text: "统一管理界面不等于执行语义一致：托管 Harness、高代码与本地纳管三种模式的执行边界不同。"
-          kind: judgment
-          anchor: alibaba_detail#产品边界
-        - text: "托管 Harness 引擎为 QwenPaw／Qoder；知识库与长期记忆、工具审批按当前指南在该模式暂不支持。"
-          kind: fact
-          anchor: alibaba_detail#定制与运行边界
-      sections:
-        - {id: a-pos, title: 定位, from: alibaba_detail, heading: 面向谁，核心侧重点是什么}
-        - {id: a-flow, title: 系统关系图与核心流程, mode: flow, from: alibaba_detail,
-           heading: 一次请求如何执行, diagram: alibaba,
-           steps_note: 步骤依据本文档「一次请求如何执行」；图中高亮为对应组件，非抓包结果}
-        - {id: a-objects, title: 关键对象关系, from: alibaba_detail, heading: 关键对象关系}
-        - {id: a-boundary, title: 模式与边界, from: alibaba_detail, heading: 产品边界, auxiliary: true}
-
-    - id: ch-b
-      num: "二"
-      title: 产品 B · Amazon Bedrock AgentCore
-      gist: 可组合运行 —— 先运行、按需治理
-      lead: 再看「运行」这条路线：Amazon 把 Agent 需要的运行能力拆成可组合的服务原语。
-      points:
-        - text: "官方定义为 Agent 构建、部署和运行平台；Runtime 承载执行，Harness 减少循环开发。"
-          kind: fact
-          anchor: amazon_detail#产品定位与边界
-        - text: "Runtime 框架中立；托管 Harness 由 Strands 驱动——两条路径共享运行平台，但自由度与责任不同。"
-          kind: judgment
-          anchor: amazon_detail#软件架构
-        - text: "服务可组合、不是逐层穿过的七层栈；microVM 与 Instances 是两种计算模式，隔离与时限边界不同。"
-          kind: fact
-          anchor: amazon_detail#软件架构
-      sections:
-        - {id: b-pos, title: 定位, from: amazon_detail, heading: 面向谁，核心侧重点是什么}
-        - {id: b-flow, title: 系统关系图与核心流程, mode: flow, from: amazon_detail,
-           heading: 一次请求如何执行, diagram: amazon,
-           steps_note: 步骤依据本文档「一次请求如何执行」；图中高亮为对应组件，非抓包结果}
-        - {id: b-exec, title: 计算模式（状态与生命周期）, from: amazon_detail, heading: 执行关系, compact: true}
-        - {id: b-design, title: 设计取舍与实现基础, from: amazon_detail, heading: 架构如何支撑产品定位}
-        - {id: b-boundary, title: 模式与边界, from: amazon_detail, heading: 两种定制入口, auxiliary: true}
-
-    - id: ch-compare
-      num: "三"
-      title: 对比
-      gist: 两种解法的三个分水岭
-      lead: 两条路线回答同一个命题，差异集中在三处：组织哲学、承载方式、边界代价。
-      points:
-        - text: "组织哲学不同：阿里云突出 Workspace 资源组织与 Agent／Team 管理，AWS 突出可独立采用的服务原语。"
-          kind: judgment
-          anchor: comparison#产品定位怎样影响软件架构
-        - text: "两者都应按「托管循环」与「自带代码」分别比较；不能用同一「功能数」比较不同职责的产品。"
-          kind: judgment
-          anchor: comparison#产品定位怎样影响软件架构
-        - text: "平台各自可靠 ≠ 联合事务：恢复语义要按历史、文件、检查点与外部副作用分别验证。"
-          kind: judgment
-          anchor: comparison#企业托管的关键判断
-      sections:
-        - {id: c-arch, title: 定位如何影响架构, from: comparison, heading: 产品定位怎样影响软件架构, table_filter: ["阿里云 AgentCore", "Amazon AgentCore"]}
-        - {id: c-boundary, title: 定制与托管边界, from: comparison, heading: 辅助比较：定制与托管边界, table_filter: ["阿里云 AgentCore", "Amazon AgentCore"]}
-        - {id: c-judgment, title: 企业托管的关键判断, from: comparison, heading: 企业托管的关键判断}
-
-    - id: ch-distill
-      num: "四"
-      title: 架构提炼 · 核心能力
-      gist: 平台核心能力 7 项检查表
-      lead: 跳出具体产品：这类平台需要回答的七个问题——选型与自建都绕不过去。
-      points:
-        - text: "七项软件职责是本批调研的分析框架（非厂商官方「七层」），可作为平台选型与自建的检查表。"
-          kind: judgment
-          anchor: comparison#从产品中提炼的软件职责
-        - text: "Amazon 官方另有一套七维分析模型（模型／编排／基础设施／知识／工具／安全／评估），与「初始七项服务」是不同概念——两套「七」都要看上下文。"
-          kind: fact
-          anchor: amazon_detail#“七层”实际上对应两种不同表述
-        - text: "模型推理基础设施、企业业务系统与知识摄取管道不属于平台本体，需要作为外部依赖单独设计。"
-          kind: judgment
-          anchor: comparison#从产品中提炼的软件职责
-      sections:
-        - {id: d-capability, title: 核心能力 7 层, mode: diagram, from: comparison, diagram: capability}
-        - {id: d-duties, title: 七项软件职责（框架原文）, from: comparison, heading: 从产品中提炼的软件职责}
-        - {id: d-seven, title: “七层”的两种表述（Amazon 佐证）, from: amazon_detail, heading: “七层”实际上对应两种不同表述}
+  chapters: []             # 待撰写：第一章 · 平台定义；第二章 · 架构
