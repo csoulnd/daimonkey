@@ -42,8 +42,11 @@
         else if (action === "out") zoomBy(0.8);
         else if (action === "reset") { scale = 1; tx = 0; ty = 0; applyTransform(); }
         else if (action === "full") {
-          var card = flow.querySelector(".sc-diagram-card");
-          if (card && card.requestFullscreen) card.requestFullscreen();
+          // 全屏整个流程卡：图 + 步骤 + 组件面板一起进全屏，演示时可切步
+          if (flow.requestFullscreen) {
+            flow.requestFullscreen();
+            setTimeout(function () { applyTransform(); }, 60);
+          }
         }
       });
     });
@@ -161,6 +164,29 @@
       observer.observe(s);
     });
   }
+
+  /* ---- 全屏演示时的键盘导航：←/→ 切步、数字键直达、Esc 退出（浏览器原生） ---- */
+  document.addEventListener("keydown", function (ev) {
+    var fs = document.fullscreenElement;
+    if (!fs) return;
+    var flow = fs.classList && fs.classList.contains("sc-flow")
+      ? fs : (fs.closest ? fs.closest(".sc-flow") : null);
+    if (!flow) return;
+    var stepsWrap = flow.querySelector(".sc-steps");
+    if (!stepsWrap) return;
+    if (ev.key === "ArrowRight" || ev.key === "ArrowDown" || ev.key === " ") {
+      ev.preventDefault();
+      var next = stepsWrap.querySelector("[data-step-next]");
+      if (next) next.click();
+    } else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
+      ev.preventDefault();
+      var prev = stepsWrap.querySelector("[data-step-prev]");
+      if (prev) prev.click();
+    } else if (/^[1-9]$/.test(ev.key)) {
+      var dot = stepsWrap.querySelector('[data-step="' + (parseInt(ev.key, 10) - 1) + '"]');
+      if (dot) { ev.preventDefault(); dot.click(); }
+    }
+  });
 
   /* ---- 全屏演示模式 ---- */
   var presentBtn = document.getElementById("sc-present");

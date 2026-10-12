@@ -671,10 +671,17 @@ tr:first-child .rank { color: var(--ink); }
 .mark-judgment { border-left: 3px solid var(--heat); background: var(--panel); padding: 8px 14px; border-radius: 0 var(--r-s) var(--r-s) 0; }
 /* ---- 多实例交互卡：图 + （可选）步骤 + 组件面板，同屏闭环 ---- */
 .sc-flow { margin-top: var(--sp-3); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
-.sc-flow.has-steps { grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr); align-items: start; }
+.sc-flow.has-steps { grid-template-columns: minmax(0, 1.25fr) minmax(270px, 0.75fr); align-items: start; }
 .sc-diagram-card { border: 1px solid var(--line); border-radius: var(--r-m); overflow: hidden; min-width: 0; }
-.sc-diagram-card:fullscreen { background: var(--bg); display: flex; flex-direction: column; }
-.sc-diagram-card:fullscreen .sc-viewport { flex: 1; height: auto; }
+/* 全屏演示：整个流程卡（图 + 步骤 + 组件面板）一起进全屏，演示时可切步 */
+.sc-flow:fullscreen {
+  background: var(--bg); padding: var(--sp-4); gap: var(--sp-4);
+  grid-template-rows: minmax(0, 1fr); align-items: stretch;
+}
+.sc-flow:fullscreen .sc-diagram-card { display: flex; flex-direction: column; min-height: 0; }
+.sc-flow:fullscreen .sc-viewport { flex: 1; height: auto; min-height: 0; }
+.sc-flow:fullscreen .sc-flow-side { max-height: 100%; overflow-y: auto; }
+.sc-flow:fullscreen .sc-steps { flex: none; }
 .sc-diagram-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .sc-diagram-bar > .dim { font-size: var(--fs-xs); flex: 1; min-width: 0; }
 .sc-zoom { display: flex; gap: 4px; flex: none; }
