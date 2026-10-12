@@ -421,16 +421,6 @@ tr:first-child .rank { color: var(--ink); }
 }
 .asst-panel-actions button:hover { color: var(--ink); border-color: var(--line-strong); }
 .asst-toolbar { display: flex; gap: var(--sp-2); }
-#asst-session-select {
-  flex: 1; background: var(--panel2); color: var(--ink);
-  border: 1px solid var(--line); border-radius: var(--r-s);
-  padding: 5px 8px; font-size: var(--fs-xs); font-family: inherit;
-}
-#asst-new {
-  background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
-  border-radius: var(--r-s); width: 30px; cursor: pointer; font-size: var(--fs-sm);
-}
-#asst-new:hover { border-color: var(--acc); color: var(--acc); }
 .asst-workflows { display: flex; flex-wrap: wrap; gap: 6px; }
 .asst-wf-btn {
   background: none; color: var(--dim); border: 1px solid var(--line);
@@ -458,13 +448,14 @@ tr:first-child .rank { color: var(--ink); }
 .asst-wf-tag { color: var(--mom); font-size: var(--fs-xs); margin-bottom: 3px; }
 .asst-form { display: flex; gap: var(--sp-2); align-items: flex-end; }
 .asst-form textarea {
-  flex: 1; resize: none; background: var(--panel2); color: var(--ink);
+  flex: 1; min-width: 0; resize: none; background: var(--panel2); color: var(--ink);
   border: 1px solid var(--line); border-radius: var(--r-m);
   padding: 8px 10px; font-size: var(--fs-sm); font-family: inherit;
   max-height: 96px;
 }
 .asst-form textarea:focus { outline: none; border-color: var(--acc); }
 #asst-send {
+  flex-shrink: 0;
   background: var(--acc); color: var(--acc-ink); border: none;
   border-radius: var(--r-m); padding: 9px 18px; font-weight: 600;
   font-size: var(--fs-sm); cursor: pointer; font-family: inherit;
@@ -569,4 +560,10 @@ tr:first-child .rank { color: var(--ink); }
 .asst-panel.max .asst-body { grid-template-columns: 190px 1fr; }
 @media (max-width: 880px) {
   .asst-body { grid-template-columns: 104px 1fr; }
+}
+
+/* 小窗字号动态缩放：面板内重定义字阶令牌（A- / A+ 调 --asst-scale，localStorage 记忆） */
+.asst-panel {
+  --fs-xs: calc(0.75rem * var(--asst-scale, 1));
+  --fs-sm: calc(0.875rem * var(--asst-scale, 1));
 }

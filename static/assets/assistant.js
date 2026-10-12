@@ -408,6 +408,29 @@
       if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openPanel(); }
     });
     $("asst-min").addEventListener("click", closePanel);
+    /* 字号动态缩放（面板令牌 --asst-scale，记忆在 localStorage） */
+    var FONT_KEY = "asst-font-scale";
+    var FONT_STEPS = [0.85, 1, 1.15, 1.3];
+    var fontScale = 1;
+    try {
+      var saved = parseFloat(localStorage.getItem(FONT_KEY));
+      if (saved >= 0.8 && saved <= 1.4) fontScale = saved;
+    } catch (e) { /* 隐私模式 */ }
+    function applyFontScale() {
+      $("asst-panel").style.setProperty("--asst-scale", String(fontScale));
+      try { localStorage.setItem(FONT_KEY, String(fontScale)); } catch (e) { }
+    }
+    applyFontScale();
+    function stepFontScale(delta) {
+      var idx = FONT_STEPS.indexOf(fontScale);
+      if (idx < 0) idx = FONT_STEPS.indexOf(1);
+      idx = Math.min(FONT_STEPS.length - 1, Math.max(0, idx + delta));
+      fontScale = FONT_STEPS[idx];
+      applyFontScale();
+      msg("字号 " + Math.round(fontScale * 100) + "%");
+    }
+    $("asst-font-minus").addEventListener("click", function () { stepFontScale(-1); });
+    $("asst-font-plus").addEventListener("click", function () { stepFontScale(1); });
     $("asst-max").addEventListener("click", function () {
       var panel = $("asst-panel");
       var maxed = panel.classList.toggle("max");
