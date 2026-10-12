@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
+from . import ai as ai_mod
 from . import assistant, db, news
 
 
@@ -130,6 +131,138 @@ def _has_table(name: str) -> bool:
     return row is not None
 
 
+def _num(v, fmt: str = ".0f", dash: str = "—") -> str:
+    """安全数字格式化：None（如新品无动量历史）显示占位符。"""
+    try:
+        return format(float(v), fmt)
+    except (TypeError, ValueError):
+        return dash
+
+
+# ---- 工作流 4：页面 AI 摘要（首页 / 新闻 / 知识库三板块统一格式） ----
+
+def _page_summary_task(payload: dict) -> str:
+    page = payload.get("page")
+    with db.conn() as c:
+        if page == "home":
+            rows = c.execute(
+                "SELECT r.rank, r.heat_score, r.momentum_score, r.delta_7d,"
+                " r.coverage, p.name, p.vendor FROM rankings r"
+                " JOIN products p ON p.id = r.product_id"
+                " WHERE r.board = 'unified' ORDER BY r.snapshot_date DESC, r.rank"
+                " LIMIT 10").fetchall()
+            if not rows:
+                raise assistant.AssistantError("暂无榜单数据")
+            total = c.execute("SELECT COUNT(*) n FROM products").fetchone()["n"]
+            obs = c.execute(
+                "SELECT COUNT(*) n FROM rankings WHERE board = 'unified'"
+                " AND coverage < 0.5 AND snapshot_date ="
+                " (SELECT MAX(snapshot_date) FROM rankings WHERE board='unified')"
+            ).fetchone()["n"]
+            lines = [f"{r['rank']}. {r['name']}（{r['vendor']}）热度{_num(r['heat_score'])}"
+                     f" 动量{_num(r['momentum_score'])}"
+                     + (f" 7日{_num(r['delta_7d'], '+.1f')}"
+                        if r['delta_7d'] is not None else "")
+                     for r in rows]
+            data = (f"联合榜前 10（共收录 {total} 个产品，观察区 {obs} 个）：\n"
+                    + "\n".join(lines))
+        elif page == "news":
+            rows = c.execute(
+                "SELECT title, source_name, category FROM news_items"
+                " ORDER BY published_at DESC LIMIT 40").fetchall()
+            if not rows:
+                raise assistant.AssistantError("暂无新闻数据")
+            counts = c.execute("SELECT category, COUNT(*) n FROM news_items"
+                               " GROUP BY category ORDER BY n DESC").fetchall()
+            lines = [f"- [{r['category']}] {r['title']}（{r['source_name']}）"
+                     for r in rows]
+            data = ("最近 40 条新闻（分类计数：" +
+                    "、".join(f"{r['category']}{r['n']}" for r in counts) + "）：\n"
+                    + "\n".join(lines))
+        elif page == "knowledge":
+            from .knowledge import load_notes
+            meta, notes = load_notes()
+            if not notes:
+                raise assistant.AssistantError("暂无知识库快照")
+            groups: dict[str, int] = {}
+            for n in notes:
+                groups[n["group_name"]] = groups.get(n["group_name"], 0) + 1
+            data = (f"知识库共 {meta['count']} 篇文档，快照于 {meta['updated'][:10]}"
+                    f"（commit {meta['short_commit']}）；分组："
+                    + "、".join(f"{k} {v} 篇" for k, v in sorted(groups.items())))
+        else:
+            raise assistant.AssistantError(f"未知摘要页: {page}")
+    return (
+        "以下是本站数据页面的当周概况。\n" + data
+        + "\n\n请用中文写一段 150-200 字的页面摘要，面向初次访问的读者："
+          "先说这个板块是什么，再概括当前的重点信息与变化趋势；"
+          "只输出摘要正文，不要标题、不要解释、不要 Markdown 语法。")
+
+
+def _page_summary_store(payload: dict, reply: str) -> None:
+    page = str(payload.get("page", ""))
+    signature = payload.get("signature")
+    with db.conn() as c:
+        db.ensure_ai_tables(c)
+        ai_mod.save_summary(c, page, reply.strip(), str(signature) if signature else None)
+
+
+# ---- 工作流 5：榜单 AI 分析评分（与规则分平行存储） ----
+
+def _board_scores_task(payload: dict) -> str:
+    board = str(payload.get("board", ""))
+    date = str(payload.get("snapshot_date", ""))
+    top_n = int(ai_mod.cfg()["scoring"].get("top_n", 15))
+    with db.conn() as c:
+        rows = c.execute(
+            "SELECT r.rank, r.heat_score, r.momentum_score, r.delta_7d, r.coverage,"
+            " p.name, p.slug, p.vendor, p.category FROM rankings r"
+            " JOIN products p ON p.id = r.product_id"
+            " WHERE r.board = ? AND r.snapshot_date = ?"
+            " ORDER BY r.rank LIMIT ?", (board, date, top_n)).fetchall()
+    if not rows:
+        raise assistant.AssistantError(f"榜单 {board} 当日无数据")
+    lines = [f"{r['rank']}. slug={r['slug']} {r['name']}（{r['vendor']}，"
+             f"{r['category']}）规则热度{_num(r['heat_score'])}"
+             f" 动量{_num(r['momentum_score'])}"
+             + (f" 7日变化{_num(r['delta_7d'], '+.1f')}"
+                if r['delta_7d'] is not None else "")
+             + f" 数据覆盖率{_num(r['coverage'], '.0%')}"
+             for r in rows]
+    return (
+        f"以下是榜单 {board} 的最新排名数据（{date}）。\n" + "\n".join(lines)
+        + "\n\n请为每个产品给出 0-100 的 AI 分析分（综合生态影响力、增长势头、"
+          "数据可信度的判断）与一句话理由（≤40 字）。"
+          "只输出一个 JSON 数组，不要任何其他文字或代码栅栏，格式："
+          '[{"slug": "...", "ai_score": 0-100 的数字, "rationale": "..."}]')
+
+
+def _board_scores_store(payload: dict, reply: str) -> None:
+    board = str(payload.get("board", ""))
+    date = str(payload.get("snapshot_date", ""))
+    with db.conn() as c:
+        db.ensure_ai_tables(c)
+        rows = c.execute(
+            "SELECT p.id, p.slug FROM rankings r JOIN products p ON p.id = r.product_id"
+            " WHERE r.board = ? AND r.snapshot_date = ?", (board, date)).fetchall()
+        by_slug = {r["slug"]: r["id"] for r in rows}
+        parsed = ai_mod.parse_scores_reply(reply, set(by_slug))
+        if not parsed:
+            raise ai_mod.AiParseError("AI 评分输出无法解析为 JSON 数组")
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+        c.execute("DELETE FROM ai_scores WHERE board = ? AND snapshot_date = ?",
+                  (board, date))
+        c.executemany(
+            "INSERT INTO ai_scores (board, snapshot_date, product_id, ai_score,"
+            " rationale, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            [(board, date, by_slug[item["slug"]], item["ai_score"],
+              item["rationale"], now) for item in parsed])
+        if not c.execute("SELECT COUNT(*) n FROM ai_scores WHERE board = ?"
+                         " AND snapshot_date = ?", (board, date)).fetchone()["n"]:
+            raise assistant.AssistantError("AI 评分与榜单产品未能匹配")
+
+
 WORKFLOWS: dict[str, WorkflowSpec] = {
     "news_digest_summary": WorkflowSpec(
         name="news_digest_summary",
@@ -149,6 +282,20 @@ WORKFLOWS: dict[str, WorkflowSpec] = {
         max_tokens=1500,
         build_task=_improve_task,
         store=_improve_store),
+    "page_summary": WorkflowSpec(
+        name="page_summary",
+        description="三板块页面 AI 摘要（payload: {page: home|news|knowledge}，"
+                    "落 ai_summaries 表，管线按数据指纹自动触发）",
+        max_tokens=900,
+        build_task=_page_summary_task,
+        store=_page_summary_store),
+    "board_ai_analysis": WorkflowSpec(
+        name="board_ai_analysis",
+        description="榜单 AI 分析评分（payload: {board, snapshot_date}，"
+                    "严格 JSON 输出，落 ai_scores 表，与规则分平行）",
+        max_tokens=2500,
+        build_task=_board_scores_task,
+        store=_board_scores_store),
 }
 
 

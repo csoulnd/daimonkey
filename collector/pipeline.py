@@ -8,7 +8,7 @@ import json
 import resource
 import traceback
 
-from . import db, export, retention, scoring, sitegen
+from . import ai, db, export, retention, scoring, sitegen
 from .config import DATA_DIR, LOG_DIR, ensure_dirs, now_iso, registry, today_utc
 from .http import Http
 from .sources import SOURCE_REGISTRY
@@ -66,6 +66,15 @@ def _collect(only: set[str] | None = None) -> dict:
 
         summary = (scoring.compute_all(c, products, today_utc())
                    if only is None else {"skipped": "news-only run"})
+        # AI 分析评分：仅全量更新；失败只降级记 notes，不影响状态
+        ai_notes: list[str] = []
+        if only is None:
+            db.ensure_ai_tables(c)
+            try:
+                ai_notes = ai.score_boards(c, today_utc())
+            except Exception as e:  # 双保险：任何异常都不允许打挂采集
+                ai_notes = [f"[ai] 评分步骤异常（已跳过）: {type(e).__name__}: {e}"]
+            notes.extend(ai_notes)
         ret_counts = retention.apply(c)
         peak_mb = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1)
         status = "success" if failed == 0 else "partial"
@@ -81,7 +90,7 @@ def _collect(only: set[str] | None = None) -> dict:
     return {"run_id": run_id, "metrics": total_metrics, "sources_ok": ok,
             "sources_failed": failed, "status": status, "notes": notes,
             "scoring": summary, "retention": ret_counts, "peak_mem_mb": peak_mb,
-            "http_requests": http.request_count}
+            "ai": ai_notes, "http_requests": http.request_count}
 
 
 def run_collect() -> dict:
@@ -94,10 +103,22 @@ def run_news_collect() -> dict:
     return _collect(NEWS_SOURCE_KEYS)
 
 
-def run_build() -> None:
+def run_build() -> list[str]:
+    """导出 API + 建站。建站前按需刷新三板块 AI 摘要（数据指纹变化才生成）。
+
+    返回 AI 摘要步骤的 notes（失败已降级，不影响建站）。
+    """
     ensure_dirs()
+    ai_notes: list[str] = []
+    try:
+        with db.conn() as c:
+            db.ensure_ai_tables(c)
+            ai_notes = ai.refresh_summaries_if_stale(c)
+    except Exception as e:  # 摘要步骤绝不该阻断建站
+        ai_notes = [f"[ai] 摘要步骤异常（已跳过）: {e}"]
     export.export_all()
     sitegen.build()
+    return ai_notes
 
 
 def run_update() -> dict:
@@ -112,7 +133,9 @@ def run_news_update() -> dict:
 
 def _update_with(result: dict) -> dict:
     try:
-        run_build()
+        ai_notes = run_build()
+        result["ai"] = list(result.get("ai", [])) + ai_notes
+        result["notes"] = result.get("notes", []) + ai_notes
         build_ok = True
     except Exception as e:
         build_ok = False
@@ -123,6 +146,6 @@ def _update_with(result: dict) -> dict:
     write_status(state, **{k: v for k, v in result.items()
                            if k in ("run_id", "metrics", "sources_ok",
                                     "sources_failed", "peak_mem_mb",
-                                    "http_requests", "build_error")})
+                                    "http_requests", "build_error", "ai")})
     result["state"] = state
     return result

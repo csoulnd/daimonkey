@@ -17,7 +17,8 @@ from .config import CACHE_DIR, date_days_ago, days_ago, now_iso, registry
 def apply(c) -> dict:
     cfg = registry().get("retention", {})
     counts = {"raw_bodies_evicted": 0, "metrics_deleted": 0,
-              "rankings_deleted": 0, "cache_files_deleted": 0, "news_deleted": 0}
+              "rankings_deleted": 0, "ai_scores_deleted": 0,
+              "cache_files_deleted": 0, "news_deleted": 0}
 
     if cfg.get("raw_body_days"):
         cutoff = days_ago(int(cfg["raw_body_days"]))
@@ -41,6 +42,12 @@ def apply(c) -> dict:
         cutoff = date_days_ago(int(cfg["rankings_days"]))
         counts["rankings_deleted"] = c.execute(
             "DELETE FROM rankings WHERE snapshot_date < ?", (cutoff,)).rowcount
+        # AI 分析分与榜单快照同窗口清理（表可能尚未建：忽略错误）
+        try:
+            counts["ai_scores_deleted"] = c.execute(
+                "DELETE FROM ai_scores WHERE snapshot_date < ?", (cutoff,)).rowcount
+        except Exception:
+            counts["ai_scores_deleted"] = 0
 
     if cfg.get("news_days"):
         cutoff = days_ago(int(cfg["news_days"]))

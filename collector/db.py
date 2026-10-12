@@ -246,6 +246,32 @@ def ensure_assistant_tables(c) -> None:
     c.executescript(ASSISTANT_DDL)
 
 
+# AI 摘要与 AI 分析分：与确定性 rankings 平行存储，永不改写规则分。
+AI_DDL = """
+CREATE TABLE IF NOT EXISTS ai_summaries (
+    page            TEXT PRIMARY KEY,     -- home | news | knowledge
+    content         TEXT NOT NULL,
+    data_signature  TEXT,                 -- 生成时依据的数据指纹（staleness 判断）
+    created_at      TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS ai_scores (
+    board           TEXT NOT NULL,
+    snapshot_date   TEXT NOT NULL,
+    product_id      INTEGER NOT NULL REFERENCES products(id),
+    ai_score        REAL NOT NULL,
+    rationale       TEXT,
+    created_at      TEXT NOT NULL,
+    PRIMARY KEY (board, snapshot_date, product_id)
+);
+CREATE INDEX IF NOT EXISTS idx_ai_scores_date ON ai_scores(snapshot_date);
+"""
+
+
+def ensure_ai_tables(c) -> None:
+    """AI 接入改造上线时调用，旧库在线补表。"""
+    c.executescript(AI_DDL)
+
+
 def conn() -> sqlite3.Connection:
     c = sqlite3.connect(DB_PATH)
     c.row_factory = sqlite3.Row
@@ -260,6 +286,7 @@ def init_db() -> None:
         c.executescript(DDL)
         ensure_news_tables(c)
         ensure_assistant_tables(c)
+        ensure_ai_tables(c)
 
 
 def sha256_hex(data: bytes) -> str:

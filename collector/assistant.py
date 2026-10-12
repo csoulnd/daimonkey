@@ -470,17 +470,20 @@ def run_chat(session_id: int, message: str) -> dict:
 
 
 def run_internal(workflow_name: str, payload: dict | None = None,
-                 channel: str = "internal") -> dict:
+                 channel: str = "internal",
+                 max_tokens: int | None = None) -> dict:
     """内部通道：执行登记在 collector.workflows 的工作流。
 
     channel: collector 进程调用走 internal（站点内部额度）；
     从 /assistant 页面手动触发时 serve.py 传 interactive（用户额度）。
+    max_tokens: 覆盖 spec 默认输出预算（推理模型需要为推理留足空间，
+    数据量大的任务过小预算会出现 finish_reason=max-tokens 空回复）。
     """
-    from . import workflows
     spec = get_workflow(workflow_name)
     task = spec.build_task(payload or {})
     result = _execute(channel, task, session_id=None, dsh_session=None,
-                      workflow=workflow_name, max_tokens=int(spec.max_tokens))
+                      workflow=workflow_name,
+                      max_tokens=int(max_tokens or spec.max_tokens))
     spec.store(payload or {}, result["reply"])
     return result
 

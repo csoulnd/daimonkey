@@ -10,7 +10,7 @@ site:
   lang: zh-CN
 
 methodology:
-  version: v1.3
+  version: v1.4                # v1.4: 新增 AI 分析维度（摘要 + AI 分，默认不影响排序）
   observation_threshold: 0.5    # 加权覆盖率低于该值的产品进观察区，不参与排名
 
 # ---- 历史数据 LRU 保留窗口（天）。0 = 永久保留。每次更新后执行清理 ----
@@ -746,3 +746,15 @@ assistant:
     lockout_minutes: 10
   sessions:
     active_days: 7                  # 会话下拉只显示近 N 天活跃会话（历史不删，仅不列出）
+  # AI 接入（v1.4）：页面摘要随数据刷新自动生成（指纹去重）；AI 分析分平行存储。
+  ai:
+    summaries:
+      enabled: true
+      pages: [home, news, knowledge]   # 三板块顶部 AI 摘要
+      max_tokens: 3000             # 推理+输出总预算（过小会出现 max-tokens 空回复）
+    scoring:
+      enabled: true
+      boards: []                    # 空 = 自动取当日有数据的所有榜；可填 [unified, coding]
+      top_n: 15                     # 每榜取前 N 名送 AI 分析
+      max_tokens: 4000
+      ai_weight: 0.0                # 0 = AI 分仅展示不改排序；调 >0 启用加权融合（方法论同步升级）
