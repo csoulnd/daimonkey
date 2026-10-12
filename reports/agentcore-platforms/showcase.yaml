@@ -2,13 +2,14 @@
 #
 # 四段式：① 产品 A 阿里云 ② 产品 B Amazon ③ 对比 ④ 架构提炼（核心能力检查表）。
 # 事实内容构建时从知识库导入（docs 表），呈现层只做选材/提炼/组织：
-#   - points（开篇概览与章要点卡）：每条须可在文档找到出处，anchor 指向原文段落；
+#   - points：报告摘要与章要点卡，每条可在文档找到出处（anchor 指向原文段落）；
 #     kind: fact（文档事实）/ judgment（研究判断）/ plain（组织性说明）。
+#   - arch_overview：全页唯一的架构总览图（两列并列），核心流程步骤书写在 steps 中，
+#     每步 highligh 两列对应组件——所有流程跳转都在这张图内完成。
 #   - table_filter：对比表只保留目标产品行；compact：去掉已由图承载的引导句。
 # 文档改标题时构建警告、页面标注「文档已变更」，按警告更新 heading 即可。
 showcase:
   title: AgentCore 平台汇报
-  subtitle: 阿里云与 Amazon 的两种解法，与这类平台的核心能力模型
 
   notes: notes.md          # 讲稿（渲染到 /notes/agentcore-platforms，登录可见）
   sources_folds:           # 参考来源折叠表（两个产品的原始来源清单）
@@ -23,66 +24,65 @@ showcase:
     comparison: agent/investigations/products/comparison.md
 
   overview:
-    title: 一页看懂
+    title: 报告摘要
     points:
-      - text: "同一个命题：把 Agent 从「跑得起来」带到「管得起来」——进入受治理的企业运行环境。"
+      - text: "命题：把 Agent 带进受治理的企业运行环境。"
         kind: judgment
         anchor: alibaba_detail#产品定位与边界
-      - text: "**阿里云 = 统一组织**：Workspace 资产与治理为中心，把 Agent 生态当企业资产管理，先管理、后运行。"
+      - text: "阿里云 = 统一组织：Workspace 资产与治理为中心。"
         kind: judgment
         anchor: alibaba_detail#产品定位与边界
-      - text: "**Amazon = 可组合运行**：服务原语 + 托管循环，先运行、按需治理；Runtime 框架中立，Harness 减少循环开发。"
+      - text: "Amazon = 可组合运行：Runtime 承载执行，Harness 与服务按需组合。"
         kind: judgment
         anchor: amazon_detail#产品定位与边界
-      - text: "两家都保留「托管循环 / 自带代码」两条路径，但 Harness 与 Runtime 的关系不同——这是选型分水岭；第四章给出这类平台的 7 项核心能力检查表。"
+      - text: "分水岭在 Harness 与 Runtime 的关系；落点是 7 项核心能力检查表（第四章）。"
         kind: plain
         anchor: comparison#产品定位怎样影响软件架构
 
+  # 架构总览：全页唯一的一张交互图，核心流程跳转全部在此完成
+  arch_overview:
+    id: arch-overview
+    title: 架构总览与核心流程
+    mode: flow
+    from: comparison
+    diagram: unified
+    steps_note: 步骤依据两家详细文档的「一次请求如何执行」组织；高亮分别对应两列，不是抓包结果
+    steps:
+      - alibaba: 在 Workspace 配置模型、工具与凭证，创建 Agent 并选择运行模式；业务渠道调用 Agent Endpoint。
+        amazon: 发布自带代码，或定义托管 Harness 的模型、指令与工具；调用方访问 Runtime Endpoint，经入站身份校验。
+        highlights: [al-define, al-access, am-define, am-access]
+      - alibaba: 实例承载 Agent，以 Session 组织连续交互；不同 Session 使用独立工作目录。
+        amazon: 进入对应运行环境和会话；microVM 与 Instances 的计算与隔离边界按模式区分。
+        highlights: [al-run, am-run]
+      - alibaba: Harness（QwenPaw／Qoder）或应用代码组织上下文；Team 仅在协作路径参与。
+        amazon: Harness 的 Strands 循环或用户应用执行；需要工具时按配置／代码调用，不要求调用全部模块。
+        highlights: [al-loop, am-loop]
+      - alibaba: 调用模型连接与 Skill／MCP 工具，产物落工作目录与 OSS。
+        amazon: 调用模型服务；工具执行走 Gateway、Browser、Code Interpreter、Memory 等按需选项。
+        highlights: [al-cap, am-cap]
+      - alibaba: 结果从入口返回；对话历史、工作文件与外部业务状态分别保存，恢复机制不能相互代替。
+        amazon: 结果经入口返回；运行环境的停止／恢复与业务动作是否重复是不同问题。
+        highlights: [al-gov, am-gov, al-access, am-access]
+
   diagrams:
-    amazon:
-      file: diagram.svg
+    unified:
+      file: unified-diagram.svg
       desc_table_from: amazon_summary
-      caption: 研究视图——依据公开职责重构，不表示 AWS 内部微服务结构
-      doc_note: 文档中的 Mermaid 研究视图以本交互图呈现；原文见知识库详细文档
+      caption: 研究视图——两列按各自公开职责重构，不代表厂商内部架构
+      doc_note: 组件说明引自各自文档表格；接入与定义行的说明为研究视图定位注释
       components:
-        - {id: caller, label: 业务调用方, desc_note: 位于平台之外的调用来源（研究视图定位）}
-        - {id: endpoint, label: Runtime Endpoint, desc_note: 调用入口，关联 Agent 版本与配置（研究视图定位）}
-        - {id: runtime, label: 托管运行环境, desc_key: Runtime}
-        - {id: harness, label: 托管 Harness / Strands, desc_key: "Harness / 用户应用"}
-        - {id: userapp, label: 用户 Agent 代码 / 自选框架, desc_key: "Harness / 用户应用"}
-        - {id: model, label: 模型服务, desc_note: 外部依赖；Runtime 不限定单一模型（研究视图定位）}
-        - {id: tools, label: 工具与记忆服务, desc_key: "Memory / Gateway / 执行工具服务"}
-        - {id: gateway, label: Gateway / Browser / Code Interpreter / Memory, desc_key: "Memory / Gateway / 执行工具服务"}
-        - {id: identity, label: Identity / Policy, desc_key: "Identity / Policy", side: true}
-        - {id: observability, label: Observability / Evaluations, desc_key: "Observability / Evaluations 等", side: true}
-      step_highlights:
-        "1": [userapp, harness]
-        "2": [endpoint, runtime]
-        "3": [harness, userapp, model, tools]
-        "4": [tools, gateway, observability]
-        "5": [endpoint]
-    alibaba:
-      file: alibaba-diagram.svg
-      desc_table_from: alibaba_summary
-      caption: 研究视图——依据公开职责重构，不是厂商内部架构图
-      doc_note: 文档中的 Mermaid 研究视图以本交互图呈现；原文见知识库详细文档
-      components:
-        - {id: caller, label: 业务应用或 IM 渠道, desc_note: 业务侧发起调用（研究视图定位）}
-        - {id: endpoint, label: Agent Endpoint, desc_note: 调用入口（研究视图定位）}
-        - {id: workspace, label: Workspace 资源管理, desc_key: "Workspace / Agent / Team"}
-        - {id: team, label: Team 协作, desc_key: "Workspace / Agent / Team"}
-        - {id: agent, label: Agent 定义, desc_key: "Workspace / Agent / Team"}
-        - {id: runtime, label: 托管实例与 Session, desc_key: "实例 / Session / Endpoint"}
-        - {id: harness, label: QwenPaw / Qoder 或自定义应用, desc_key: "QwenPaw / Qoder 或自定义应用"}
-        - {id: model, label: 模型连接与模型, desc_key: "模型、Skill、MCP、凭证"}
-        - {id: skills, label: Skill 与 MCP 工具, desc_key: "模型、Skill、MCP、凭证"}
-        - {id: storage, label: 工作目录与 OSS, desc_note: 会话文件与持久存储（研究视图定位）}
-        - {id: observability, label: AgentLoop 观测, desc_key: "观测及网络等云依赖", side: true}
-      step_highlights:
-        "1": [workspace, agent]
-        "2": [caller, endpoint, runtime]
-        "3": [harness, model, skills]
-        "4": [runtime, storage]
+        - {id: al-access, label: 业务渠道 → Agent Endpoint, table: alibaba_summary, desc_note: 渠道调用入口（研究视图定位）}
+        - {id: al-define, label: Workspace · Agent 定义, table: alibaba_summary, desc_key: "Workspace / Agent / Team"}
+        - {id: al-run, label: 托管实例与 Session, table: alibaba_summary, desc_key: "实例 / Session / Endpoint"}
+        - {id: al-loop, label: QwenPaw / Qoder 或自定义应用, table: alibaba_summary, desc_key: "QwenPaw / Qoder 或自定义应用"}
+        - {id: al-cap, label: 模型连接 · Skill/MCP · 工作目录/OSS, table: alibaba_summary, desc_key: "模型、Skill、MCP、凭证"}
+        - {id: al-gov, label: AgentLoop 观测, table: alibaba_summary, desc_key: "观测及网络等云依赖", side: true}
+        - {id: am-access, label: 业务调用方 → Runtime Endpoint, table: amazon_summary, desc_note: 调用入口与入站身份（研究视图定位）}
+        - {id: am-define, label: Harness 配置 / 用户代码发布, table: amazon_summary, desc_note: 定义与发布，关联版本与 Endpoint（研究视图定位）}
+        - {id: am-run, label: 托管运行环境（Runtime）, table: amazon_summary, desc_key: Runtime}
+        - {id: am-loop, label: Harness（Strands）或用户应用, table: amazon_summary, desc_key: "Harness / 用户应用"}
+        - {id: am-cap, label: 模型服务 · Gateway / Memory 等服务, table: amazon_summary, desc_key: "Memory / Gateway / 执行工具服务"}
+        - {id: am-gov, label: Identity / Policy · Observability, table: amazon_summary, desc_key: ["Identity / Policy", "Observability / Evaluations 等"], side: true}
     capability:
       file: capability.svg
       desc_table_from: comparison
@@ -116,9 +116,7 @@ showcase:
           anchor: alibaba_detail#定制与运行边界
       sections:
         - {id: a-pos, title: 定位, from: alibaba_detail, heading: 面向谁，核心侧重点是什么}
-        - {id: a-diagram, title: 系统关系图, mode: diagram, from: alibaba_detail, diagram: alibaba}
         - {id: a-objects, title: 关键对象关系, from: alibaba_detail, heading: 关键对象关系}
-        - {id: a-flow, title: 一次请求如何执行, mode: flow, from: alibaba_detail, heading: 一次请求如何执行, diagram: alibaba}
         - {id: a-boundary, title: 模式与边界, from: alibaba_detail, heading: 产品边界, auxiliary: true}
 
     - id: ch-b
@@ -138,10 +136,8 @@ showcase:
           anchor: amazon_detail#软件架构
       sections:
         - {id: b-pos, title: 定位, from: amazon_detail, heading: 面向谁，核心侧重点是什么}
-        - {id: b-diagram, title: 系统关系图, mode: diagram, from: amazon_detail, diagram: amazon}
         - {id: b-exec, title: 计算模式（状态与生命周期）, from: amazon_detail, heading: 执行关系, compact: true}
         - {id: b-design, title: 设计取舍与实现基础, from: amazon_detail, heading: 架构如何支撑产品定位}
-        - {id: b-flow, title: 一次请求如何执行, mode: flow, from: amazon_detail, heading: 一次请求如何执行, diagram: amazon}
         - {id: b-boundary, title: 模式与边界, from: amazon_detail, heading: 两种定制入口, auxiliary: true}
 
     - id: ch-compare

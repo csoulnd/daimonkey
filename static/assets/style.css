@@ -739,3 +739,16 @@ tr:first-child .rank { color: var(--ink); }
   .sc-viewport, .sc-flow.has-steps .sc-viewport { height: 320px; }
 }
 .mark-judgment-inline { border-left: 3px solid var(--heat); background: var(--panel); padding: 2px 10px 2px 8px; margin-left: 6px; border-radius: 0 var(--r-s) var(--r-s) 0; }
+
+/* 架构总览单元：多产品合并图的补充样式 */
+.sc-arch-overview { margin-top: var(--sp-6); }
+.sc-step-tag {
+  display: inline-block; font-size: var(--fs-xs); color: var(--acc);
+  border: 1px solid var(--line); border-radius: var(--r-s);
+  padding: 0 6px; margin-right: 6px;
+}
+.sc-steps-note { font-size: var(--fs-xs); margin: var(--sp-2) 0 0; }
+/* 合并图专用图元 */
+.sc-inner .sc-col-head { font-size: 15px; font-weight: 600; fill: var(--ink); }
+.sc-inner .sc-stage { fill: var(--dim); font-size: 12.5px; text-anchor: end; letter-spacing: 0.1em; }
+.sc-inner .sc-divider { stroke: var(--line); stroke-width: 1; stroke-dasharray: 6 6; }

@@ -243,6 +243,57 @@ class ShowcaseFixture(unittest.TestCase):
         self.assertIn("showcase_error", ctx)
         self.assertTrue(warnings)
 
+    def test_arch_overview_authored_steps_and_table_override(self):
+        """合并图：yaml 书写的双栏步骤 + 步骤高亮 + 组件级表格与列表 desc_key。"""
+        self.write_conf("""
+            showcase:
+              title: 总览测试
+              docs:
+                detail: agent/detail.md
+                amazon: agent/summary.md
+              arch_overview:
+                id: arch-overview
+                title: 架构总览与核心流程
+                mode: flow
+                from: detail
+                diagram: unified
+                steps_note: 步骤依据两家文档
+                steps:
+                  - alibaba: 第一步_阿里动作。
+                    amazon: 第一步_Amazon动作。
+                    highlights: [al-define, am-run]
+                  - text: 第二步_纯文本。
+                    highlights: [al-run]
+              diagrams:
+                unified:
+                  file: diagram.svg
+                  components:
+                    - {id: al-define, label: 定义, table: amazon, desc_key: "Runtime"}
+                    - {id: am-run, label: 运行, table: amazon, desc_key: "Harness / 用户应用"}
+                    - {id: al-run, label: 双行, table: amazon, desc_key: ["Runtime", "Harness / 用户应用"]}
+              chapters: []
+        """)
+        ctx, warnings = self.mod.load_showcase(self.report_dir)
+        self.assertEqual(warnings, [])
+        ao = ctx["arch_overview"]
+        self.assertEqual(len(ao["steps"]), 2)
+        # 双栏步骤：标签 + 各自动作；高亮按步索引覆盖
+        self.assertIn("阿里云", ao["steps"][0])
+        self.assertIn("第一步_阿里动作", ao["steps"][0])
+        self.assertIn("Amazon", ao["steps"][0])
+        self.assertIn("第一步_Amazon动作", ao["steps"][0])
+        self.assertIn("第二步_纯文本", ao["steps"][1])
+        self.assertEqual(ao["step_highlights"]["1"], ["al-define", "am-run"])
+        self.assertEqual(ao["step_highlights"]["2"], ["al-run"])
+        # 组件级 table 覆盖 + 列表 desc_key 合并
+        comps = {c["id"]: c for c in ao["diagram"]["components"]}
+        self.assertIn("承载执行环境与会话生命周期", comps["al-define"]["desc_html"])
+        self.assertIn("托管循环或自带框架", comps["am-run"]["desc_html"])
+        both = comps["al-run"]["desc_html"]
+        self.assertIn("承载执行环境与会话生命周期", both)
+        self.assertIn("托管循环或自带框架", both)
+        self.assertIn("<br>", both)
+
     def test_render_notes(self):
         notes = self.report_dir / "notes.md"
         notes.write_text("# 讲稿\n\n开场白。\n\n<script>alert(1)</script>\n", encoding="utf-8")

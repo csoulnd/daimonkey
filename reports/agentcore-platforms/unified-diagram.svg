@@ -1,0 +1,92 @@
+<svg id="sc-diagram" viewBox="0 0 1040 660" role="img" aria-label="两家 AgentCore 架构总览与核心流程：左列阿里云（渠道→Endpoint→Workspace/Agent定义→实例与Session→QwenPaw/Qoder 或自定义应用→模型/Skill/MCP/存储→AgentLoop观测），右列 Amazon（调用方→Runtime Endpoint→Harness配置/用户代码→Runtime→Harness(Strands)或用户应用→模型/Gateway等服务→Identity/Policy与Observability）">
+  <defs>
+    <marker id="sc-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" class="sc-arrow"></path>
+    </marker>
+  </defs>
+
+  <!-- 列头与阶段标注 -->
+  <text class="sc-col-head" x="320" y="28">阿里云 AgentCore</text>
+  <text class="sc-col-head" x="760" y="28">Amazon Bedrock AgentCore</text>
+  <line class="sc-divider" x1="540" y1="44" x2="540" y2="616"></line>
+  <text class="sc-stage" x="100" y="84">接入</text>
+  <text class="sc-stage" x="100" y="180">定义</text>
+  <text class="sc-stage" x="100" y="276">运行</text>
+  <text class="sc-stage" x="100" y="372">循环</text>
+  <text class="sc-stage" x="100" y="468">能力</text>
+  <text class="sc-stage" x="100" y="580">治理</text>
+
+  <!-- 左列：阿里云 -->
+  <g class="sc-node" data-node="al-access">
+    <rect x="120" y="52" width="400" height="64" rx="9"></rect>
+    <text x="320" y="80">业务应用 / IM 渠道 → Agent Endpoint</text>
+    <text class="sc-sub" x="320" y="102">渠道调用入口</text>
+  </g>
+  <g class="sc-node" data-node="al-define">
+    <rect x="120" y="148" width="400" height="64" rx="9"></rect>
+    <text x="320" y="176">Workspace · Agent 定义</text>
+    <text class="sc-sub" x="320" y="198">模型／工具／凭证 · 资产绑定 · 运行模式</text>
+  </g>
+  <g class="sc-node" data-node="al-run">
+    <rect x="120" y="244" width="400" height="64" rx="9"></rect>
+    <text x="320" y="272">托管实例与 Session</text>
+    <text class="sc-sub" x="320" y="294">会话组织连续交互 · 独立工作目录</text>
+  </g>
+  <g class="sc-node" data-node="al-loop">
+    <rect x="120" y="340" width="400" height="64" rx="9"></rect>
+    <text x="320" y="368">QwenPaw / Qoder 或自定义应用</text>
+    <text class="sc-sub" x="320" y="390">托管循环 或 高代码</text>
+  </g>
+  <g class="sc-node" data-node="al-cap">
+    <rect x="120" y="436" width="400" height="64" rx="9"></rect>
+    <text x="320" y="464">模型连接 · Skill/MCP · 工作目录/OSS</text>
+    <text class="sc-sub" x="320" y="486">能力与资源接入</text>
+  </g>
+  <g class="sc-node sc-side" data-node="al-gov">
+    <rect x="120" y="548" width="400" height="64" rx="9"></rect>
+    <text x="320" y="576">AgentLoop 观测</text>
+    <text class="sc-sub" x="320" y="598">执行轨迹（横向）</text>
+  </g>
+  <path class="sc-edge" d="M 320 116 V 142" marker-end="url(#sc-arr)"></path>
+  <path class="sc-edge" d="M 320 212 V 238" marker-end="url(#sc-arr)"></path>
+  <path class="sc-edge" d="M 320 308 V 334" marker-end="url(#sc-arr)"></path>
+  <path class="sc-edge" d="M 320 404 V 430" marker-end="url(#sc-arr)"></path>
+  <path class="sc-edge-soft" d="M 320 500 V 542" marker-end="url(#sc-arr)"></path>
+
+  <!-- 右列：Amazon -->
+  <g class="sc-node" data-node="am-access">
+    <rect x="560" y="52" width="400" height="64" rx="9"></rect>
+    <text x="760" y="80">业务调用方 → Runtime Endpoint</text>
+    <text class="sc-sub" x="760" y="102">入站身份校验</text>
+  </g>
+  <g class="sc-node" data-node="am-define">
+    <rect x="560" y="148" width="400" height="64" rx="9"></rect>
+    <text x="760" y="176">Harness 配置 / 用户代码发布</text>
+    <text class="sc-sub" x="760" y="198">模型／指令／工具 · 版本与 Endpoint</text>
+  </g>
+  <g class="sc-node" data-node="am-run">
+    <rect x="560" y="244" width="400" height="64" rx="9"></rect>
+    <text x="760" y="272">托管运行环境（Runtime）</text>
+    <text class="sc-sub" x="760" y="294">microVM / Instances · 会话生命周期</text>
+  </g>
+  <g class="sc-node" data-node="am-loop">
+    <rect x="560" y="340" width="400" height="64" rx="9"></rect>
+    <text x="760" y="368">Harness（Strands）或用户应用</text>
+    <text class="sc-sub" x="760" y="390">托管循环 或 自选框架</text>
+  </g>
+  <g class="sc-node" data-node="am-cap">
+    <rect x="560" y="436" width="400" height="64" rx="9"></rect>
+    <text x="760" y="464">模型服务 · Gateway / Memory 等服务</text>
+    <text class="sc-sub" x="760" y="486">按需组合，不要求全部调用</text>
+  </g>
+  <g class="sc-node sc-side" data-node="am-gov">
+    <rect x="560" y="548" width="400" height="64" rx="9"></rect>
+    <text x="760" y="576">Identity / Policy · Observability</text>
+    <text class="sc-sub" x="760" y="598">权限治理 · 采集评估（横向）</text>
+  </g>
+  <path class="sc-edge" d="M 760 116 V 142" marker-end="url(#sc-arr)"></path>
+  <path class="sc-edge" d="M 760 212 V 238" marker-end="url(#sc-arr)"></path>
+  <path class="sc-edge" d="M 760 308 V 334" marker-end="url(#sc-arr)"></path>
+  <path class="sc-edge" d="M 760 404 V 430" marker-end="url(#sc-arr)"></path>
+  <path class="sc-edge-soft" d="M 760 500 V 542" marker-end="url(#sc-arr)"></path>
+</svg>

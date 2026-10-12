@@ -13,37 +13,7 @@
   <button id="sc-present" class="sc-btn" type="button" title="全屏演示模式（Esc 退出）">⛶ 演示模式</button>
 </header>
 
-<div class="sc-shell">
-  <main class="sc-main" id="sc-main">
-    <section class="sc-ov" id="sec-overview">
-      <h2 class="sc-ov-title">{{ overview.title }}</h2>
-      <ul class="sc-points">
-        {% for p in overview.points %}
-        <li class="k-{{ p.kind }}">{{ p.html | safe }}{% if p.href %} <a class="sc-anchor" href="{{ p.href }}" title="原文出处">★</a>{% endif %}</li>
-        {% endfor %}
-      </ul>
-    </section>
-
-    {% for ch in chapters %}
-    <section class="sc-chapter" id="{{ ch.id }}">
-      <div class="sc-chapter-head">
-        <span class="sc-ch-num">第{{ ch.num }}章</span>
-        <h2>{{ ch.title }}</h2>
-        <span class="sc-gist">{{ ch.gist }}</span>
-      </div>
-      {% if ch.lead %}<p class="sc-lead">{{ ch.lead }}</p>{% endif %}
-      {% if ch.points %}
-      <ul class="sc-points ch-points">
-        {% for p in ch.points %}
-        <li class="k-{{ p.kind }}">{{ p.html | safe }}{% if p.href %} <a class="sc-anchor" href="{{ p.href }}" title="原文出处">★</a>{% endif %}</li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-
-      {% for s in ch.sections %}
-      <section class="sc-sec{% if s.auxiliary %} auxiliary{% endif %}" id="sec-{{ s.id }}">
-        <h3 class="sc-sec-title">{{ s.title }}</h3>
-
+{% macro sc_section_body(s) %}
         {% if s.missing %}
         <div class="warn-box">文档已变更：{{ s.missing }}。请更新 showcase.yaml 映射（研究文档可能调整了标题）。</div>
         {% elif s.mode == 'fold' %}
@@ -66,7 +36,7 @@
             <p class="sc-diagram-note dim">{{ s.diagram.doc_note }}</p>
           </div>
           <div class="sc-flow-side">
-            {% if s.mode == 'flow' and s.steps %}
+            {% if s.steps %}
             <div class="sc-steps">
               <div class="sc-steps-nav">
                 <button class="sc-btn" type="button" data-step-prev title="上一步">‹</button>
@@ -78,6 +48,7 @@
               <div class="sc-step-bodies">
                 {% for body in s.steps %}<div class="sc-step-body{% if not loop.first %} hidden{% endif %}" data-step-body="{{ loop.index0 }}">{{ body | safe }}</div>{% endfor %}
               </div>
+              {% if s.steps_note %}<p class="dim sc-steps-note">{{ s.steps_note }}</p>{% endif %}
             </div>
             {% endif %}
             <aside class="sc-panel">
@@ -89,12 +60,51 @@
               </div>
             </aside>
           </div>
-          <script type="application/json" class="sc-data">{{ {"components": s.diagram.components or [], "step_highlights": s.diagram.step_highlights or {}, "doc_url": s.diagram.doc_url} | tojson }}</script>
+          <script type="application/json" class="sc-data">{{ {"components": s.diagram.components or [], "step_highlights": s.step_highlights or s.diagram.step_highlights or {}, "doc_url": s.diagram.doc_url} | tojson }}</script>
         </div>
         {% else %}
         <div class="markdown-body sc-body">{{ s.html | safe }}</div>
         {% endif %}
+{% endmacro %}
 
+<div class="sc-shell">
+  <main class="sc-main" id="sc-main">
+    <section class="sc-ov" id="sec-overview">
+      <h2 class="sc-ov-title">{{ overview.title }}</h2>
+      <ul class="sc-points">
+        {% for p in overview.points %}
+        <li class="k-{{ p.kind }}">{{ p.html | safe }}{% if p.href %} <a class="sc-anchor" href="{{ p.href }}" title="原文出处">★</a>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    {% if arch_overview %}
+    <section class="sc-sec sc-arch-overview" id="sec-arch-overview">
+      <h3 class="sc-sec-title">{{ arch_overview.title }}</h3>
+      {{ sc_section_body(arch_overview) }}
+    </section>
+    {% endif %}
+
+    {% for ch in chapters %}
+    <section class="sc-chapter" id="{{ ch.id }}">
+      <div class="sc-chapter-head">
+        <span class="sc-ch-num">第{{ ch.num }}章</span>
+        <h2>{{ ch.title }}</h2>
+        <span class="sc-gist">{{ ch.gist }}</span>
+      </div>
+      {% if ch.lead %}<p class="sc-lead">{{ ch.lead }}</p>{% endif %}
+      {% if ch.points %}
+      <ul class="sc-points ch-points">
+        {% for p in ch.points %}
+        <li class="k-{{ p.kind }}">{{ p.html | safe }}{% if p.href %} <a class="sc-anchor" href="{{ p.href }}" title="原文出处">★</a>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% for s in ch.sections %}
+      <section class="sc-sec{% if s.auxiliary %} auxiliary{% endif %}" id="sec-{{ s.id }}">
+        <h3 class="sc-sec-title">{{ s.title }}</h3>
+        {{ sc_section_body(s) }}
         <div class="sc-secline dim">
           <a href="{{ s.src.kb_url }}{% if s.src.anchor %}#{{ s.src.anchor }}{% endif %}">知识库原文</a>
           <a href="{{ s.src.gh_url }}" target="_blank" rel="noopener">GitHub ↗</a>
@@ -122,6 +132,9 @@
     <div class="dim sc-toc-cap">目录</div>
     <nav>
       <a href="#sec-overview">{{ overview.title }}</a>
+      {% if arch_overview %}
+      <a href="#sec-arch-overview" class="sc-toc-ch">{{ arch_overview.title }}</a>
+      {% endif %}
       {% for ch in chapters %}
       <a href="#{{ ch.id }}" class="sc-toc-ch">{{ ch.title }}</a>
       {% for s in ch.sections %}

@@ -301,27 +301,42 @@ def _load_diagrams(conf: dict, report_dir: Path, docs: dict,
         d["svg"] = svg_file.read_text(encoding="utf-8") if svg_file.is_file() else ""
         if not d["svg"]:
             warnings.append(f"[showcase] 缺少交互图文件: {d.get('file')}")
-        table: dict[str, str] = {}
-        table_doc = docs.get(str(d.get("desc_table_from", "")))
-        if table_doc:
-            table = parse_component_table(
-                table_doc["body"], str(d.get("desc_table_header", "关键部分")))
+        table_cache: dict[tuple[str, str], dict] = {}
+
+        def table_of(doc_key: str | None, keyword: str) -> tuple[dict, dict | None]:
+            doc = docs.get(str(doc_key or ""))
+            if doc is None:
+                return {}, None
+            ck = (str(doc_key), keyword)
+            if ck not in table_cache:
+                table_cache[ck] = parse_component_table(doc["body"], keyword)
+            return table_cache[ck], doc
+
         components = []
         for comp in d.get("components") or []:
             ckey = comp.get("desc_key")
+            keyword = str(comp.get("desc_table_header")
+                          or d.get("desc_table_header", "关键部分"))
+            table, table_doc = table_of(comp.get("table") or d.get("desc_table_from"),
+                                        keyword)
             desc_html = ""
-            if ckey and table:
-                row = table.get(str(ckey)) or next(
-                    (v for k, v in table.items()
-                     if _norm_heading(str(ckey)) in _norm_heading(k)), None)
-                if row is None:
-                    warnings.append(f"[showcase] 组件表未找到行: {ckey}")
-                elif table_doc:
-                    desc_html = render_inline(row, table_doc["rel"], known, commit)
+            if ckey and table_doc:
+                keys = ckey if isinstance(ckey, list) else [ckey]
+                parts = []
+                for k in keys:
+                    row = table.get(str(k)) or next(
+                        (v for kk, v in table.items()
+                         if _norm_heading(str(k)) in _norm_heading(kk)), None)
+                    if row is None:
+                        warnings.append(f"[showcase] 组件表未找到行: {k}")
+                    else:
+                        parts.append(render_inline(row, table_doc["rel"], known, commit))
+                desc_html = "<br>".join(parts)
             components.append({**comp, "desc_html": desc_html,
                                "desc_source": "doc-table" if desc_html else "view-note"})
         d["components"] = components
-        d["doc_url"] = table_doc["kb_url"] if table_doc else ""
+        default_doc = docs.get(str(d.get("desc_table_from", "")))
+        d["doc_url"] = default_doc["kb_url"] if default_doc else ""
         diagrams[key] = d
     return diagrams, warnings
 
@@ -351,6 +366,96 @@ def _render_points(points: list | None, docs: dict, known: set[str], commit: str
             "href": href,
         })
     return out
+
+
+def _build_section(spec: dict, docs: dict, diagrams: dict, known: set[str],
+                   commit: str, warnings: list[str],
+                   section_source) -> dict | None:
+    """构建一个小节：full 导入 / diagram / flow（文档抽取或 yaml 书写步骤）/ fold。"""
+    doc_key = str(spec.get("from", ""))
+    doc = docs.get(doc_key)
+    if doc is None:
+        warnings.append(f"[showcase] 章节引用了未知文档: {doc_key}")
+        return None
+    heading = str(spec.get("heading", ""))
+    item = {"id": str(spec.get("id", "")), "title": str(spec.get("title", "")),
+            "mode": str(spec.get("mode", "full")),
+            "auxiliary": bool(spec.get("auxiliary")),
+            "missing": None, "step_highlights": None,
+            "steps_note": str(spec.get("steps_note", "")),
+            "src": section_source(doc_key, heading)}
+    rel, body = doc["rel"], doc["body"]
+    if item["mode"] == "fold":
+        items = []
+        for fold in spec.get("items") or []:
+            fdoc = docs.get(str(fold.get("from", "")))
+            if fdoc is None:
+                warnings.append(f"[showcase] 折叠项引用未知文档: {fold.get('from')}")
+                continue
+            seg, warn = extract_section(fdoc["body"], str(fold.get("heading", "")))
+            if warn:
+                warnings.append(f"[showcase] {warn}（文档可能已变更）")
+                continue
+            items.append({"label": str(fold.get("label", "")),
+                          "html": render_md(MERMAID_RE.sub("", seg).strip(),
+                                            fdoc["rel"], known, commit)})
+        item["folds"] = items
+    elif item["mode"] in ("diagram", "flow"):
+        dkey = str(spec.get("diagram", ""))
+        diagram = diagrams.get(dkey)
+        if diagram is None:
+            warnings.append(f"[showcase] 章节引用了未知图: {dkey}")
+            item["missing"] = f"未知图 {dkey}"
+            return item
+        item["diagram"] = diagram
+        if item["mode"] == "flow":
+            authored = spec.get("steps")
+            if authored:
+                # 书写的步骤（跨产品合并图）：每步可含 alibaba/amazon 双栏文案与高亮
+                steps, highlights = [], {}
+                for i, st in enumerate(authored, start=1):
+                    parts = []
+                    if st.get("alibaba"):
+                        parts.append('<p><span class="sc-step-tag">阿里云</span>'
+                                     + render_inline(str(st["alibaba"]), rel, known, commit)
+                                     + "</p>")
+                    if st.get("amazon"):
+                        parts.append('<p><span class="sc-step-tag">Amazon</span>'
+                                     + render_inline(str(st["amazon"]), rel, known, commit)
+                                     + "</p>")
+                    if st.get("text"):
+                        parts.append("<p>" + render_inline(str(st["text"]), rel, known,
+                                                           commit) + "</p>")
+                    steps.append("".join(parts))
+                    if st.get("highlights"):
+                        highlights[str(i)] = [str(h) for h in st["highlights"]]
+                item["steps"] = steps
+                item["step_highlights"] = highlights
+            else:
+                seg, warn = extract_section(body, heading)
+                if warn:
+                    warnings.append(f"[showcase] {warn}（文档可能已变更）")
+                    item["steps"] = []
+                else:
+                    item["steps"] = extract_steps(
+                        MERMAID_RE.sub("", seg).strip(), known, rel, commit)
+    else:
+        seg, warn = extract_section(body, heading)
+        if warn:
+            warnings.append(f"[showcase] {warn}（文档可能已变更）")
+            item["missing"] = warn
+        else:
+            md_text = MERMAID_RE.sub("", seg).strip()
+            flt = spec.get("table_filter")
+            if flt:
+                md_text = filter_table_rows(md_text, [str(k) for k in flt])
+            if spec.get("compact"):
+                # 精简节：去掉首行导语（文档的"阅读路线"类句子）
+                lines = md_text.splitlines()
+                if lines and not lines[0].strip().startswith(("|", "#", "-", "*")):
+                    md_text = "\n".join(lines[1:]).strip()
+            item["html"] = render_md(md_text, rel, known, commit)
+    return item
 
 
 def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
@@ -390,71 +495,24 @@ def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
                    "sections": []}
         used_docs: list[str] = []
         for spec in ch_spec.get("sections") or []:
-            doc_key = str(spec.get("from", ""))
-            doc = docs.get(doc_key)
-            if doc is None:
-                warnings.append(f"[showcase] 章节引用了未知文档: {doc_key}")
+            item = _build_section(spec, docs, diagrams, known, commit,
+                                  warnings, section_source)
+            if item is None:
                 continue
+            doc_key = str(spec.get("from", ""))
             if doc_key not in used_docs:
                 used_docs.append(doc_key)
-            heading = str(spec.get("heading", ""))
-            item = {"id": str(spec["id"]), "title": str(spec.get("title", "")),
-                    "mode": str(spec.get("mode", "full")),
-                    "auxiliary": bool(spec.get("auxiliary")),
-                    "missing": None, "src": section_source(doc_key, heading)}
-            rel, body = doc["rel"], doc["body"]
-            if item["mode"] == "fold":
-                items = []
-                for fold in spec.get("items") or []:
-                    fdoc = docs.get(str(fold.get("from", "")))
-                    if fdoc is None:
-                        warnings.append(f"[showcase] 折叠项引用未知文档: {fold.get('from')}")
-                        continue
-                    seg, warn = extract_section(fdoc["body"], str(fold.get("heading", "")))
-                    if warn:
-                        warnings.append(f"[showcase] {warn}（文档可能已变更）")
-                        continue
-                    items.append({"label": str(fold.get("label", "")),
-                                  "html": render_md(MERMAID_RE.sub("", seg).strip(),
-                                                    fdoc["rel"], known, commit)})
-                item["folds"] = items
-            elif item["mode"] in ("diagram", "flow"):
-                dkey = str(spec.get("diagram", ""))
-                diagram = diagrams.get(dkey)
-                if diagram is None:
-                    warnings.append(f"[showcase] 章节引用了未知图: {dkey}")
-                    item["missing"] = f"未知图 {dkey}"
-                else:
-                    item["diagram"] = diagram
-                if item["mode"] == "flow":
-                    seg, warn = extract_section(body, heading)
-                    if warn:
-                        warnings.append(f"[showcase] {warn}（文档可能已变更）")
-                        item["steps"] = []
-                    else:
-                        item["steps"] = extract_steps(
-                            MERMAID_RE.sub("", seg).strip(), known, rel, commit)
-            else:
-                seg, warn = extract_section(body, heading)
-                if warn:
-                    warnings.append(f"[showcase] {warn}（文档可能已变更）")
-                    item["missing"] = warn
-                else:
-                    md_text = MERMAID_RE.sub("", seg).strip()
-                    flt = spec.get("table_filter")
-                    if flt:
-                        md_text = filter_table_rows(md_text, [str(k) for k in flt])
-                    if spec.get("compact"):
-                        # 精简节：去掉首行导语（文档的"阅读路线"类句子）
-                        lines = md_text.splitlines()
-                        if lines and not lines[0].strip().startswith(("|", "#", "-", "*")):
-                            md_text = "\n".join(lines[1:]).strip()
-                    item["html"] = render_md(md_text, rel, known, commit)
             chapter["sections"].append(item)
         chapter["src_links"] = [{"label": docs[k]["rel"].split("/")[-2],
                                  "kb_url": docs[k]["kb_url"],
                                  "gh_url": docs[k]["gh_url"]} for k in used_docs]
         chapters.append(chapter)
+
+    # 架构总览（报告摘要之后的独立单元：多产品合并图 + 书写的核心流程步骤）
+    arch_overview = None
+    if conf.get("arch_overview"):
+        arch_overview = _build_section(conf["arch_overview"], docs, diagrams,
+                                       known, commit, warnings, section_source)
 
     # 参考来源：链接行 + 折叠表
     sources_links = [{"label": f"{Path(d['rel']).parent.name}/{Path(d['rel']).name}",
@@ -483,10 +541,11 @@ def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
         "sc_title": str(conf.get("title", "调研展示")),
         "sc_subtitle": str(conf.get("subtitle", "")),
         "overview": {
-            "title": str((conf.get("overview") or {}).get("title", "一页看懂")),
+            "title": str((conf.get("overview") or {}).get("title", "报告摘要")),
             "points": _render_points((conf.get("overview") or {}).get("points"),
                                      docs, known, commit, warnings),
         },
+        "arch_overview": arch_overview,
         "chapters": chapters,
         "sources": {"links": sources_links, "folds": sources_folds},
         "notes_url": f"/notes/{report_dir.name}",
