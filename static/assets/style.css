@@ -391,6 +391,7 @@ tr:first-child .rank { color: var(--ink); }
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
 }
+.asst-panel[hidden] { display: none; }
 .asst-panel {
   position: fixed; right: 22px; bottom: 22px; z-index: 61;
   width: min(400px, calc(100vw - 32px));
@@ -401,6 +402,12 @@ tr:first-child .rank { color: var(--ink); }
   padding: var(--sp-3) var(--sp-4) var(--sp-3);
   animation: asst-pop 0.18s ease-out;
 }
+/* 大窗模式（⛶）：长对话 */
+.asst-panel.max {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(780px, calc(100vh - 44px));
+}
+.asst-panel.max .asst-messages { max-height: none; flex: 1; }
 @keyframes asst-pop {
   from { opacity: 0; transform: translateY(12px) scale(0.97); }
   to { opacity: 1; transform: none; }

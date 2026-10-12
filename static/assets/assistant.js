@@ -314,7 +314,15 @@
     pet.addEventListener("keydown", function (ev) {
       if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openPanel(); }
     });
-    $("asst-close").addEventListener("click", closePanel);
+    $("asst-min").addEventListener("click", closePanel);
+    $("asst-max").addEventListener("click", function () {
+      var panel = $("asst-panel");
+      var maxed = panel.classList.toggle("max");
+      this.title = maxed ? "切换回小窗" : "切换大窗";
+    });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && state.open) closePanel();
+    });
     $("asst-logout").addEventListener("click", function () {
       api("/logout", { method: "POST" }).then(function () {
         state.authed = false;
@@ -322,7 +330,7 @@
         $("asst-logout").hidden = true;
         renderMessages([]);
         refreshAll();
-        msg("已退出");
+        msg("已退出登录（下次使用需重新输入密码）");
       });
     });
     $("asst-new").addEventListener("click", newSession);
