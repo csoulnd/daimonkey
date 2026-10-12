@@ -589,3 +589,42 @@ tr:first-child .rank { color: var(--ink); }
   cursor: help; font-size: 0.95em;
 }
 .rcard .ai-score { margin-left: var(--sp-2); font-size: var(--fs-xs); }
+
+/* ---- 报告厅（/reports）：卡片列表 + 三种内容形态 ---- */
+.report-list { display: flex; flex-direction: column; gap: var(--sp-3); margin-top: var(--sp-2); }
+.report-card {
+  display: block; padding: var(--sp-4) var(--sp-5);
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--r-m); color: var(--ink); text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+.report-card:hover { border-color: var(--acc); text-decoration: none; }
+.report-card-head { display: flex; align-items: center; gap: var(--sp-3); }
+.report-title { font-weight: 600; font-size: var(--fs-md); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-date { flex: none; font-size: var(--fs-xs); font-family: var(--mono); }
+.report-kind {
+  flex: none; font-size: var(--fs-xs); padding: 1px 9px;
+  border-radius: var(--r-full); border: 1px solid var(--line);
+}
+.report-kind.k-ppt { color: var(--heat); border-color: var(--heat); }
+.report-kind.k-md { color: var(--acc); border-color: var(--acc); }
+.report-kind.k-html { color: var(--mom); border-color: var(--mom); }
+.report-summary { margin: var(--sp-2) 0 0; color: var(--dim); font-size: var(--fs-sm); line-height: 1.65; }
+.report-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--sp-2); }
+.report-intro { margin-bottom: var(--sp-4); }
+.report-frame-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: var(--fs-sm); margin: var(--sp-3) 0 var(--sp-2);
+}
+.report-frame {
+  width: 100%; height: 76vh; border: 1px solid var(--line);
+  border-radius: var(--r-m); background: var(--panel);
+}
+.report-download p { margin: var(--sp-1) 0; }
+.report-materials { margin-top: var(--sp-6); }
+.report-materials h2 { font-size: var(--fs-md); }
+.report-materials ul { padding-left: 1.2em; }
+.report-materials li { margin: 4px 0; font-size: var(--fs-sm); }
+@media (max-width: 880px) {
+  .report-frame { height: 68vh; }
+}

@@ -15,6 +15,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from . import ai as ai_mod
 from . import db, queries, svgchart, knowledge, news as newslib
+from . import reports as reportslib
 from .config import (DIST_DIR, STATIC_DIR, TEMPLATES_DIR, ensure_dirs, now_iso,
                      registry, today_utc)
 from .scoring import load_latest_metrics
@@ -244,6 +245,8 @@ def build() -> None:
             for old in digest_root.glob("*.html"):
                 if old.stem not in digest_outputs:
                     old.unlink()
+        # ---- 报告厅（第四入口 /reports，内容在仓库 reports/ 目录）----
+        reportslib.build(env, common)
     finally:
         c.close()
 

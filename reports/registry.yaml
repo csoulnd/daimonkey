@@ -1,0 +1,20 @@
+# 报告厅清单：新增报告 = 建目录 reports/{slug}/ + 此处登记一条。
+#
+# 字段：
+#   slug       必填，唯一标识（URL 为 /reports/{slug}）
+#   title      必填，报告标题
+#   date       必填，YYYY-MM-DD（列表按此倒序）
+#   file       选填，内容文件名；缺省按 report.md → index.html → report.html → deck.pptx
+#              探测。支持 .md（站内渲染）/ .html（原样网页嵌入）/ .pptx（原件下载）
+#   summary    选填，一句话摘要（列表与详情页展示）
+#   tags       选填，标签列表
+#   materials  选填，参考材料（知识库笔记路径 / 链接等），详情页展示为"参考材料"
+#
+# 登记后运行一次建站即可发布（任意更新按钮或 --build）。
+reports:
+  - slug: hello-report
+    title: 报告厅框架示例
+    date: 2026-10-12
+    file: report.md
+    summary: 用于验证报告厅渲染链路的示例报告，可在熟悉后删除。
+    tags: [示例, 框架]

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ r.title }} · 报告厅{% endblock %}
+{% block content %}
+<div class="kb-breadcrumb"><a href="/reports">报告厅</a> / <span>{{ r.title }}</span></div>
+
+<section class="kb-intro report-intro">
+  <div class="dim">{{ r.kind_name }} · {{ r.date }}</div>
+  <h1>{{ r.title }}</h1>
+  {% if r.summary %}<p>{{ r.summary }}</p>{% endif %}
+  {% if r.tags %}<div class="report-tags">{% for t in r.tags %}<span class="chip">{{ t }}</span>{% endfor %}</div>{% endif %}
+</section>
+
+{% if r.kind == 'md' %}
+<article class="markdown-body">{{ body_html | safe }}</article>
+{% elif r.kind == 'html' %}
+<div class="report-frame-bar dim">
+  <span>原样网页报告</span>
+  <a href="{{ r.frame_url }}" target="_blank" rel="noopener">新窗口打开 ↗</a>
+</div>
+<iframe class="report-frame" src="{{ r.frame_url }}" title="{{ r.title }}" loading="lazy"></iframe>
+{% else %}
+<section class="note-box report-download">
+  <p><strong>演示文稿原件</strong>：<a href="/reports/{{ r.slug }}/{{ r.file_name }}">{{ r.file_name }}</a>
+    （{% if r.file_mb %}{{ r.file_mb }} MB{% else %}{{ r.file_kb }} KB{% endif %}）</p>
+  <p class="dim">PPT 网页化在线预览（HTML 幻灯片）为后续版本规划；当前提供原件下载。</p>
+</section>
+{% endif %}
+
+{% if r.materials %}
+<section class="report-materials">
+  <h2>参考材料</h2>
+  <ul>
+    {% for m in r.materials %}
+    <li>{% if m.startswith('http://') or m.startswith('https://') or m.startswith('/') %}<a href="{{ m }}"{% if not m.startswith('/') %} target="_blank" rel="noopener"{% endif %}>{{ m }}</a>{% else %}<span>{{ m }}</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

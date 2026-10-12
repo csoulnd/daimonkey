@@ -68,6 +68,7 @@ CONTENT_TYPES = {
     ".gif": "image/gif",
     ".webp": "image/webp",
     ".ico": "image/x-icon",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 }
 
 _lock = threading.Lock()

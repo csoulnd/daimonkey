@@ -17,10 +17,10 @@
     var dp = a.dataset.path || "";
     var on = false;
     if (dp === "/") {
-      // 热度首页是除新闻/知识库/助手外所有页面的归属（榜单/产品/方法论/数据源…）
-      on = here !== "/news" && here !== "/knowledge" && here !== "/assistant"
+      // 热度首页是除新闻/知识库/报告厅/助手外所有页面的归属（榜单/产品/方法论/数据源…）
+      on = here !== "/news" && here !== "/knowledge" && here !== "/reports" && here !== "/assistant"
         && !here.startsWith("/news/") && !here.startsWith("/knowledge/")
-        && !here.startsWith("/assistant/");
+        && !here.startsWith("/reports/") && !here.startsWith("/assistant/");
     } else {
       on = dp === here || here.startsWith(dp + "/");
     }

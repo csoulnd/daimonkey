@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="/assets/style.css?v={{ assets_v }}">
 </head>
 <body{% if knowledge_page %} class="knowledge-page"{% endif %}>
-{% if stale and not knowledge_page and not news_page %}<div class="stale-banner">⚠ 数据超过 48 小时未更新（{{ meta.last_collected_at | dt }}），点击右上「更新」刷新</div>{% endif %}
+{% if stale and not knowledge_page and not news_page and not reports_page %}<div class="stale-banner">⚠ 数据超过 48 小时未更新（{{ meta.last_collected_at | dt }}），点击右上「更新」刷新</div>{% endif %}
 <div class="layout">
   <aside class="side" id="sidebar">
     <div class="side-head">
@@ -19,6 +19,7 @@
     <nav class="tree">
       <a href="/" data-path="/"><i>├─</i>智能体热度指数</a>
       <a href="/news" data-path="/news"><i>├─</i>AI Agent 新闻</a>
+      <a href="/reports" data-path="/reports"><i>├─</i>报告厅</a>
       <a href="/knowledge" data-path="/knowledge"><i>└─</i>个人知识库</a>
     </nav>
     {% if knowledge_page %}
@@ -37,6 +38,8 @@
           {% if knowledge_page %}
           <span class="asof">仓库快照 {{ kb.updated[:10] if kb.updated else '尚未同步' }} · {{ kb.short_commit }}</span>
           <button id="btn-kb-update" type="button" title="从 GitHub 同步知识库代码仓（约 10~60 秒），不重采热度数据">⟳ 同步知识库</button>
+          {% elif reports_page %}
+          <span class="asof">共 {{ reports_total }} 份报告</span>
           {% elif news_page %}
           <span class="asof" title="新闻与热度数据的最后采集时间">新闻截至 {{ news_meta.last_fetched_at | dt if news_meta.last_fetched_at else '暂无' }} · 热度截至 {{ meta.last_collected_at | dt if meta.last_collected_at else '暂无数据' }}</span>
           <button id="btn-news-update" type="button" title="仅采集新闻（约 1 分钟），不重采热度数据">⟳ 仅更新新闻</button>
@@ -54,6 +57,8 @@
       <footer class="footer">
         {% if knowledge_page %}
         <p class="dim">内容来自 <a href="{{ kb.url }}">csoulnd / InferTechNote</a>，以 GitHub 仓库为准；本站提供只读快照。外部子模块通过原仓库链接访问。</p>
+        {% elif reports_page %}
+        <p class="dim">报告内容与代码同仓版本化（<code>reports/</code>）；素材来自知识库、站内数据与外部资料。HTML 报告为作者自备内容。</p>
         {% else %}
         <p class="dim">数据为公开信息汇总；原始响应体保留期为 {{ meta.retention.raw_body_days }} 天，过期后仅保留元数据和校验值。不构成投资或采购建议。</p>
         <p class="dim foot-end"><a href="/methodology">方法论</a> · <a href="/sources">数据源</a></p>

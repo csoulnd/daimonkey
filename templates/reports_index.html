@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}报告厅 · {{ site.name }}{% endblock %}
+{% block content %}
+<section class="kb-intro">
+  <div class="dim">REPORT HALL</div>
+  <h1>报告厅</h1>
+  <p>汇报报告与演示文稿：网页报告直接在线阅读（Markdown 或原样 HTML），PPT 提供原件下载。</p>
+  <div class="dim">共 {{ reports | length }} 份报告 · 内容与代码同仓版本化</div>
+</section>
+
+{% if reports %}
+<div class="report-list">
+  {% for r in reports %}
+  <a class="report-card" href="/reports/{{ r.slug }}">
+    <div class="report-card-head">
+      <span class="report-kind k-{{ r.kind }}">{{ r.kind_name }}</span>
+      <span class="report-title">{{ r.title }}</span>
+      <span class="dim report-date">{{ r.date }}</span>
+    </div>
+    {% if r.summary %}<p class="report-summary">{{ r.summary }}</p>{% endif %}
+    {% if r.tags %}<div class="report-tags">{% for t in r.tags %}<span class="chip">{{ t }}</span>{% endfor %}</div>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="warn-box">报告厅还是空的：在 <code>reports/registry.yaml</code> 登记第一份报告后运行一次建站。新增方式见 <code>reports/README.md</code>。</div>
+{% endif %}
+{% endblock %}
