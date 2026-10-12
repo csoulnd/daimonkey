@@ -272,20 +272,36 @@ def _commit() -> str:
 
 # ---- 主入口 ----
 
-def _load_docs(conf: dict, known: set[str], commit: str) -> tuple[dict, list[str]]:
-    """加载 docs 注册表中的全部源文档：{key: {rel, body, meta}}。"""
+def _load_docs(conf: dict, known: set[str], commit: str,
+               report_dir: Path) -> tuple[dict, list[str]]:
+    """加载 docs 注册表中的源文档：{key: {rel, path, body, meta, kb_url, gh_url, label}}。
+
+    支持两类来源：
+    - 知识库路径（默认）：相对 data/knowledge-repo，链接指向 /knowledge 页面 + GitHub 固定链接；
+    - 本地素材（`local:` 前缀）：相对报告目录（如来源素材文档），链接指向 doc_urls
+      登记的外部官方原文。
+    """
     from .knowledge import split_frontmatter
     docs: dict[str, dict] = {}
     warnings: list[str] = []
-    for key, rel in (conf.get("docs") or {}).items():
-        path = KB_REPO / str(rel)
+    urls = conf.get("doc_urls") or {}
+    for key, val in (conf.get("docs") or {}).items():
+        rel = str(val)
+        local = rel.startswith("local:")
+        path = report_dir / rel[len("local:"):] if local else KB_REPO / rel
         if not path.is_file():
-            warnings.append(f"[showcase] 源文档不存在: {rel}（先同步知识库）")
+            warnings.append(f"[showcase] 源文档不存在: {rel}（知识库未同步或素材缺失）")
             continue
         meta, body = split_frontmatter(path.read_text(encoding="utf-8"))
-        docs[str(key)] = {"rel": str(rel), "body": body, "meta": meta,
-                          "kb_url": note_url(str(rel)),
-                          "gh_url": _github_blob(str(rel), commit)}
+        if local:
+            kb_url, gh_url, label = str(urls.get(str(key), "")), "", "官方原文"
+        else:
+            kb_url = note_url(rel)
+            gh_url = _github_blob(rel, commit)
+            label = "知识库原文"
+        docs[str(key)] = {"rel": rel, "path": path, "body": body, "meta": meta,
+                          "kb_url": kb_url, "gh_url": gh_url, "label": label,
+                          "local": local}
     return docs, warnings
 
 
@@ -353,7 +369,7 @@ def _render_points(points: list | None, docs: dict, known: set[str], commit: str
         if anchor:
             key, _, heading = str(anchor).partition("#")
             doc = docs.get(key)
-            if doc and heading:
+            if doc and heading and not doc.get("local"):
                 href = doc["kb_url"] + "#" + quote(slugify_unicode(heading, "-"), safe="")
             elif doc:
                 href = doc["kb_url"]
@@ -469,7 +485,7 @@ def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
     conf = conf.get("showcase") or {}
     commit = _commit()
     known = _known_paths()
-    docs, w = _load_docs(conf, known, commit)
+    docs, w = _load_docs(conf, known, commit, report_dir)
     warnings.extend(w)
     if not docs:
         return {"showcase_error": "未配置可用的源文档（先同步知识库）"}, warnings
@@ -478,10 +494,14 @@ def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
 
     def section_source(doc_key: str, heading: str) -> dict:
         doc = docs.get(doc_key, {})
+        anchor = ""
+        if heading and not doc.get("local"):
+            anchor = quote(slugify_unicode(heading, "-"), safe="")
         return {
             "kb_url": doc.get("kb_url", ""),
             "gh_url": doc.get("gh_url", ""),
-            "anchor": quote(slugify_unicode(heading, "-"), safe="") if heading else "",
+            "label": doc.get("label", "知识库原文"),
+            "anchor": anchor,
         }
 
     chapters = []
@@ -503,9 +523,12 @@ def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
             if doc_key not in used_docs:
                 used_docs.append(doc_key)
             chapter["sections"].append(item)
-        chapter["src_links"] = [{"label": docs[k]["rel"].split("/")[-2],
-                                 "kb_url": docs[k]["kb_url"],
-                                 "gh_url": docs[k]["gh_url"]} for k in used_docs]
+        chapter["src_links"] = [{
+            "label": (docs[k]["meta"].get("title") or docs[k]["rel"])
+                     if docs[k]["local"] else docs[k]["rel"].split("/")[-2],
+            "kb_url": docs[k]["kb_url"],
+            "gh_url": docs[k]["gh_url"],
+            "link_label": docs[k]["label"]} for k in used_docs]
         chapters.append(chapter)
 
     # 架构总览（报告摘要之后的独立单元：多产品合并图 + 书写的核心流程步骤）
@@ -515,9 +538,14 @@ def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
                                        known, commit, warnings, section_source)
 
     # 参考来源：链接行 + 折叠表
-    sources_links = [{"label": f"{Path(d['rel']).parent.name}/{Path(d['rel']).name}",
-                      "kb_url": d["kb_url"], "gh_url": d["gh_url"]}
-                     for d in docs.values()]
+    sources_links = []
+    for d in docs.values():
+        if d["local"]:
+            label = str(d["meta"].get("title") or d["rel"])
+        else:
+            label = f"{Path(d['rel']).parent.name}/{Path(d['rel']).name}"
+        sources_links.append({"label": label, "kb_url": d["kb_url"],
+                              "gh_url": d["gh_url"], "link_label": d["label"]})
     sources_folds = []
     for fold in conf.get("sources_folds") or []:
         doc = docs.get(str(fold.get("from", "")))
@@ -550,7 +578,7 @@ def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
 
     fingerprint = hashlib.sha256()
     for d in docs.values():
-        fingerprint.update((KB_REPO / d["rel"]).read_bytes())
+        fingerprint.update(d["path"].read_bytes())
 
     ctx = {
         "showcase_error": None,

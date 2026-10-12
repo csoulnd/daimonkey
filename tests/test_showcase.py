@@ -314,6 +314,50 @@ class ShowcaseFixture(unittest.TestCase):
         self.assertGreaterEqual(att["size_kb"], 2)
         self.assertTrue(any("附件不存在" in w for w in warnings))
 
+    def test_local_source_docs(self):
+        """本地来源素材（local: 前缀）：指向官方原文、无 GitHub 链接、锚点走外部。"""
+        src_dir = self.report_dir / "sources"
+        src_dir.mkdir()
+        (src_dir / "official.md").write_text(textwrap.dedent("""\
+            ---
+            title: 官方素材
+            ---
+            # 官方素材
+
+            ## 官方定义
+
+            这是官方定义段落。
+        """), encoding="utf-8")
+        self.write_conf("""
+            showcase:
+              title: T
+              docs:
+                kb: agent/detail.md
+                official: "local:sources/official.md"
+              doc_urls:
+                official: "https://example.com/a"
+              overview:
+                points:
+                  - {text: "要点。", kind: fact, anchor: "official#官方定义"}
+              chapters:
+                - id: ch
+                  title: 章
+                  sections:
+                    - {id: s1, title: 定义, from: official, heading: 官方定义}
+                    - {id: s2, title: 定位, from: kb, heading: 产品定位与边界}
+        """)
+        ctx, warnings = self.mod.load_showcase(self.report_dir)
+        self.assertEqual(warnings, [])
+        secs = {s["id"]: s for s in ctx["chapters"][0]["sections"]}
+        self.assertIn("官方定义段落", secs["s1"]["html"])
+        self.assertEqual(secs["s1"]["src"]["label"], "官方原文")
+        self.assertEqual(secs["s1"]["src"]["gh_url"], "")
+        self.assertEqual(secs["s1"]["src"]["anchor"], "")     # 本地素材不带锚点
+        self.assertIn("/knowledge/notes/agent/detail.html",
+                      secs["s2"]["src"]["kb_url"])            # 知识库文档不受影响
+        # 要点锚点 → 官方原文整链（无 # 锚点）
+        self.assertEqual(ctx["overview"]["points"][0]["href"], "https://example.com/a")
+
     def test_render_notes(self):
         notes = self.report_dir / "notes.md"
         notes.write_text("# 讲稿\n\n开场白。\n\n<script>alert(1)</script>\n", encoding="utf-8")

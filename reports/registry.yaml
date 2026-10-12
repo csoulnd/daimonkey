@@ -16,8 +16,8 @@ reports:
   - slug: agentcore-platforms
     title: AgentCore 平台汇报
     date: 2026-10-12
-    summary: 撰写中——第一章 · 平台定义（阿里云 AgentCore 是什么、面向谁）；第二章 · 架构。附 2026-10-09 原始演示文稿。
-    tags: [汇报, AgentCore, 撰写中]
+    summary: 第一章 · 阿里云 AgentCore 平台定义；第二章 · Amazon Bedrock AgentCore 七大核心能力（均为官方口径，两产品各自独立）。附 2026-10-09 原始演示文稿。
+    tags: [汇报, AgentCore, 官方口径]
   - slug: hello-report
     title: 报告厅框架示例
     date: 2026-10-12
