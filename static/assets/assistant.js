@@ -163,36 +163,70 @@
       });
     });
   }
-  function renameSession() {
-    if (!state.sessionId) { msg("没有可重命名的会话", true); return; }
-    withAuth(function () {
-      var sel = $("asst-session-select");
-      var current = sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text : "";
-      var title = window.prompt("会话标题：", current);
-      if (!title || !title.trim()) return null;
-      return api("/sessions/" + state.sessionId + "/rename", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim() })
-      }).then(function (res) {
-        if (res.ok) { msg("已重命名"); refreshSessions(); }
-        else { msg(res.body.error || "重命名失败", true); }
-      });
+  /* ---- 面板内闭环：行内重命名 / 行内删除确认（不用浏览器原生弹窗，避免焦点抢占导致页面滚动） ---- */
+  function anyInlineRowOpen() {
+    return ["asst-rename-row", "asst-delete-row", "asst-login-row"]
+      .some(function (id) { var n = $(id); return n && !n.hidden; });
+  }
+  function hideInlineRows() {
+    ["asst-rename-row", "asst-delete-row"].forEach(function (id) {
+      var n = $(id); if (n) n.hidden = true;
     });
   }
+
+  function renameSession() {
+    if (!state.sessionId) { msg("没有可重命名的会话", true); return; }
+    var row = $("asst-rename-row");
+    var input = $("asst-rename-input");
+    if (!row.hidden) { row.hidden = true; return; }  // 再点一次 ✎ 收起
+    var sel = $("asst-session-select");
+    input.value = sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text : "";
+    row.hidden = false;
+    input.focus();
+    input.select();
+    function submit() {
+      var title = input.value.trim();
+      row.hidden = true;
+      if (!title) return;
+      withAuth(function () {
+        return api("/sessions/" + state.sessionId + "/rename", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: title })
+        }).then(function (res) {
+          if (res.ok) { msg("已重命名"); refreshSessions(); }
+          else { msg(res.body.error || "重命名失败", true); }
+        });
+      });
+    }
+    input.onkeydown = function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); submit(); }
+      else if (ev.key === "Escape") { ev.stopPropagation(); row.hidden = true; }
+    };
+    $("asst-rename-ok").onclick = submit;
+    $("asst-rename-cancel").onclick = function () { row.hidden = true; };
+  }
+
   function deleteSession() {
     if (!state.sessionId) { msg("没有可删除的会话", true); return; }
-    withAuth(function () {
-      if (!window.confirm("删除当前会话及其全部消息？此操作不可恢复。")) return null;
-      return api("/sessions/" + state.sessionId, { method: "DELETE" }).then(function (res) {
-        if (res.ok) {
-          state.sessionId = null;
-          renderMessages([]);
-          refreshSessions();
-          msg("会话已删除");
-        } else { msg(res.body.error || "删除失败", true); }
+    var row = $("asst-delete-row");
+    if (!row.hidden) { row.hidden = true; return; }  // 再点一次 🗑 收起
+    hideInlineRows();
+    row.hidden = false;
+    $("asst-delete-ok").onclick = function () {
+      row.hidden = true;
+      withAuth(function () {
+        return api("/sessions/" + state.sessionId, { method: "DELETE" }).then(function (res) {
+          if (res.ok) {
+            state.sessionId = null;
+            renderMessages([]);
+            refreshSessions();
+            msg("会话已删除");
+          } else { msg(res.body.error || "删除失败", true); }
+        });
       });
-    });
+    };
+    $("asst-delete-cancel").onclick = function () { row.hidden = true; };
   }
 
   function renderMessages(items) {
@@ -321,7 +355,7 @@
         if (!v) return;
         var line = el("span", "asst-usage-line" +
           (v.limit && v.requests / v.limit >= 0.8 ? " warn" : ""));
-        line.textContent = (ch === "interactive" ? "助手" : "内部")
+        line.textContent = "今日" + (ch === "interactive" ? "助手" : "内部")
           + " " + v.requests + "/" + v.limit
           + " · " + fmtTokens(v.tokens) + "tok";
         box.appendChild(line);
@@ -358,7 +392,9 @@
       this.title = maxed ? "切换回小窗" : "切换大窗";
     });
     document.addEventListener("keydown", function (ev) {
-      if (ev.key === "Escape" && state.open) closePanel();
+      if (ev.key !== "Escape" || !state.open) return;
+      if (anyInlineRowOpen()) { hideInlineRows(); return; }  // 先关行内框，再最小化
+      closePanel();
     });
     $("asst-logout").addEventListener("click", function () {
       api("/logout", { method: "POST" }).then(function () {

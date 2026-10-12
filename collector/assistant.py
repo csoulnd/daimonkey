@@ -22,7 +22,7 @@ import signal
 import threading
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from .config import DATA_DIR, registry
 from . import db
@@ -262,12 +262,20 @@ def create_session(title: str) -> int:
 
 
 def list_sessions() -> list[dict]:
+    """会话下拉数据：只列活跃会话（默认近 7 天有使用，registry 可调）。
+
+    历史会话不删除（可溯源），只是不再出现在切换列表里。
+    """
+    active_days = int(cfg().get("sessions", {}).get("active_days", 7))
+    cutoff = (datetime.now(timezone.utc).astimezone()
+              - timedelta(days=active_days)).isoformat(timespec="seconds")
     with _connect() as c:
         rows = c.execute(
             "SELECT s.id, s.title, s.dsh_session, s.updated_at,"
             " (SELECT COUNT(*) FROM assistant_messages m WHERE m.session_id = s.id)"
             " AS messages FROM assistant_sessions s"
-            " ORDER BY s.updated_at DESC LIMIT 100").fetchall()
+            " WHERE s.updated_at >= ?"
+            " ORDER BY s.updated_at DESC LIMIT 100", (cutoff,)).fetchall()
     return [dict(r) for r in rows]
 
 

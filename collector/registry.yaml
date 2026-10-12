@@ -744,3 +744,5 @@ assistant:
   login:
     max_failures: 5
     lockout_minutes: 10
+  sessions:
+    active_days: 7                  # 会话下拉只显示近 N 天活跃会话（历史不删，仅不列出）

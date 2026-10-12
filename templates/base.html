@@ -79,8 +79,18 @@
     <button id="asst-rename" class="icon" type="button" title="重命名当前会话">✎</button>
     <button id="asst-delete" class="icon danger" type="button" title="删除当前会话">🗑</button>
   </div>
+  <div class="asst-inline-row" id="asst-rename-row" hidden>
+    <input type="text" id="asst-rename-input" placeholder="会话标题" maxlength="80">
+    <button id="asst-rename-ok" type="button">确定</button>
+    <button id="asst-rename-cancel" type="button" class="muted">取消</button>
+  </div>
+  <div class="asst-inline-row confirm" id="asst-delete-row" hidden>
+    <span class="asst-confirm-text">删除当前会话及全部消息？不可恢复。</span>
+    <button id="asst-delete-ok" type="button" class="danger">删除</button>
+    <button id="asst-delete-cancel" type="button" class="muted">取消</button>
+  </div>
   <div class="asst-workflows" id="asst-workflows"></div>
-  <div class="asst-login-row" id="asst-login-row" hidden>
+  <div class="asst-inline-row" id="asst-login-row" hidden>
     <input type="password" id="asst-password" placeholder="输入密码，回车登录" maxlength="128" autocomplete="current-password">
   </div>
   <div id="asst-messages" class="asst-messages" aria-live="polite"></div>

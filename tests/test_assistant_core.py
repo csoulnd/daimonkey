@@ -54,6 +54,27 @@ class AssistantCoreTests(unittest.TestCase):
         self.assertEqual(a.list_sessions(), [])
         self.assertFalse(a.delete_session(sid))
 
+    def test_list_sessions_active_filter(self):
+        """会话下拉只显示近 N 天活跃会话；过期的保留在库但不再列出。"""
+        a = self.assistant
+        import collector.db as db
+        from datetime import datetime, timedelta, timezone
+
+        def local_iso(days_ago: float) -> str:
+            return (datetime.now(timezone.utc).astimezone()
+                    - timedelta(days=days_ago)).isoformat(timespec="seconds")
+
+        fresh = a.create_session("活跃会话")
+        stale = a.create_session("过期会话")
+        with db.conn() as c:
+            c.execute("UPDATE assistant_sessions SET updated_at = ? WHERE id = ?",
+                      (local_iso(30), stale))
+        titles = [s["title"] for s in a.list_sessions()]
+        self.assertIn("活跃会话", titles)
+        self.assertNotIn("过期会话", titles)
+        # 过期会话仍在库中，消息可正常读取
+        self.assertTrue(a.session_messages(stale) == [])
+
     def test_quota_enforced_per_channel(self):
         a = self.assistant
         # 灌满 interactive 当日请求数（limit=100）

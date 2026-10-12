@@ -496,3 +496,25 @@ tr:first-child .rank { color: var(--ink); }
 }
 .asst-toolbar button.icon:hover { color: var(--ink); border-color: var(--line-strong); }
 .asst-toolbar button.icon.danger:hover { color: var(--down); border-color: var(--down); }
+
+/* 面板内闭环的行内操作行（重命名 / 删除确认 / 登录共用） */
+.asst-inline-row { display: flex; gap: var(--sp-2); align-items: center; }
+.asst-inline-row[hidden] { display: none; }
+.asst-inline-row input {
+  flex: 1; min-width: 0; background: var(--panel2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--r-s);
+  padding: 7px 10px; font-size: var(--fs-xs); font-family: inherit;
+}
+.asst-inline-row input:focus { outline: none; border-color: var(--acc); }
+.asst-inline-row button {
+  background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: var(--r-s); padding: 6px 12px; font-size: var(--fs-xs);
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.asst-inline-row button:hover { border-color: var(--line-strong); }
+.asst-inline-row button.muted { color: var(--dim); }
+.asst-inline-row button.danger { color: var(--down); }
+.asst-inline-row button.danger:hover { border-color: var(--down); }
+.asst-inline-row.confirm .asst-confirm-text {
+  flex: 1; font-size: var(--fs-xs); color: var(--down);
+}
