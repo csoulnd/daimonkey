@@ -50,6 +50,41 @@ class UpdateAuthTests(unittest.TestCase):
                     httpd.server_close()
                     thread.join()
 
+    def test_assistant_session_cookie_grants_update(self):
+        """一次登录完全权限：合法助手 Cookie 可直接触发更新（免密码）。"""
+        with tempfile.TemporaryDirectory() as directory:
+            password_file = Path(directory) / "password.sha256"
+            password_file.write_text(hashlib.sha256(b"test-password").hexdigest())
+            secret_file = Path(directory) / "assistant_secret"
+            running = Mock()
+            running.poll.return_value = None
+            with patch.object(server, "PASSWORD_FILE", password_file), \
+                    patch.object(server, "ASSISTANT_SECRET_FILE", secret_file), \
+                    patch.dict(server._proc, {"running": running}), \
+                    patch.object(server.subprocess, "Popen") as spawn:
+                httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+                thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    cookie = f"assistant_session={server.make_cookie_value()}"
+                    # 合法 Cookie、无密码头 -> 通过鉴权（因 running mock 返回 409）
+                    conn = HTTPConnection(*httpd.server_address)
+                    conn.request("POST", "/api/v1/update",
+                                 headers={"Cookie": cookie})
+                    self.assertEqual(conn.getresponse().status, 409)
+                    conn.close()
+                    # 伪造 Cookie -> 401
+                    conn = HTTPConnection(*httpd.server_address)
+                    conn.request("POST", "/api/v1/update",
+                                 headers={"Cookie": "assistant_session=1.bad"})
+                    self.assertEqual(conn.getresponse().status, 401)
+                    conn.close()
+                    spawn.assert_not_called()
+                finally:
+                    httpd.shutdown()
+                    httpd.server_close()
+                    thread.join()
+
 
 if __name__ == "__main__":
     unittest.main()

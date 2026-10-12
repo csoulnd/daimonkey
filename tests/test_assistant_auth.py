@@ -43,10 +43,17 @@ class AssistantAuthTests(unittest.TestCase):
         self._secret_patch.start()
         self._secret_patch2 = patch.object(server, "ASSISTANT_SECRET_FILE", self.secret_file)
         self._secret_patch2.start()
+        # 数据隔离：助手端点走真实 DB，这里指到临时库避免读到生产会话
+        from collector import db as _db
+        self._db_patch = patch.object(_db, "DB_PATH",
+                                      Path(self._tmp.name) / "test.sqlite3")
+        self._db_patch.start()
+        with _db.conn() as c:
+            _db.ensure_assistant_tables(c)
         # 重置登录限流与任务状态（模块级可变量）
         server._login_guard.update(failures=0, locked_until=0.0)
         server._chat_state.update(state="idle", error=None, session_id=None,
-                                  workflow=None, started_at=None)
+                                  workflow=None, started_at=None, reply=None)
         self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
 
@@ -55,6 +62,7 @@ class AssistantAuthTests(unittest.TestCase):
         self.httpd.server_close()
         self._secret_patch.stop()
         self._secret_patch2.stop()
+        self._db_patch.stop()
         self._tmp.cleanup()
 
     def test_login_issues_cookie_and_protects_endpoints(self):

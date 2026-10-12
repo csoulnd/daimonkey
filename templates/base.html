@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}{{ site.name }}{% endblock %}</title>
 <script>try{if(localStorage.getItem("side")==="closed")document.documentElement.classList.add("no-side")}catch(e){}</script>
+<script>try{var t=localStorage.getItem("theme");if(t==="light"||(!t&&matchMedia("(prefers-color-scheme: light)").matches))document.documentElement.dataset.theme="light"}catch(e){}</script>
 <link rel="stylesheet" href="/assets/style.css?v={{ assets_v }}">
 </head>
 <body{% if knowledge_page %} class="knowledge-page"{% endif %}>
-{% if stale and not knowledge_page and not news_page and not assistant_page %}<div class="stale-banner">⚠ 数据超过 48 小时未更新（{{ meta.last_collected_at | dt }}），点击右上「更新」刷新</div>{% endif %}
+{% if stale and not knowledge_page and not news_page %}<div class="stale-banner">⚠ 数据超过 48 小时未更新（{{ meta.last_collected_at | dt }}），点击右上「更新」刷新</div>{% endif %}
 <div class="layout">
   <aside class="side" id="sidebar">
     <div class="side-head">
@@ -18,8 +19,7 @@
     <nav class="tree">
       <a href="/" data-path="/"><i>├─</i>智能体热度指数</a>
       <a href="/news" data-path="/news"><i>├─</i>AI Agent 新闻</a>
-      <a href="/knowledge" data-path="/knowledge"><i>├─</i>个人知识库</a>
-      <a href="/assistant" data-path="/assistant"><i>└─</i>智能助手</a>
+      <a href="/knowledge" data-path="/knowledge"><i>└─</i>个人知识库</a>
     </nav>
     {% if knowledge_page %}
     <div class="kb-side-nav"><a class="kb-search-link" href="/knowledge#kb-search">⌕ 搜索全部文档</a><div class="kb-tree">{% include "_knowledge_tree.html" %}</div></div>
@@ -40,13 +40,11 @@
           <span class="asof" title="新闻与热度数据的最后采集时间">新闻截至 {{ news_meta.last_fetched_at | dt if news_meta.last_fetched_at else '暂无' }} · 热度截至 {{ meta.last_collected_at | dt if meta.last_collected_at else '暂无数据' }}</span>
           <button id="btn-news-update" type="button" title="仅采集新闻（约 1 分钟），不重采热度数据">⟳ 仅更新新闻</button>
           <button id="btn-update" type="button">⟳ 全量更新</button>
-          {% elif assistant_page %}
-          <span class="asof">DSH agent loop · 单用户</span>
-          <button id="asst-logout" type="button">退出登录</button>
           {% else %}
           <span class="asof" id="asof" title="数据截至（最后采集时间）">截至 {{ meta.last_collected_at | dt if meta.last_collected_at else '暂无数据' }}</span>
           <button id="btn-update" type="button">⟳ 更新</button>
           {% endif %}
+          <button id="btn-theme" type="button" title="切换明暗主题">◐</button>
         </span>
       </header>
       <main>
@@ -63,9 +61,37 @@
     </div>
   </div>
 </div>
+
+<!-- 悬浮智能助手（全站入口） -->
+<div class="asst-pet" id="asst-pet" title="智能助手" role="button" tabindex="0" aria-label="打开智能助手">🐱</div>
+<section class="asst-panel" id="asst-panel" hidden aria-label="智能助手">
+  <div class="asst-panel-head">
+    <span class="asst-panel-title">🐱 智能助手</span>
+    <span class="asst-panel-actions">
+      <button id="asst-logout" type="button" title="退出登录" hidden>退出</button>
+      <button id="asst-close" type="button" title="收起">× 关闭</button>
+    </span>
+  </div>
+  <div class="asst-toolbar">
+    <select id="asst-session-select" title="切换会话" aria-label="会话"></select>
+    <button id="asst-new" type="button" title="新会话">＋</button>
+  </div>
+  <div class="asst-workflows" id="asst-workflows"></div>
+  <div class="asst-login-row" id="asst-login-row" hidden>
+    <input type="password" id="asst-password" placeholder="输入密码，回车登录" maxlength="128" autocomplete="current-password">
+  </div>
+  <div id="asst-messages" class="asst-messages" aria-live="polite"></div>
+  <form id="asst-form" class="asst-form">
+    <textarea id="asst-input" rows="2" maxlength="8000" placeholder="输入消息，Ctrl+Enter 发送"></textarea>
+    <button id="asst-send" type="submit">发送</button>
+  </form>
+  <div class="asst-msg" id="asst-msg"></div>
+  <div class="asst-usage" id="asst-usage"></div>
+</section>
+
 <script src="/assets/app.js?v={{ assets_v }}"></script>
 {% if knowledge_page %}<script src="/assets/knowledge.js?v={{ assets_v }}" defer></script>{% endif %}
 {% if news_page %}<script src="/assets/news.js?v={{ assets_v }}" defer></script>{% endif %}
-{% if assistant_page %}<script src="/assets/assistant.js?v={{ assets_v }}" defer></script>{% endif %}
+<script src="/assets/assistant.js?v={{ assets_v }}" defer></script>
 </body>
 </html>

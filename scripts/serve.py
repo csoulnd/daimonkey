@@ -345,9 +345,10 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path not in ("/api/v1/update", "/api/v1/update/news"):
             self._json({"error": "not found"}, 404)
             return
+        # 一次登录完全权限：已持有助手会话 Cookie 或提供正确密码均可触发更新
         supplied = self.headers.get("X-Update-Password", "")
-        if not password_valid(supplied):
-            self._json({"error": "更新密码错误或未填写"}, 401)
+        if not (self._assistant_authed() or password_valid(supplied)):
+            self._json({"error": "未登录或更新密码错误"}, 401)
             return
         with _lock:
             p = _proc.get("running")

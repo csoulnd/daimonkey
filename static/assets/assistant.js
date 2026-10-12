@@ -1,9 +1,9 @@
-/* 智能助手前端：单用户登录 + 会话 + 对话 + 工作流 + 用量显示（原生 JS，无框架） */
+/* 智能助手悬浮组件：全站宠物入口 + 按需登录 + 会话 + 工作流 + 用量（原生 JS） */
 (function () {
   "use strict";
 
   var API = "/api/v1/assistant";
-  var state = { authed: false, sessionId: null, running: false, pollTimer: null };
+  var state = { authed: false, sessionId: null, running: false, pollTimer: null, open: false };
 
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) {
@@ -12,13 +12,12 @@
     if (text !== undefined) n.textContent = text;
     return n;
   }
-  function esc(s) {
-    return String(s == null ? "" : s);
-  }
   function msg(text, isErr) {
     var box = $("asst-msg");
-    box.textContent = text || "";
-    box.className = "asst-msg" + (isErr ? " err" : "");
+    if (box) {
+      box.textContent = text || "";
+      box.className = "asst-msg" + (isErr ? " err" : "");
+    }
   }
   function fmtTokens(n) {
     return n >= 1000000 ? (n / 1000000).toFixed(1) + "M"
@@ -28,115 +27,135 @@
   function api(path, options) {
     return fetch(API + path, Object.assign({ credentials: "same-origin" },
       options || {})).then(function (r) {
-      if (r.status === 401) { state.authed = false; showLogin(); throw new Error("未登录"); }
       return r.json().catch(function () { return {}; }).then(function (body) {
-        if (!r.ok) throw new Error(body.error || ("HTTP " + r.status));
-        return body;
+        return { ok: r.ok, status: r.status, body: body };
       });
     });
   }
 
-  /* ---- 视图切换 ---- */
-  function showLogin() {
-    $("asst-login").hidden = false;
-    $("asst-app").hidden = true;
+  /* ---- 按需登录：需要权限时展示密码行，成功后重试原动作 ---- */
+  function askPassword() {
+    return new Promise(function (resolve) {
+      var row = $("asst-login-row");
+      var input = $("asst-password");
+      row.hidden = false;
+      input.value = "";
+      input.focus();
+      function done(value) {
+        row.hidden = true;
+        input.removeEventListener("keydown", onKey);
+        resolve(value);
+      }
+      function onKey(ev) {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          var v = input.value.trim();
+          if (v) done(v);
+        } else if (ev.key === "Escape") {
+          done(null);
+        }
+      }
+      input.addEventListener("keydown", onKey);
+      msg("此操作需要登录，请输入密码", true);
+    });
+  }
+
+  function login(password) {
+    return api("/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: password })
+    }).then(function (res) {
+      if (res.ok) {
+        state.authed = true;
+        var btn = $("asst-logout");
+        if (btn) btn.hidden = false;
+        return true;
+      }
+      msg(res.status === 429 ? "尝试次数过多，已临时锁定" : "密码错误", true);
+      return false;
+    });
+  }
+
+  /* 需要登录的动作包装：未登录 → 密码行 → 登录 → 重试一次 */
+  function withAuth(action) {
+    if (state.authed) return action();
+    return askPassword().then(function (password) {
+      if (!password) return null;
+      return login(password).then(function (ok) { return ok ? action() : null; });
+    });
+  }
+
+  /* ---- 面板开合 ---- */
+  function openPanel() {
+    state.open = true;
+    $("asst-panel").hidden = false;
+    $("asst-pet").classList.add("hide");
+    refreshAll();
+    if (!state.sessionId) {
+      api("/sessions").then(function (res) {
+        if (res.status === 401) return; // 未登录也能看面板，动作时再登录
+        if (res.ok && res.body.sessions && res.body.sessions.length) {
+          selectSession(res.body.sessions[0].id);
+        }
+      });
+    }
+    $("asst-input").focus();
+  }
+  function closePanel() {
+    state.open = false;
+    $("asst-panel").hidden = true;
+    $("asst-pet").classList.remove("hide");
     stopPolling();
   }
-  function showApp() {
-    $("asst-login").hidden = true;
-    $("asst-app").hidden = false;
+
+  function refreshAll() {
     refreshSessions();
     refreshUsage();
     loadWorkflows();
   }
 
-  /* ---- 登录 / 登出 ---- */
-  function doLogin() {
-    var btn = $("asst-login-btn");
-    var password = $("asst-password").value;
-    if (!password) { $("asst-login-msg").textContent = "请输入密码"; return; }
-    btn.disabled = true;
-    fetch(API + "/login", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: password })
-    }).then(function (r) {
-      return r.json().catch(function () { return {}; }).then(function (b) {
-        return { ok: r.ok, status: r.status, body: b };
-      });
-    }).then(function (res) {
-      btn.disabled = false;
-      if (res.ok) {
-        $("asst-password").value = "";
-        $("asst-login-msg").textContent = "";
-        state.authed = true;
-        showApp();
-      } else if (res.status === 429) {
-        $("asst-login-msg").textContent = "尝试次数过多，已临时锁定，请稍后再试";
-      } else {
-        $("asst-login-msg").textContent = res.body.error || "密码错误";
-      }
-    }).catch(function () {
-      btn.disabled = false;
-      $("asst-login-msg").textContent = "网络错误，请重试";
-    });
-  }
-  function doLogout() {
-    api("/logout", { method: "POST" }).catch(function () { }).then(function () {
-      state.authed = false;
-      showLogin();
-    });
-  }
-
   /* ---- 会话 ---- */
   function refreshSessions() {
-    api("/sessions").then(function (data) {
-      var list = $("asst-sessions");
-      list.textContent = "";
-      (data.sessions || []).forEach(function (s) {
-        var li = el("li", s.id === state.sessionId ? "on" : "");
-        var title = el("span", "asst-s-title", esc(s.title || ("会话 " + s.id)));
-        title.title = (s.title || "") + " · " + (s.updated_at || "");
-        var del = el("button", "asst-s-del", "×");
-        del.title = "删除会话";
-        del.addEventListener("click", function (ev) {
-          ev.stopPropagation();
-          api("/sessions/" + s.id, { method: "DELETE" }).then(function () {
-            if (state.sessionId === s.id) { state.sessionId = null; renderMessages([]); }
-            refreshSessions();
-          }).catch(function (e) { msg(e.message, true); });
-        });
-        li.appendChild(title);
-        li.appendChild(del);
-        li.addEventListener("click", function () { selectSession(s.id); });
-        list.appendChild(li);
+    api("/sessions").then(function (res) {
+      if (res.status === 401) { state.authed = false; return; }
+      if (!res.ok) return;
+      var sel = $("asst-session-select");
+      sel.textContent = "";
+      (res.body.sessions || []).forEach(function (s) {
+        var opt = el("option", null,
+          (s.title || ("会话 " + s.id)).slice(0, 24));
+        opt.value = String(s.id);
+        if (s.id === state.sessionId) opt.selected = true;
+        sel.appendChild(opt);
       });
-      if (!state.sessionId && data.sessions && data.sessions.length) {
-        selectSession(data.sessions[0].id);
+      if (!sel.options.length) {
+        var opt = el("option", null, "（无会话，点 ＋ 新建）");
+        opt.value = "";
+        sel.appendChild(opt);
       }
-    }).catch(function (e) { if (state.authed) msg(e.message, true); });
+    });
   }
   function selectSession(id) {
     state.sessionId = id;
-    document.querySelectorAll("#asst-sessions li").forEach(function (li) {
-      li.classList.remove("on");
+    api("/sessions/" + id + "/messages").then(function (res) {
+      if (res.ok) renderMessages(res.body.messages || []);
     });
-    api("/sessions/" + id + "/messages").then(function (data) {
-      renderMessages(data.messages || []);
-      refreshSessions();
-    }).catch(function (e) { msg(e.message, true); });
   }
   function newSession() {
-    api("/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "" })
-    }).then(function (data) {
-      state.sessionId = data.session_id;
-      renderMessages([]);
-      refreshSessions();
-    }).catch(function (e) { msg(e.message, true); });
+    withAuth(function () {
+      return api("/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "" })
+      }).then(function (res) {
+        if (res.ok) {
+          state.sessionId = res.body.session_id;
+          renderMessages([]);
+          refreshSessions();
+        } else { msg(res.body.error || "创建失败", true); }
+      });
+    });
   }
 
   function renderMessages(items) {
@@ -144,8 +163,8 @@
     box.textContent = "";
     items.forEach(function (m) {
       var div = el("div", "asst-bubble " + (m.role === "user" ? "u" : "a"));
-      if (m.workflow) div.appendChild(el("div", "asst-wf-tag", "工作流: " + m.workflow));
-      div.appendChild(el("div", "asst-bubble-body", esc(m.content)));
+      if (m.workflow) div.appendChild(el("div", "asst-wf-tag", "⚙ " + m.workflow));
+      div.appendChild(el("div", "asst-bubble-body", m.content == null ? "" : m.content));
       box.appendChild(div);
     });
     box.scrollTop = box.scrollHeight;
@@ -154,74 +173,93 @@
   /* ---- 对话 + 轮询 ---- */
   function sendMessage() {
     if (state.running) return;
-    if (!state.sessionId) { msg("先新建或选择一个会话", true); return; }
     var input = $("asst-input");
     var text = input.value.trim();
     if (!text) return;
-    var box = $("asst-messages");
-    var bubble = el("div", "asst-bubble u");
-    bubble.appendChild(el("div", "asst-bubble-body", text));
-    box.appendChild(bubble);
-    box.scrollTop = box.scrollHeight;
-    input.value = "";
-    msg("");
-    startRun("/chat", { session_id: state.sessionId, message: text });
+    withAuth(function () {
+      return ensureSession().then(function (sid) {
+        if (!sid) return;
+        var box = $("asst-messages");
+        var bubble = el("div", "asst-bubble u");
+        bubble.appendChild(el("div", "asst-bubble-body", text));
+        box.appendChild(bubble);
+        box.scrollTop = box.scrollHeight;
+        input.value = "";
+        msg("");
+        startRun("/chat", { session_id: sid, message: text });
+      });
+    });
+  }
+
+  function ensureSession() {
+    if (state.sessionId) return Promise.resolve(state.sessionId);
+    return api("/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "" })
+    }).then(function (res) {
+      if (!res.ok) { msg(res.body.error || "创建会话失败", true); return null; }
+      state.sessionId = res.body.session_id;
+      refreshSessions();
+      return state.sessionId;
+    });
   }
 
   function runWorkflow(name, description) {
     if (state.running) return;
-    var payload = {};
-    if (name === "content_polish") {
-      var text = window.prompt(description + "\n请输入要润色的文案：", "");
-      if (!text) return;
-      payload = { text: text };
-    }
-    if (!window.confirm("运行工作流「" + name + "」？将消耗当日配额。")) return;
-    startRun("/workflows/" + encodeURIComponent(name), payload);
+    withAuth(function () {
+      var payload = {};
+      if (name === "content_polish") {
+        var text = window.prompt(description + "\n请输入要润色的文案：", "");
+        if (!text) return null;
+        payload = { text: text };
+      }
+      if (!window.confirm("运行工作流「" + name + "」？")) return null;
+      return startRun("/workflows/" + encodeURIComponent(name), payload);
+    });
   }
 
   function startRun(path, body) {
     state.running = true;
     $("asst-send").disabled = true;
-    msg("执行中…（DSH agent loop，最长 5 分钟）");
+    msg("执行中…");
     api(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
-    }).then(function () {
+    }).then(function (res) {
+      if (res.status === 401) { state.authed = false; finishRun(); msg("登录已过期，请重试", true); return; }
+      if (res.status === 409) { finishRun(); msg("已有一个任务进行中", true); return; }
+      if (!res.ok) { finishRun(); msg(res.body.error || ("HTTP " + res.status), true); return; }
       pollStatus();
-    }).catch(function (e) {
+    }).catch(function () {
       finishRun();
-      msg(e.message, true);
+      msg("网络错误", true);
     });
   }
 
   function pollStatus() {
     stopPolling();
     state.pollTimer = setInterval(function () {
-      api("/status").then(function (s) {
-        if (s.state === "running") return;
+      api("/status").then(function (res) {
+        if (!res.ok || res.body.state === "running") return;
         finishRun();
-        if (s.state === "success") {
+        if (res.body.state === "success") {
           msg("完成");
-          if (s.workflow && s.reply) {
-            // 工作流结果不落会话，直接回显到对话面板
+          if (res.body.workflow && res.body.reply) {
             var box = $("asst-messages");
             var bubble = el("div", "asst-bubble a");
-            bubble.appendChild(el("div", "asst-wf-tag", "工作流: " + s.workflow));
-            bubble.appendChild(el("div", "asst-bubble-body", s.reply));
+            bubble.appendChild(el("div", "asst-wf-tag", "⚙ " + res.body.workflow));
+            bubble.appendChild(el("div", "asst-bubble-body", res.body.reply));
             box.appendChild(bubble);
             box.scrollTop = box.scrollHeight;
           } else if (state.sessionId) {
             selectSession(state.sessionId);
           }
         } else {
-          msg(s.error || "执行失败", true);
+          msg(res.body.error || "执行失败", true);
         }
         refreshUsage();
-      }).catch(function (e) {
-        finishRun();
-        msg(e.message, true);
       });
     }, 2000);
   }
@@ -234,48 +272,63 @@
     $("asst-send").disabled = false;
   }
 
-  /* ---- 用量 ---- */
+  /* ---- 用量（低调显示在面板底部） ---- */
   function refreshUsage() {
-    api("/usage").then(function (data) {
-      var u = data.usage || {};
+    api("/usage").then(function (res) {
+      if (!res.ok) return;
       var box = $("asst-usage");
       box.textContent = "";
+      var u = res.body.usage || {};
       ["interactive", "internal"].forEach(function (ch) {
         var v = u[ch];
         if (!v) return;
-        var ratio = v.limit ? v.requests / v.limit : 0;
-        var line = el("div", "asst-usage-line" + (ratio >= 0.8 ? " warn" : ""));
+        var line = el("span", "asst-usage-line" +
+          (v.limit && v.requests / v.limit >= 0.8 ? " warn" : ""));
         line.textContent = (ch === "interactive" ? "助手" : "内部")
-          + " " + v.requests + "/" + v.limit + " 次 · "
-          + fmtTokens(v.tokens) + "/" + fmtTokens(v.tokens_limit) + " tok";
+          + " " + v.requests + "/" + v.limit
+          + " · " + fmtTokens(v.tokens) + "tok";
         box.appendChild(line);
       });
-    }).catch(function () { /* 用量失败不打扰 */ });
+    });
   }
 
-  /* ---- 工作流列表 ---- */
+  /* ---- 工作流 ---- */
   function loadWorkflows() {
-    api("/workflows").then(function (data) {
+    api("/workflows").then(function (res) {
+      if (!res.ok) return;
       var box = $("asst-workflows");
       box.textContent = "";
-      (data.workflows || []).forEach(function (w) {
-        var btn = el("button", "asst-wf-btn", "⚙ " + w.name);
+      (res.body.workflows || []).forEach(function (w) {
+        var btn = el("button", "asst-wf-btn", w.name);
         btn.title = w.description;
         btn.addEventListener("click", function () { runWorkflow(w.name, w.description); });
         box.appendChild(btn);
       });
-    }).catch(function () { });
+    });
   }
 
   /* ---- 初始化 ---- */
   function init() {
-    $("asst-login-btn").addEventListener("click", doLogin);
-    $("asst-password").addEventListener("keydown", function (ev) {
-      if (ev.key === "Enter") doLogin();
+    var pet = $("asst-pet");
+    pet.addEventListener("click", openPanel);
+    pet.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openPanel(); }
     });
-    var logoutBtn = $("asst-logout");
-    if (logoutBtn) logoutBtn.addEventListener("click", doLogout);
+    $("asst-close").addEventListener("click", closePanel);
+    $("asst-logout").addEventListener("click", function () {
+      api("/logout", { method: "POST" }).then(function () {
+        state.authed = false;
+        state.sessionId = null;
+        $("asst-logout").hidden = true;
+        renderMessages([]);
+        refreshAll();
+        msg("已退出");
+      });
+    });
     $("asst-new").addEventListener("click", newSession);
+    $("asst-session-select").addEventListener("change", function () {
+      if (this.value) selectSession(parseInt(this.value, 10));
+    });
     $("asst-form").addEventListener("submit", function (ev) {
       ev.preventDefault();
       sendMessage();
@@ -286,12 +339,11 @@
         sendMessage();
       }
     });
-    fetch(API + "/session", { credentials: "same-origin" })
-      .then(function (r) { return r.json(); })
-      .then(function (s) {
-        state.authed = !!s.authed;
-        if (state.authed) showApp(); else showLogin();
-      }).catch(showLogin);
+    // 启动时静默探一次登录态（Cookie 7 天有效，多数时候直接就绪）
+    api("/session").then(function (res) {
+      state.authed = !!(res.ok && res.body.authed);
+      if (state.authed) $("asst-logout").hidden = false;
+    });
   }
 
   if (document.readyState === "loading") {

@@ -42,8 +42,21 @@
     });
   });
 
+  /* ---- 主题切换（明/暗，记忆 + 跟随系统初始值已在 base.html 预设） ---- */
+  var btnTheme = document.getElementById("btn-theme");
+  if (btnTheme) {
+    btnTheme.addEventListener("click", function () {
+      var root = document.documentElement;
+      var toLight = root.dataset.theme !== "light";
+      if (toLight) root.dataset.theme = "light";
+      else delete root.dataset.theme;
+      try { localStorage.setItem("theme", toLight ? "light" : "dark"); } catch (e) { }
+    });
+  }
+
   /* ---- 手动更新（POST /api/v1/update + 轮询状态，成功后刷新页面）---- */
-  // 清除旧令牌；每次发起更新均输入密码，不在浏览器中保存。
+  // 清除旧令牌；更新按钮与智能助手共用登录态（Cookie 7 天），
+  // 未登录时才弹密码框，输入的密码同时用于建立会话。
   try {
     sessionStorage.removeItem("utoken");
     var oldUrl = new URL(location.href);
@@ -54,9 +67,9 @@
   function askPassword() {
     return new Promise(function (resolve) {
       var dialog = document.createElement("dialog");
-      dialog.setAttribute("aria-label", "输入更新密码");
-      dialog.style.cssText = "border:1px solid #444;border-radius:12px;padding:24px;background:#161b22;color:#eee;max-width:90vw";
-      dialog.innerHTML = '<form><h3 style="margin-top:0">更新数据</h3><label>更新密码<input type="password" name="password" required autocomplete="off" style="display:block;margin:12px 0;padding:10px;font-size:16px"></label><div style="display:flex;gap:12px;justify-content:flex-end"><button type="button">取消</button><button type="submit">开始更新</button></div></form>';
+      dialog.setAttribute("aria-label", "输入密码");
+      dialog.className = "pwd-dialog";
+      dialog.innerHTML = '<form><h3 style="margin-top:0">需要权限</h3><label>密码<input type="password" name="password" required autocomplete="off" style="display:block;margin:12px 0;padding:10px;font-size:16px"></label><div style="display:flex;gap:12px;justify-content:flex-end"><button type="button">取消</button><button type="submit">确定</button></div></form>';
       document.body.appendChild(dialog);
       var finished = false;
       function finish(value) {
@@ -75,6 +88,23 @@
       dialog.showModal();
       dialog.querySelector("input").focus();
     });
+  }
+
+  /* 用密码建立助手会话（一次登录，本浏览器获得完全权限） */
+  function establishSession(password) {
+    return fetch("/api/v1/assistant/login", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: password })
+    }).then(function (r) { return r.ok; }).catch(function () { return false; });
+  }
+
+  function sessionAuthed() {
+    return fetch("/api/v1/assistant/session", { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (s) { return !!s.authed; })
+      .catch(function () { return false; });
   }
 
   function poll(btn, orig) {
@@ -101,10 +131,11 @@
 
   function trigger(btn, endpoint, password) {
     var orig = btn.textContent;
-    fetch(endpoint, { method: "POST", headers: { "X-Update-Password": password } })
+    var headers = password ? { "X-Update-Password": password } : {};
+    fetch(endpoint, { method: "POST", headers: headers, credentials: "same-origin" })
       .then(function (res) {
         if (res.status === 401) {
-          alert("更新密码错误，请重新点击更新并输入密码。");
+          alert("密码错误或登录已过期，请重新点击并输入密码。");
           return;
         }
         if (!res.ok && res.status !== 409) throw new Error("HTTP " + res.status);
@@ -127,8 +158,12 @@
             poll(btn, btn.textContent);
             return;
           }
-          askPassword().then(function (password) {
-            if (password !== null) trigger(btn, endpoint, password);
+          sessionAuthed().then(function (authed) {
+            if (authed) { trigger(btn, endpoint, null); return; }
+            askPassword().then(function (password) {
+              if (password === null || password === "") return;
+              establishSession(password).then(function () { trigger(btn, endpoint, null); });
+            });
           });
         })
         .catch(function () {
