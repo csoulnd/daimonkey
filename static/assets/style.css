@@ -765,3 +765,23 @@ tr:first-child .rank { color: var(--ink); }
 .sc-attach-item { display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
   border: 1px solid var(--line); border-radius: var(--r-m); padding: 6px 14px; background: var(--panel); }
 .sc-attach-item .dim { font-size: var(--fs-xs); }
+
+/* ---- 演示文稿网页版（幻灯片区） ---- */
+.sc-slides { border: 1px solid var(--line); border-radius: var(--r-m); overflow: hidden; background: var(--panel); }
+.sc-slides:fullscreen { background: var(--bg); display: flex; flex-direction: column; border-radius: 0; }
+.sc-slides-bar { display: flex; align-items: center; gap: var(--sp-2); padding: 8px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.sc-slides-pos { font-family: var(--mono); font-size: var(--fs-xs); color: var(--dim); }
+.sc-slides-dots { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+.sc-slide-bodies { padding: var(--sp-5) var(--sp-6) var(--sp-4); }
+.sc-slides:fullscreen .sc-slide-bodies { flex: 1; overflow-y: auto; }
+.sc-slide-title { margin: 0 0 var(--sp-3); font-size: var(--fs-lg); }
+.sc-slide-sub { margin: calc(-1 * var(--sp-2)) 0 var(--sp-3); }
+.sc-slide-list { margin: 0 0 var(--sp-3); padding-left: 1.2em; }
+.sc-slide-list li { margin: 5px 0; line-height: 1.7; font-size: var(--fs-base); }
+.sc-slide-list li.lvl-1 { margin-left: 1.2em; }
+.sc-slide-list li.lvl-2 { margin-left: 2.4em; }
+.sc-slide-list li.lvl-3 { margin-left: 3.6em; }
+.sc-slide-tablewrap { overflow-x: auto; margin: var(--sp-3) 0; }
+.sc-slide-table { font-size: var(--fs-sm); }
+.sc-slide-media { font-size: var(--fs-sm); }
+.sc-slides-note { padding: 0 var(--sp-5) var(--sp-3); font-size: var(--fs-xs); }

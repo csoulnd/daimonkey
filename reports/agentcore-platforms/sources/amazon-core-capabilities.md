@@ -1,5 +1,5 @@
 ---
-title: Amazon Bedrock AgentCore · 七大核心能力（官方口径整理）
+title: AgentCore 七大核心能力（亚马逊云科技官方号）
 source: 亚马逊云科技（官方号文章）
 url: https://zhuanlan.zhihu.com/p/1929547160770295073
 accessed: 2026-10-12

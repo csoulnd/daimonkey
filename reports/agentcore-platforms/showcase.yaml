@@ -18,6 +18,12 @@ showcase:
       file: 01-AgentCore-20261009.pptx
       note: 早期版本，结论以本站当前内容为准
 
+  # 演示文稿网页版：构建时解析 pptx 文字与表格，直接展示（可翻页/全屏）
+  slides:
+    file: 01-AgentCore-20261009.pptx
+    title: 演示文稿（2026-10-09 版）
+    note: 网页版按原件文字与表格内容重建；版式、配色与图形以原件为准（含图形页见原件下载）。
+
   notes: notes.md          # 讲稿（渲染到 /notes/agentcore-platforms，登录可见）
 
   docs:
@@ -41,9 +47,9 @@ showcase:
   chapters:
     - id: ch-a
       num: "一"
-      title: 阿里云 AgentCore · 平台定义
+      title: 阿里云 AgentCore
       gist: 智能体构建和治理平台
-      lead: 先看平台的定义——阿里云 AgentCore 是什么。
+      lead: 先看阿里云 AgentCore 是什么。
       points:
         - text: "定义为**智能体构建和治理平台**：企业可以创建、接入和统一管理智能体。"
           kind: fact
@@ -55,16 +61,16 @@ showcase:
           kind: fact
           anchor: alibaba_definition#概念与边界
       sections:
-        - {id: a-def, title: 官方定义, from: alibaba_definition, heading: 官方定义}
+        - {id: a-def, title: 它是什么, from: alibaba_definition, heading: 官方定义}
         - {id: a-audience, title: 面向谁, from: alibaba_definition, heading: 面向谁}
         - {id: a-concepts, title: 概念与边界, from: alibaba_definition, heading: 概念与边界}
         - {id: a-access, title: 接入路径, from: alibaba_definition, heading: 接入路径}
 
     - id: ch-b
       num: "二"
-      title: Amazon Bedrock AgentCore · 七大核心能力
+      title: Amazon Bedrock AgentCore
       gist: 可组合的能力体系
-      lead: 再看架构——Amazon Bedrock AgentCore 的能力体系由七项核心服务组成。
+      lead: 再看 Amazon Bedrock AgentCore——能力体系由七项核心服务组成。
       points:
         - text: "架构由**七项核心能力**组成：Runtime、Memory、Identity、Gateway、Code Interpreter、Browser Tool、Observability。"
           kind: fact

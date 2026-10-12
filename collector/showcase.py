@@ -576,6 +576,27 @@ def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
             "size_kb": max(1, round(fpath.stat().st_size / 1024)),
         })
 
+    # 演示文稿网页版：构建时解析 pptx（文字/表格重建为可翻页幻灯片）
+    slides_ctx = None
+    sl_conf = conf.get("slides")
+    if sl_conf:
+        fname = str(sl_conf.get("file", ""))
+        fpath = report_dir / fname
+        if not fpath.is_file():
+            warnings.append(f"[showcase] 演示文稿不存在: {fname}")
+        else:
+            try:
+                from . import pptx as pptx_lib
+                items = pptx_lib.extract_slides(fpath)
+                slides_ctx = {
+                    "title": str(sl_conf.get("title", "演示文稿")),
+                    "note": str(sl_conf.get("note", "")),
+                    "items": items, "count": len(items),
+                    "download_url": f"/reports/{report_dir.name}/{quote(fname)}",
+                }
+            except Exception as e:   # 解析失败降级为仅下载，不阻断建站
+                warnings.append(f"[showcase] 演示文稿解析失败（降级为下载）: {e}")
+
     fingerprint = hashlib.sha256()
     for d in docs.values():
         fingerprint.update(d["path"].read_bytes())
@@ -592,6 +613,7 @@ def load_showcase(report_dir: Path) -> tuple[dict, list[str]]:
         "arch_overview": arch_overview,
         "chapters": chapters,
         "attachments": attachments,
+        "slides": slides_ctx,
         "sources": {"links": sources_links, "folds": sources_folds},
         "notes_url": f"/notes/{report_dir.name}",
         "short_commit": commit[:8],

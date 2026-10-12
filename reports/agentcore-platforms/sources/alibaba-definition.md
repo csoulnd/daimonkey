@@ -1,5 +1,5 @@
 ---
-title: 阿里云 AgentCore · 平台定义（官方口径整理）
+title: 阿里发布企业级 Agent 平台 AgentCore（官方博客）
 source: 阿里系统软件技术 / 阿里云云原生（官方博客）
 url: https://www.cnblogs.com/alisystemsoftware/p/23239636
 accessed: 2026-10-12

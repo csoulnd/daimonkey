@@ -165,26 +165,72 @@
     });
   }
 
-  /* ---- 全屏演示时的键盘导航：←/→ 切步、数字键直达、Esc 退出（浏览器原生） ---- */
+  /* ---- 演示文稿网页版：翻页 / 全屏（键盘在下方全屏处理中统一接入） ---- */
+  document.querySelectorAll("[data-slides]").forEach(function (wrap) {
+    var bodies = wrap.querySelectorAll("[data-slide-body]");
+    var dots = wrap.querySelectorAll("[data-slide]");
+    var pos = wrap.querySelector(".sc-slides-pos b");
+    var current = 0;
+    function show(index) {
+      current = Math.max(0, Math.min(bodies.length - 1, index));
+      bodies.forEach(function (b, i) { b.classList.toggle("hidden", i !== current); });
+      dots.forEach(function (d, i) { d.classList.toggle("on", i === current); });
+      if (pos) pos.textContent = String(current + 1);
+    }
+    var prev = wrap.querySelector("[data-slide-prev]");
+    var next = wrap.querySelector("[data-slide-next]");
+    if (prev) prev.addEventListener("click", function () { show(current - 1); });
+    if (next) next.addEventListener("click", function () { show(current + 1); });
+    dots.forEach(function (d) {
+      d.addEventListener("click", function () { show(parseInt(d.dataset.slide, 10)); });
+    });
+    var full = wrap.querySelector(".sc-slide-full");
+    if (full && wrap.requestFullscreen) {
+      full.addEventListener("click", function () { wrap.requestFullscreen(); });
+    } else if (full) {
+      full.hidden = true;
+    }
+    if (bodies.length) show(0);
+  });
+
+  /* ---- 全屏演示时的键盘导航：←/→ 翻页或切步、数字键直达（Esc 浏览器原生退出） ---- */
   document.addEventListener("keydown", function (ev) {
     var fs = document.fullscreenElement;
     if (!fs) return;
     var flow = fs.classList && fs.classList.contains("sc-flow")
       ? fs : (fs.closest ? fs.closest(".sc-flow") : null);
-    if (!flow) return;
-    var stepsWrap = flow.querySelector(".sc-steps");
-    if (!stepsWrap) return;
-    if (ev.key === "ArrowRight" || ev.key === "ArrowDown" || ev.key === " ") {
-      ev.preventDefault();
-      var next = stepsWrap.querySelector("[data-step-next]");
-      if (next) next.click();
-    } else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
-      ev.preventDefault();
-      var prev = stepsWrap.querySelector("[data-step-prev]");
-      if (prev) prev.click();
-    } else if (/^[1-9]$/.test(ev.key)) {
-      var dot = stepsWrap.querySelector('[data-step="' + (parseInt(ev.key, 10) - 1) + '"]');
-      if (dot) { ev.preventDefault(); dot.click(); }
+    if (flow) {
+      var stepsWrap = flow.querySelector(".sc-steps");
+      if (!stepsWrap) return;
+      if (ev.key === "ArrowRight" || ev.key === "ArrowDown" || ev.key === " ") {
+        ev.preventDefault();
+        var next = stepsWrap.querySelector("[data-step-next]");
+        if (next) next.click();
+      } else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
+        ev.preventDefault();
+        var prev = stepsWrap.querySelector("[data-step-prev]");
+        if (prev) prev.click();
+      } else if (/^[1-9]$/.test(ev.key)) {
+        var dot = stepsWrap.querySelector('[data-step="' + (parseInt(ev.key, 10) - 1) + '"]');
+        if (dot) { ev.preventDefault(); dot.click(); }
+      }
+      return;
+    }
+    var slides = fs.classList && fs.classList.contains("sc-slides")
+      ? fs : (fs.closest ? fs.closest(".sc-slides") : null);
+    if (slides) {
+      if (ev.key === "ArrowRight" || ev.key === "ArrowDown" || ev.key === " ") {
+        ev.preventDefault();
+        var n2 = slides.querySelector("[data-slide-next]");
+        if (n2) n2.click();
+      } else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
+        ev.preventDefault();
+        var p2 = slides.querySelector("[data-slide-prev]");
+        if (p2) p2.click();
+      } else if (/^[1-9]$/.test(ev.key)) {
+        var d2 = slides.querySelector('[data-slide="' + (parseInt(ev.key, 10) - 1) + '"]');
+        if (d2) { ev.preventDefault(); d2.click(); }
+      }
     }
   });
 

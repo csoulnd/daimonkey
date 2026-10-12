@@ -89,6 +89,45 @@
     </div>
     {% endif %}
 
+    {% if slides %}
+    <section class="sc-sec sc-slides-sec" id="sec-slides">
+      <h3 class="sc-sec-title">{{ slides.title }}</h3>
+      <div class="sc-slides" data-slides>
+        <div class="sc-slides-bar">
+          <button class="sc-btn" type="button" data-slide-prev title="上一页">‹</button>
+          <span class="sc-slides-pos"><b>1</b> / {{ slides.count }}</span>
+          <span class="sc-slides-dots">
+            {% for s in slides['items'] %}<button class="sc-dot" type="button" data-slide="{{ loop.index0 }}" title="第 {{ loop.index }} 页">{{ loop.index }}</button>{% endfor %}
+          </span>
+          <button class="sc-btn" type="button" data-slide-next title="下一页">›</button>
+          <button class="sc-btn sc-slide-full" type="button" title="全屏演示（←/→ 翻页）">⛶ 全屏</button>
+          <a class="sc-btn" href="{{ slides.download_url }}" download title="下载 PPTX 原件">下载原件</a>
+        </div>
+        <div class="sc-slide-bodies">
+          {% for s in slides['items'] %}
+          <div class="sc-slide{% if not loop.first %} hidden{% endif %}" data-slide-body="{{ loop.index0 }}">
+            {% if s.title %}<h4 class="sc-slide-title">{{ s.title }}</h4>{% endif %}
+            {% if s.subtitle %}<p class="sc-slide-sub dim">{{ s.subtitle }}</p>{% endif %}
+            {% for b in s.blocks %}
+              {% if b.type == 'bullets' %}
+              <ul class="sc-slide-list">{% for it in b['items'] %}<li class="lvl-{{ it['lvl'] }}">{{ it['text'] }}</li>{% endfor %}</ul>
+              {% elif b.type == 'table' %}
+              <div class="sc-slide-tablewrap"><table class="tbl mini sc-slide-table">
+                {% if b.rows %}<thead><tr>{% for cell in b.rows[0] %}<th>{{ cell }}</th>{% endfor %}</tr></thead>{% endif %}
+                <tbody>{% for row in b.rows[1:] %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+              </table></div>
+              {% elif b.type == 'media' %}
+              <p class="dim sc-slide-media">［本页含图形内容，网页版未重建——见原件］</p>
+              {% endif %}
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        <p class="dim sc-slides-note">{{ slides.note }}</p>
+      </div>
+    </section>
+    {% endif %}
+
     {% if arch_overview %}
     <section class="sc-sec sc-arch-overview" id="sec-arch-overview">
       <h3 class="sc-sec-title">{{ arch_overview.title }}</h3>
@@ -151,6 +190,7 @@
     <div class="dim sc-toc-cap">目录</div>
     <nav>
       {% if overview.points %}<a href="#sec-overview">{{ overview.title }}</a>{% endif %}
+      {% if slides %}<a href="#sec-slides" class="sc-toc-ch">{{ slides.title }}</a>{% endif %}
       {% if arch_overview %}
       <a href="#sec-arch-overview" class="sc-toc-ch">{{ arch_overview.title }}</a>
       {% endif %}
