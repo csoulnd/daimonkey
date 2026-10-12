@@ -41,9 +41,6 @@ showcase:
       - text: "Amazon = 可组合运行：Runtime 承载执行，Harness 与服务按需组合。"
         kind: judgment
         anchor: amazon_detail#产品定位与边界
-      - text: "分水岭在 Harness 与 Runtime 的关系；落点是 7 项核心能力检查表（第四章）。"
-        kind: plain
-        anchor: comparison#产品定位怎样影响软件架构
 
   diagrams:
     amazon:
