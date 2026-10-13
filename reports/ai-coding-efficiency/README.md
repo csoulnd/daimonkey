@@ -23,6 +23,13 @@
 | 文件 | 表情 | 来源与署名 | 许可 | 修改情况 | 使用位置 |
 |---|---|---|---|---|---|
 | [assets/exploding-head.svg](assets/exploding-head.svg) | Exploding Head（U+1F92F，爆炸头） | [SVG 原图](https://openmoji.org/data/color/svg/1F92F.svg)；[OpenMoji，the open-source emoji and icon project](https://github.com/hfg-gmuend/openmoji) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 未修改 | 第 1 屏 |
+| [assets/thinking-face.svg](assets/thinking-face.svg) | Thinking Face（思考） | [SVG 原图](https://openmoji.org/data/color/svg/1F914.svg)；[OpenMoji](https://github.com/hfg-gmuend/openmoji) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 未修改 | 第 3、10 屏 |
+| [assets/face-with-monocle.svg](assets/face-with-monocle.svg) | Face with Monocle（审视） | [SVG 原图](https://openmoji.org/data/color/svg/1F9D0.svg)；[OpenMoji](https://github.com/hfg-gmuend/openmoji) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 未修改 | 第 5 屏 |
+| [assets/robot.svg](assets/robot.svg) | Robot（机器人） | [SVG 原图](https://openmoji.org/data/color/svg/1F916.svg)；[OpenMoji](https://github.com/hfg-gmuend/openmoji) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 未修改 | 第 6 屏 |
+| [assets/spiral-calendar.svg](assets/spiral-calendar.svg) | Spiral Calendar（日历） | [SVG 原图](https://openmoji.org/data/color/svg/1F5D3.svg)；[OpenMoji](https://github.com/hfg-gmuend/openmoji) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 未修改 | 第 6 屏 |
+| [assets/face-with-spiral-eyes.svg](assets/face-with-spiral-eyes.svg) | Face with Spiral Eyes（眩晕） | [SVG 原图](https://openmoji.org/data/color/svg/1F635-200D-1F4AB.svg)；[OpenMoji](https://github.com/hfg-gmuend/openmoji) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 未修改 | 第 7 屏 |
+| [assets/anxious-face-with-sweat.svg](assets/anxious-face-with-sweat.svg) | Anxious Face with Sweat（焦虑） | [SVG 原图](https://openmoji.org/data/color/svg/1F630.svg)；[OpenMoji](https://github.com/hfg-gmuend/openmoji) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 未修改 | 第 8 屏 |
+| [assets/nerd-face.svg](assets/nerd-face.svg) | Nerd Face（书呆子） | [SVG 原图](https://openmoji.org/data/color/svg/1F913.svg)；[OpenMoji](https://github.com/hfg-gmuend/openmoji) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 未修改 | 第 9 屏 |
 
 ## 演示与讲稿对应（2026-10-13 调整）
 

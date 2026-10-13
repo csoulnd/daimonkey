@@ -89,7 +89,7 @@
         <text class="decision-detail" x="577" y="404">明确恢复方式</text>
       </svg>
     </div>
-    <div class="plan-copy"><p class="quote">改一行 plan，<br>往往比返工一段代码<br><em>更划算。</em></p><div class="rule-line"><span>目标</span><b>要解决什么问题？</b></div><div class="rule-line"><span>边界</span><b>这次做什么、不做什么？</b></div><div class="rule-line"><span>验收</span><b>什么证据说明做对了？</b></div><p class="small">小任务几句话走完，复杂任务再正式展开。</p></div>
+    <div class="plan-copy"><img class="emoji-plan" src="assets/thinking-face.svg" width="112" height="112" alt="" aria-hidden="true"><p class="quote">改一行 plan，<br>往往比返工一段代码<br><em>更划算。</em></p><div class="rule-line"><span>目标</span><b>要解决什么问题？</b></div><div class="rule-line"><span>边界</span><b>这次做什么、不做什么？</b></div><div class="rule-line"><span>验收</span><b>什么证据说明做对了？</b></div><p class="small">小任务几句话走完，复杂任务再正式展开。</p></div>
   </div>
   <aside class="reading-note">改动行数只是一种信号。一行权限判断也可能比几十行样式更需要审慎。流程可以按轻重展开，目标、方案、实现和验证仍然需要有人负责。</aside>
 </section>
@@ -123,7 +123,7 @@
 <section class="slide" id="s-5" data-title="测试通过之后，还要追到真实结果" aria-label="第 5 屏：真实验收">
   <div class="eyebrow">第一层 / 任务内提效 <span>05 — 验收现场</span></div>
   <h2>测试通过之后，还要追到<em>真实结果</em></h2>
-  <div class="case-strip"><span>我的一个真实经历</span><blockquote>“精度乱码已经解决，问题彻底修复了吗？”</blockquote></div>
+  <div class="case-strip"><img class="emoji-case" src="assets/face-with-monocle.svg" width="100" height="100" alt="" aria-hidden="true"><span>我的一个真实经历</span><blockquote>“精度乱码已经解决，问题彻底修复了吗？”</blockquote></div>
   <div class="status-path" id="status-path" aria-label="四种不同的完成状态">
     <button class="status-step selected" type="button" data-status="0" aria-pressed="true"><span>01</span><b>代码已修改</b><small>实现落到了文件</small></button><i>→</i>
     <button class="status-step" type="button" data-status="1" aria-pressed="false"><span>02</span><b>检查已通过</b><small>测试覆盖了本次风险</small></button><i>→</i>
@@ -140,8 +140,8 @@
   <h2>把重复工作，交给 <em>skill + 定时任务</em></h2>
   <p class="lead">skill 固化怎么做；定时任务安排什么时候做。</p>
   <div class="reuse-layout">
-    <article class="reuse-skill"><span class="reuse-label">开发中的同类任务 / 按需调用</span><h3>skill：复用一套流程</h3><code>agentos-wsl-deployment</code><p class="reuse-example">把“上次怎么装好的”，<br>变成“这次有据可依”。</p><div class="reuse-steps"><span>读取当前文档</span><span>核对环境与配置</span><span>按顺序部署排障</span><span>端到端验收</span></div></article>
-    <article class="reuse-schedule"><span class="reuse-label">需要持续掌握信息的角色 / 按周期跟进</span><h3>定时任务：让信息按时来</h3><p class="schedule-example">例如：每日动态简报、每周变化汇总</p><dl><div><dt>少一点重复查找</dt><dd>按约定周期收集、整理更新</dd></div><div><dt>少一点遗忘与遗漏</dt><dd>把持续跟进变成固定节奏</dd></div><div><dt>少一点信息噪声</dt><dd>聚焦新增变化，带上时间与来源</dd></div></dl></article>
+    <article class="reuse-skill"><span class="reuse-label">开发中的同类任务 / 按需调用</span><h3 class="emoji-card-heading"><img class="emoji-inline" src="assets/robot.svg" width="48" height="48" alt="" aria-hidden="true">skill：复用一套流程</h3><code>agentos-wsl-deployment</code><p class="reuse-example">把“上次怎么装好的”，<br>变成“这次有据可依”。</p><div class="reuse-steps"><span>读取当前文档</span><span>核对环境与配置</span><span>按顺序部署排障</span><span>端到端验收</span></div></article>
+    <article class="reuse-schedule"><span class="reuse-label">需要持续掌握信息的角色 / 按周期跟进</span><h3 class="emoji-card-heading"><img class="emoji-inline" src="assets/spiral-calendar.svg" width="48" height="48" alt="" aria-hidden="true">定时任务：让信息按时来</h3><p class="schedule-example">例如：每日动态简报、每周变化汇总</p><dl><div><dt>少一点重复查找</dt><dd>按约定周期收集、整理更新</dd></div><div><dt>少一点遗忘与遗漏</dt><dd>把持续跟进变成固定节奏</dd></div><div><dt>少一点信息噪声</dt><dd>聚焦新增变化，带上时间与来源</dd></div></dl></article>
   </div>
   <div class="skill-authoring"><div><b>怎样写好 skill？</b><span>一个目标 · 触发清晰 · 输入输出明确 · 用真实任务验证</span></div><p>可用 <code>$skill-creator</code> 起草，再从实践中迭代。<a href="https://learn.chatgpt.com/docs/build-skills" target="_blank" rel="noopener">官方编写指南 ↗</a></p></div>
   <aside class="reading-note">开发中的重复任务先通过 skill 复用流程。产品、运营、管理等需要持续了解变化的工作，可以配合定时任务按周期整理新增信息。页面中的每日简报、每周汇总是使用示例。定时运行的结果仍要检查时效、来源和质量。<a href="https://learn.chatgpt.com/docs/build-skills" target="_blank" rel="noopener">OpenAI 官方指南</a>建议聚焦单一工作、写清触发范围与输入输出，并验证实际触发行为；内置 skill-creator 可帮助起草。</aside>
@@ -149,6 +149,7 @@
 
 <section class="slide bottleneck-slide" id="s-7" data-title="生成速度，已经超过我的判别速度" aria-label="第 7 屏：产出瓶颈">
   <div class="eyebrow">从任务效率，走向人的成长 <span>07 — 转折</span></div>
+  <img class="emoji-corner" src="assets/face-with-spiral-eyes.svg" width="86" height="86" alt="" aria-hidden="true">
   <h2>生成速度，已经超过<em>我的判别速度</em></h2>
   <div class="bottleneck-diagram">
     <svg viewBox="0 0 1448 556" role="img" aria-labelledby="bottleneck-title bottleneck-desc">
@@ -197,6 +198,7 @@
 
 <section class="slide three-debts-slide" id="s-8" data-title="代码写完，三类债务仍可能增长" aria-label="第 8 屏：三类债务">
   <div class="eyebrow">第二层 / 人的提升 <span>08 — 先认识债务</span></div>
+  <img class="emoji-corner" src="assets/anxious-face-with-sweat.svg" width="86" height="86" alt="" aria-hidden="true">
   <h2>代码写完，三类债务仍可能<em>增长</em></h2>
   <p class="lead">欠在实现里，欠在理解里，也欠在没有留下来的“为什么”里。</p>
   <div class="three-debts">
@@ -211,6 +213,7 @@
 
 <section class="slide repay-learn-slide" id="s-9" data-title="把债务补回来，把关键练习留下来" aria-label="第 9 屏：偿还债务与保留练习">
   <div class="eyebrow">第二层 / 人的提升 <span>09 — 再行动，再积累</span></div>
+  <img class="emoji-corner" src="assets/nerd-face.svg" width="86" height="86" alt="" aria-hidden="true">
   <h2>把债务补回来，把关键练习<em>留下来</em></h2>
   <div class="debt-payments">
     <div><b>技术债务</b><span>补实现</span><p>明确边界 · 小步交付 · 独立验证 · 持续整理</p></div>
@@ -233,7 +236,7 @@
     <article><a class="milestone-date" href="https://www.anthropic.com/news/claude-4" target="_blank" rel="noopener">2025.05 ↗</a><span class="milestone-dot"></span><h3>任务委托</h3><b>Claude Code 正式发布</b><p>从建议代码，<br>走向执行工程任务</p></article>
   </div>
   <div class="experience-decay"><strong>今天需要反复提示的做法，明天可能成为模型的默认能力。</strong><p>经验会折旧。人要持续扩大理解、判断和可负责的范围。</p></div>
-  <div class="self-review"><h3>每次协作后，给自己做一次复盘</h3><div class="self-review-questions"><article><span>01 / 补理解</span><b>我真正理解了什么？</b><p>原理 · 边界 · 失败路径</p></article><article><span>02 / 更新经验</span><b>哪些做法已经过时？</b><p>旧提示词 · 旧流程 · 新默认能力</p></article><article><span>03 / 扩大职责</span><b>下次能独立负责什么？</b><p>把结论变成笔记、skill 与新练习</p></article></div></div>
+  <div class="self-review"><h3 class="emoji-review-heading"><img class="emoji-inline" src="assets/thinking-face.svg" width="42" height="42" alt="" aria-hidden="true">每次协作后，给自己做一次复盘</h3><div class="self-review-questions"><article><span>01 / 补理解</span><b>我真正理解了什么？</b><p>原理 · 边界 · 失败路径</p></article><article><span>02 / 更新经验</span><b>哪些做法已经过时？</b><p>旧提示词 · 旧流程 · 新默认能力</p></article><article><span>03 / 扩大职责</span><b>下次能独立负责什么？</b><p>把结论变成笔记、skill 与新练习</p></article></div></div>
   <div class="evolution-takeaway">别只记录 AI 完成了什么，也记录自己学会了什么。</div>
   <aside class="reading-note">这一页按主讲人的新主线收尾：模型与工具进步，会让部分通用操作经验逐渐失去稀缺性；持续复盘，把每次协作变成理解、判断和负责范围的增长。时间轴是代表性节点，不把各次发布视为能力阶段的严格分界。Cursor 2023 年已有 AI 编码功能，早于 Gemini 2.5；Claude Code 2025-02-24 研究预览、2025-05-22 正式发布。不能以 Gemini 2.5 作为 AI 首次进入生产或 Coding 的起点。“经验变成模型参数”在这里是比喻，不代表个人经验必然进入训练；演示采用“明天可能成为模型的默认能力”。<a href="https://www.anthropic.com/news/claude-3-7-sonnet" target="_blank" rel="noopener">Claude Code 研究预览发布记录</a>。</aside>
 </section>
