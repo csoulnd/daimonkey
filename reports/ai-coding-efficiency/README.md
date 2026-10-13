@@ -15,3 +15,12 @@
 更新讲稿快照后，调整 `build-script.py` 中固定版本，使用站点虚拟环境解释器执行 `build-script.py`；讲稿由单份 Markdown 生成。演示摘要需要随内容变更同步检查。
 
 网页文件使用原样 HTML 报告接口发布，不修改共享模板、其他报告或鉴权行为。
+
+## 开场卡通图
+
+`assets/exploding-head.svg` 为 OpenMoji 的 Exploding Head（U+1F92F），保持原图，未修改。
+
+- 来源：https://openmoji.org/data/color/svg/1F92F.svg
+- 项目：https://github.com/hfg-gmuend/openmoji
+- 署名：OpenMoji，the open-source emoji and icon project。
+- 许可：CC BY-SA 4.0，https://creativecommons.org/licenses/by-sa/4.0/
