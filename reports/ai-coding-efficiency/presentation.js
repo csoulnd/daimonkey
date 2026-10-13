@@ -150,13 +150,6 @@
     '核对构建产物、部署状态、实际运行镜像与浏览器资源，确认版本真的更新了。',
     '走实际页面，给出操作序列、预期与实际；用户体验符合要求，才完成这次验收。'
   ], '#status-detail');
-  selectable('[data-loop]', [
-    '说清目标、边界和验收标准，把任务交代给 AI，也给自己的注意力减负。',
-    '先摆出方案、改动范围和影响面，在关键决策处确认。',
-    '让 AI 承担重复执行；人及时补充现实信息、纠偏并控制范围。',
-    '用测试、运行观测和实际行为核对结果；发现偏差，返回计划或执行。',
-    '整理可检视、可验证的交付物；复盘经验，沉淀成笔记、skill 与仓库约定。'
-  ], '#loop-detail');
   setReading(reading, false);
   fit();
   if (reading) requestAnimationFrame(() => slides[current].scrollIntoView({block: 'start'}));

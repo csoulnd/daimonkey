@@ -222,14 +222,20 @@
   <aside class="reading-note">对应原稿二、2、3，以及二、4 的偿还动作。AI 可以辅助解释、提供反例和减少绕路，但理解的形成需要自己的认知参与。把掌握过的重复劳动交出去，保留关键练习，用笔记、skill 和仓库约定沉淀经验。Anthropic 对 52 名、主要为初级的工程师进行的小规模研究测量了短期学习效果，不能直接推出所有开发者的长期能力变化。<a href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener">研究说明</a>。</aside>
 </section>
 
-<section class="slide closing" id="s-10" data-title="不积跬步，无以至千里" aria-label="第 10 屏：两个循环">
-  <div class="eyebrow">带回工作中的三个动作 <span>10 — 收尾</span></div>
-  <h2>不积跬步，<em>无以至千里</em></h2>
-  <p class="quote-attribution">—— 荀子《劝学》 <a href="https://www.lnpc.edu.cn/jcsjc/2024/0506/c269a24286/page.htm" target="_blank" rel="noopener" aria-label="查看荀子劝学引文出处">出处 ↗</a></p>
-  <div class="loop-layout"><div class="delivery-loop"><span class="small-label">交付循环 / 把生成变成结果</span><div class="loop-stages"><button type="button" data-loop="0" class="selected" aria-pressed="true">目标</button><i>→</i><button type="button" data-loop="1" aria-pressed="false">计划</button><i>→</i><button type="button" data-loop="2" aria-pressed="false">执行</button><i>→</i><button type="button" data-loop="3" aria-pressed="false">验证</button><i>→</i><button type="button" data-loop="4" aria-pressed="false">交付</button></div><p id="loop-detail" aria-live="polite">说清目标、边界和验收标准，把任务交代给 AI，也给自己的注意力减负。</p><div class="return-line">验证发现偏差，返回计划或执行</div></div><div class="learning-loop"><span class="small-label">学习循环 / 把协作变成能力</span><b>复盘 → 练习 → 沉淀 → 复用</b><p>每次任务，扩大理解和验证的范围。</p></div></div>
-  <div class="closing-lines"><p><span>01</span>把重复劳动<em>交出去</em></p><p><span>02</span>把关键理解<em>练回来</em></p><p><span>03</span>把设计意图<em>记下来</em></p></div>
-  <div class="slide-bottom"><span>AI Coding 提效实践：工作流与人的成长</span><span>下一次类似任务，我能比这次负责更多吗？</span></div>
-  <aside class="reading-note">工作流通过每次任务持续积累。交付循环提高当下效率，学习循环支撑长期能力。skill 给机器复用，笔记给人复用，AGENTS.md 等仓库约定给后续会话复用。<a href="assets/ai-coding-workflow/task-delivery-loop.png" target="_blank">查看原稿交付闭环图</a>。</aside>
+<section class="slide closing-evolution" id="s-10" data-title="模型在迭代，人也要持续复盘与成长" aria-label="第 10 屏：AI 演进与自我复盘">
+  <div class="eyebrow">模型在迭代，人也要迭代 <span>10 — 持续更新自己</span></div>
+  <h2>苟日新，日日新，<em>又日新</em></h2>
+  <p class="evolution-attribution">—— 商汤盘铭，《大学》引用 <a href="https://ccr.sdufe.edu.cn/info/1006/1025.htm" target="_blank" rel="noopener">出处 ↗</a><span>从代码补全到任务委托，模型与工具持续扩展能力边界。</span></p>
+  <div class="ai-evolution" aria-label="AI Coding 能力演进的代表性节点">
+    <article><a class="milestone-date" href="https://github.blog/news-insights/product-news/introducing-github-copilot-ai-pair-programmer/" target="_blank" rel="noopener">2021.06 ↗</a><span class="milestone-dot"></span><h3>代码补全</h3><b>GitHub Copilot</b><p>技术预览：<br>建议整行代码与函数</p></article>
+    <article><a class="milestone-date" href="https://cursor.com/changelog/0-2-0" target="_blank" rel="noopener">2023.04 ↗</a><span class="milestone-dot"></span><h3>编辑器协作</h3><b>Cursor 0.2.0</b><p>AI 能力进入<br>日常代码编辑流程</p></article>
+    <article><a class="milestone-date" href="https://blog.google/innovation-and-ai/models-and-research/google-deepmind/gemini-model-thinking-updates-march-2025/" target="_blank" rel="noopener">2025.03 ↗</a><span class="milestone-dot"></span><h3>推理与代码生成</h3><b>Gemini 2.5 Pro</b><p>实验发布：<br>处理更复杂的问题与实现</p></article>
+    <article><a class="milestone-date" href="https://www.anthropic.com/news/claude-4" target="_blank" rel="noopener">2025.05 ↗</a><span class="milestone-dot"></span><h3>任务委托</h3><b>Claude Code 正式发布</b><p>从建议代码，<br>走向执行工程任务</p></article>
+  </div>
+  <div class="experience-decay"><strong>今天需要反复提示的做法，明天可能成为模型的默认能力。</strong><p>经验会折旧。人要持续扩大理解、判断和可负责的范围。</p></div>
+  <div class="self-review"><h3>每次协作后，给自己做一次复盘</h3><div class="self-review-questions"><article><span>01 / 补理解</span><b>我真正理解了什么？</b><p>原理 · 边界 · 失败路径</p></article><article><span>02 / 更新经验</span><b>哪些做法已经过时？</b><p>旧提示词 · 旧流程 · 新默认能力</p></article><article><span>03 / 扩大职责</span><b>下次能独立负责什么？</b><p>把结论变成笔记、skill 与新练习</p></article></div></div>
+  <div class="evolution-takeaway">别只记录 AI 完成了什么，也记录自己学会了什么。</div>
+  <aside class="reading-note">这一页按主讲人的新主线收尾：模型与工具进步，会让部分通用操作经验逐渐失去稀缺性；持续复盘，把每次协作变成理解、判断和负责范围的增长。时间轴是代表性节点，不把各次发布视为能力阶段的严格分界。Cursor 2023 年已有 AI 编码功能，早于 Gemini 2.5；Claude Code 2025-02-24 研究预览、2025-05-22 正式发布。不能以 Gemini 2.5 作为 AI 首次进入生产或 Coding 的起点。“经验变成模型参数”在这里是比喻，不代表个人经验必然进入训练；演示采用“明天可能成为模型的默认能力”。<a href="https://www.anthropic.com/news/claude-3-7-sonnet" target="_blank" rel="noopener">Claude Code 研究预览发布记录</a>。</aside>
 </section>
 </div>
 </main>
