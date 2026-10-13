@@ -1,0 +1,11 @@
+{
+  "title": "AI Coding 提效实践：工作流与人的成长",
+  "source_repository": "https://github.com/csoulnd/InferTechNote",
+  "source_path": "agent/reports/ai-coding-workflow-practice.md",
+  "source_commit": "c61e29bd7f79e2f6097687a3adcee65c1ba0789a",
+  "source_sha256": "3dd2c6b1539b256d7a249565d1e5bb96edc9204d0bc643fb212338f1fbd17da2",
+  "slides": 10,
+  "target_duration_minutes": "10–15",
+  "audience": "有 AI Coding 经验及初次接触的开发者",
+  "paper_table": "arXiv:2603.08274v1, Table 9; all 11 models with all three lengths; best-case fabrication percentages"
+}

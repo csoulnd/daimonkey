@@ -13,6 +13,14 @@
 #
 # 登记后运行一次建站即可发布（任意更新按钮或 --build）。
 reports:
+  - slug: ai-coding-efficiency
+    title: AI Coding 提效实践：工作流与人的成长
+    date: 2026-10-13
+    file: index.html
+    summary: 10 屏、10–15 分钟的实践分享：任务内提效、部署 skill、真实验收，以及人的学习与成长。
+    tags: [AI Coding, 实践分享, 工作流, 学习]
+    materials:
+    - https://github.com/csoulnd/InferTechNote/blob/c61e29bd7f79e2f6097687a3adcee65c1ba0789a/agent/reports/ai-coding-workflow-practice.md
   - slug: agentcore-platforms
     title: AgentCore 平台汇报
     date: 2026-10-12
