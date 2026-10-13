@@ -7,5 +7,17 @@
   "slides": 10,
   "target_duration_minutes": "10–15",
   "audience": "有 AI Coding 经验及初次接触的开发者",
-  "paper_table": "arXiv:2603.08274v1, Table 9; all 11 models with all three lengths; best-case fabrication percentages"
+  "paper_table": "arXiv:2603.08274v1, Table 9; all 11 models with all three lengths; best-case fabrication percentages",
+  "presentation_revision": {
+    "date": "2026-10-13",
+    "basis": "主讲人逐页反馈",
+    "changes": [
+      "第4页聚焦一、3和一、4，论文图降为辅助证据",
+      "第5页采用主讲人提供的精度乱码故事引子",
+      "第6页补充定时任务与官方skill指南",
+      "第8页先介绍三类债务，第9页讲偿还动作与练习",
+      "第10页引用荀子劝学"
+    ],
+    "speaker_article_snapshot": "保持原稿，未同步改写逐屏口播"
+  }
 }

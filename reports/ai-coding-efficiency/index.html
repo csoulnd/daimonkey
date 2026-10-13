@@ -94,20 +94,36 @@
   <aside class="reading-note">改动行数只是一种信号。一行权限判断也可能比几十行样式更需要审慎。流程可以按轻重展开，目标、方案、实现和验证仍然需要有人负责。</aside>
 </section>
 
-<section class="slide chart-slide" id="s-4" data-title="上下文要保留证据，也要清理弯路" aria-label="第 4 屏：上下文与论文数据">
-  <div class="eyebrow">第一层 / 任务内提效 <span>04 — 上下文</span></div>
-  <h2>上下文要保留证据，也要<em>清理弯路</em></h2>
-  <div class="split context-split">
-    <div class="context-copy"><p class="quote">换会议室之前，<br>记得把白板带走。</p><ul class="plain-list"><li><b>换题另开会话</b><span>探索岔路走支线</span></li><li><b>交接留下四样东西</b><span>目标边界 · 已确认决策<br>当前状态 · 下一步验收</span></li><li><b>按信息质量整理</b><span>保留相关证据，清理过时信息</span></li></ul><p class="finding">多数模型在长上下文下<br>编造率上升，幅度不同。</p></div>
-    <figure class="heatmap"><figcaption><b>针对缺失信息的最佳编造率</b><span>越低越好 · 点击列标题聚焦</span></figcaption><table id="fabrication-table"><thead><tr><th scope="col">模型</th><th scope="col"><button type="button" data-column="0" aria-pressed="false">32K</button></th><th scope="col"><button type="button" data-column="1" aria-pressed="false">128K</button></th><th scope="col"><button type="button" data-column="2" aria-pressed="false">200K</button></th></tr></thead><tbody></tbody></table><p class="chart-caption">11 个模型在三档长度均完成测试；每档取所测温度和硬件组合中的最低编造率。合成英文文档问答，不代表日常回答或代码生成的总体错误率。</p><a class="source-link" href="https://arxiv.org/html/2603.08274v1" target="_blank" rel="noopener">arXiv:2603.08274v1 · §5.4 / 表 9 ↗</a></figure>
+<section class="slide context-process-slide" id="s-4" data-title="流程，是人的外置上下文管理" aria-label="第 4 屏：流程与人的上下文管理">
+  <div class="eyebrow">第一层 / 任务内提效 <span>04 — 流程与上下文</span></div>
+  <h2>流程，是人的<em>外置上下文管理</em></h2>
+  <p class="lead">把必须记住的东西写下来，给人的注意力装上护栏。</p>
+  <div class="external-context-flow">
+    <article><span>01 / 需求</span><h3>目标与边界</h3><p>做什么 · 不做什么<br>什么算完成</p><small>把需求从脑子里挪出来</small></article><i>→</i>
+    <article><span>02 / 设计</span><h3>方案与取舍</h3><p>改哪里 · 为什么这样改<br>影响到谁</p><small>把决策依据留下来</small></article><i>→</i>
+    <article><span>03 / 开发</span><h3>实现与状态</h3><p>已完成 · 待处理<br>排除了哪些错误路径</p><small>把当前进度讲清楚</small></article><i>→</i>
+    <article><span>04 / 测试</span><h3>验收与证据</h3><p>预期与实际<br>失败路径与运行结果</p><small>把完成标准落实到证据</small></article>
   </div>
-  <aside class="reading-note">幻觉是缺乏事实依据、却被当作事实陈述的内容。这里的实验针对不存在的实体或缺失字段，35 个开放权重模型中有 11 个完成全部三档测试。变化并非全部单调上升。实际工作中仍要以最新文件和运行证据核对关键结论。<a href="assets/ai-coding-workflow/context-fabrication-rates.png" target="_blank">查看原稿图表</a>。</aside>
+  <div class="context-followup">
+    <div class="human-context">
+      <h3>换会议室之前，记得把白板带走。</h3>
+      <div class="context-principles"><span>换题另开会话</span><span>探索走支线</span><span>按信噪比整理</span></div>
+      <p>交接留下四样东西</p>
+      <div class="handoff-items"><b>目标与边界</b><b>已确认决策</b><b>代码与环境状态</b><b>下一步验收</b></div>
+    </div>
+    <figure class="context-evidence">
+      <a href="assets/ai-coding-workflow/context-fabrication-rates.png" target="_blank" rel="noopener" title="查看完整论文数据图"><img src="assets/ai-coding-workflow/context-fabrication-rates.png" alt="论文数据：11 个模型在不同上下文长度下的最佳编造率" width="340" height="213"></a>
+      <figcaption><b>长上下文也有代价</b><span>多数模型编造率上升，幅度不同。</span><a href="https://arxiv.org/html/2603.08274v1" target="_blank" rel="noopener">论文表 9 / 点击图查看完整数据 ↗</a></figcaption>
+    </figure>
+  </div>
+  <div class="context-last-line">流程按任务轻重展开；会话按信息质量切换。</div>
+  <aside class="reading-note">对应演讲稿一、3 和一、4。需求、设计、实现、验证仍然需要有人负责，小任务可以几句话走完；正式文档是人的外置上下文。换会话时传递目标、已确认决策、当前代码与环境状态、下一步验收标准。论文图作为辅助证据：35 个开放权重模型中，展示三档长度均完成测试的 11 个模型；每档取所测温度和硬件组合中的最低编造率，针对合成英文文档中的缺失信息探测，并非日常回答或代码生成的总体错误率。</aside>
 </section>
 
 <section class="slide" id="s-5" data-title="测试通过之后，还要追到真实结果" aria-label="第 5 屏：真实验收">
   <div class="eyebrow">第一层 / 任务内提效 <span>05 — 验收现场</span></div>
   <h2>测试通过之后，还要追到<em>真实结果</em></h2>
-  <div class="case-strip"><span>我的一次实际反馈</span><blockquote>“前端显示没变化，修改没有生效吗？”</blockquote></div>
+  <div class="case-strip"><span>我的一个真实经历</span><blockquote>“精度乱码已经解决，问题彻底修复了吗？”</blockquote></div>
   <div class="status-path" id="status-path" aria-label="四种不同的完成状态">
     <button class="status-step selected" type="button" data-status="0" aria-pressed="true"><span>01</span><b>代码已修改</b><small>实现落到了文件</small></button><i>→</i>
     <button class="status-step" type="button" data-status="1" aria-pressed="false"><span>02</span><b>检查已通过</b><small>测试覆盖了本次风险</small></button><i>→</i>
@@ -116,16 +132,19 @@
   </div>
   <div class="status-explanation"><span class="small-label">点击上方状态，沿真实链路检查</span><p id="status-detail" aria-live="polite">先核对改动范围：目标问题是否解决，是否引入了无关修改？</p></div>
   <div class="control-rules"><div><b>过程控制</b><p>及时插话 · 喂现实 · 陷入循环就回头审方案</p></div><div><b>结果控制</b><p>给操作序列 · 对照预期与实际 · 按影响设置确认点</p></div></div>
-  <aside class="reading-note">案例来自重复上传修复：AI 报告测试通过后，实际页面仍然没有变化。继续核对构建、部署、运行镜像和浏览器资源。测试、运行、用户结果对应不同的证据。实现和测试也可能共享同一个错误假设。</aside>
+  <aside class="reading-note">用“精度乱码已经解决，问题彻底修复了吗？”引出对修复范围和真实结果的追问。具体经历由主讲人现场展开。其余验收状态与过程控制保持原有结构。</aside>
 </section>
 
-<section class="slide" id="s-6" data-title="重复的工作流，沉淀成 skill" aria-label="第 6 屏：部署 skill">
-  <div class="eyebrow">第一层 / 任务内提效 <span>06 — 流程复用</span></div>
-  <h2>重复的工作流，沉淀成 <em>skill</em></h2>
-  <p class="lead">skill = 可调用的流程说明，把检查顺序与验收标准一起留下来。</p>
-  <div class="skill-layout"><div class="skill-terminal"><div class="terminal-top"><span></span><span></span><span></span><b>我的部署 skill</b></div><code>agentos-wsl-deployment</code><h3>Windows 客户端<br>+ WSL Manager / Server</h3><div class="skill-spec"><span>先确认</span><b>当前交付文档与环境</b><span>再执行</span><b>安装、排障与分层验收</b><span>完成依据</span><b>实际端到端链路</b></div></div><div class="skill-sequence"><div><span>1</span><p><b>读取当前文档</b><small>确认本次交付版本与脚本</small></p></div><div><span>2</span><p><b>核对环境与配置</b><small>包来源 · 网络地址 · UID/GID（用户与组标识）</small></p></div><div><span>3</span><p><b>按顺序部署和排障</b><small>客户端 → Manager → Server</small></p></div><div><span>4</span><p><b>检查服务，再验收实际链路</b><small>从“启动成功”走到“真的能用”</small></p></div></div></div>
-  <div class="takeaway">把“上次怎么装好的”，变成“这次有据可依”。</div>
-  <aside class="reading-note">这是作者本机个人 skill。环境会变，因此流程先读取当前交付包文档并核对实际配置。知识整理也可复用：atomic-knowledge 固定原子笔记格式，knowledge-distillation 固定阶段性知识提炼流程。skill 需要持续维护。</aside>
+<section class="slide skill-schedule-slide" id="s-6" data-title="skill 固化怎么做，定时任务安排什么时候做" aria-label="第 6 屏：skill 与定时任务">
+  <div class="eyebrow">第一层 / 任务内提效 <span>06 — 复用与持续跟进</span></div>
+  <h2>把重复工作，交给 <em>skill + 定时任务</em></h2>
+  <p class="lead">skill 固化怎么做；定时任务安排什么时候做。</p>
+  <div class="reuse-layout">
+    <article class="reuse-skill"><span class="reuse-label">开发中的同类任务 / 按需调用</span><h3>skill：复用一套流程</h3><code>agentos-wsl-deployment</code><p class="reuse-example">把“上次怎么装好的”，<br>变成“这次有据可依”。</p><div class="reuse-steps"><span>读取当前文档</span><span>核对环境与配置</span><span>按顺序部署排障</span><span>端到端验收</span></div></article>
+    <article class="reuse-schedule"><span class="reuse-label">需要持续掌握信息的角色 / 按周期跟进</span><h3>定时任务：让信息按时来</h3><p class="schedule-example">例如：每日动态简报、每周变化汇总</p><dl><div><dt>少一点重复查找</dt><dd>按约定周期收集、整理更新</dd></div><div><dt>少一点遗忘与遗漏</dt><dd>把持续跟进变成固定节奏</dd></div><div><dt>少一点信息噪声</dt><dd>聚焦新增变化，带上时间与来源</dd></div></dl></article>
+  </div>
+  <div class="skill-authoring"><div><b>怎样写好 skill？</b><span>一个目标 · 触发清晰 · 输入输出明确 · 用真实任务验证</span></div><p>可用 <code>$skill-creator</code> 起草，再从实践中迭代。<a href="https://learn.chatgpt.com/docs/build-skills" target="_blank" rel="noopener">官方编写指南 ↗</a></p></div>
+  <aside class="reading-note">开发中的重复任务先通过 skill 复用流程。产品、运营、管理等需要持续了解变化的工作，可以配合定时任务按周期整理新增信息。页面中的每日简报、每周汇总是使用示例。定时运行的结果仍要检查时效、来源和质量。<a href="https://learn.chatgpt.com/docs/build-skills" target="_blank" rel="noopener">OpenAI 官方指南</a>建议聚焦单一工作、写清触发范围与输入输出，并验证实际触发行为；内置 skill-creator 可帮助起草。</aside>
 </section>
 
 <section class="slide bottleneck-slide" id="s-7" data-title="生成速度，已经超过我的判别速度" aria-label="第 7 屏：产出瓶颈">
@@ -176,25 +195,37 @@
   <aside class="reading-note">“+”表示两种能力共同支撑交付，不是把范围简单相加。成熟测试、静态分析、监控和可靠的独立检视能扩大验证范围。让生成服从消化能力，一次交付一个能理解、能验证的功能。<a href="assets/ai-coding-workflow/generation-judgment-bottleneck.png" target="_blank">查看原稿图示</a>。</aside>
 </section>
 
-<section class="slide" id="s-8" data-title="把重复劳动交出去，把关键练习留下来" aria-label="第 8 屏：学习">
-  <div class="eyebrow">第二层 / 人的提升 <span>08 — 保留练习</span></div>
-  <h2>把重复劳动交出去，<br>把<em>关键练习</em>留下来</h2>
-  <div class="learning-layout"><div class="learning-copy"><p class="quote">答案来得快，<br>理解不会自动安装<br>到你的脑子里。</p><p>AI 可以解释概念、提供反例、减少绕路。<br>形成理解，仍然需要自己的认知参与。</p><div class="recommendation"><span>推荐阅读</span><b>《学习能力决定你的职责范围》</b></div></div><div class="practice-cycle"><div><span>01</span><b>先预测</b><p>先说出预期结果，再求解释</p></div><div><span>02</span><b>做小实验</b><p>陌生机制自己验证一次</p></div><div><span>03</span><b>换条件</b><p>换输入与失败条件，检验能否迁移</p></div><div><span>04</span><b>讲清楚</b><p>为什么这样改？证据是什么？</p></div></div></div>
-  <aside class="reading-note">AI 可能替你拿走查文档、提出假设、排错和写测试的练习机会。Anthropic 对 52 名、主要为初级的工程师开展的随机对照研究发现，学习陌生 Python 库后 AI 组测验平均得分低约 17 个百分点，任务速度差异未达统计显著。这是短期、小规模实验，不能直接推出所有开发者的长期能力变化。<a href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener">研究说明</a>。</aside>
-</section>
-
-<section class="slide" id="s-9" data-title="代码写完，债务不一定清零" aria-label="第 9 屏：认知与意图债务">
-  <div class="eyebrow">第二层 / 人的提升 <span>09 — 两种债务</span></div>
-  <h2>代码写完，债务不一定<em>清零</em></h2>
-  <div class="debt-grid"><article class="debt understanding-debt"><span class="debt-index">01 / 欠理解</span><h3>认知债务</h3><blockquote>“它怎么工作？<br>改它会影响什么？”</blockquote><p>功能上线了，没人说清<br>错误处理与权限边界。</p><div class="repay"><b>偿还动作</b><span>读代码 · 走链路 · 做实验 · 自己复述</span></div></article><article class="debt intent-debt"><span class="debt-index">02 / 欠为什么</span><h3>意图债务</h3><blockquote>“当初为什么这样设计？<br>哪些条件不能破坏？”</blockquote><p>默认值看起来合理，<br>团队却没确认、没记录选择理由。</p><div class="repay"><b>偿还动作</b><span>记录目标 · 约束 · 取舍 · 放弃的方案</span></div></article></div>
-  <p class="debt-foot">AI 可以起草文档；关键决策理由，由做决定的人确认。</p>
+<section class="slide three-debts-slide" id="s-8" data-title="代码写完，三类债务仍可能增长" aria-label="第 8 屏：三类债务">
+  <div class="eyebrow">第二层 / 人的提升 <span>08 — 先认识债务</span></div>
+  <h2>代码写完，三类债务仍可能<em>增长</em></h2>
+  <p class="lead">欠在实现里，欠在理解里，也欠在没有留下来的“为什么”里。</p>
+  <div class="three-debts">
+    <article class="technical-debt"><span>01 / 欠实现质量</span><h3>技术债务</h3><blockquote>改这个功能，<br>为什么要连带<br>改这么多处？</blockquote><p>缺少易于维护、<br>能够演进的实现。</p></article>
+    <article class="cognitive-debt"><span>02 / 欠理解</span><h3>认知债务</h3><blockquote>它怎么工作？<br>改它会影响什么？</blockquote><p>功能上线了，没人说清<br>错误处理与权限边界。</p></article>
+    <article class="intention-debt"><span>03 / 欠为什么</span><h3>意图债务</h3><blockquote>当初为什么这样设计？<br>哪些条件不能破坏？</blockquote><p>默认值看起来合理，<br>选择理由却没有留下来。</p></article>
+  </div>
+  <div class="debt-conclusion">实现、理解、决策依据，三者都需要有人负责。</div>
   <a class="source-link" href="https://arxiv.org/abs/2603.22106" target="_blank" rel="noopener">Storey · 三类债务概念框架 ↗</a>
-  <aside class="reading-note">三类债务框架分别关注代码、团队共同理解和外化的决策依据，是分析软件健康的概念框架。技术债务关注实现的可维护性；认知债务关注人的理解；意图债务关注被记录的目标与理由。事后从代码生成文档，不能凭空恢复未记录的人类意图。</aside>
+  <aside class="reading-note">对应原稿二、4，提前作为人的提升部分的切入点。技术债务关注实现的可维护性，认知债务关注团队共同理解，意图债务关注被记录的目标、约束和决策依据。这是软件健康的概念分析框架，并非可精确计量的评分公式。</aside>
 </section>
 
-<section class="slide closing" id="s-10" data-title="让今天的速度，成为明天的能力" aria-label="第 10 屏：两个循环">
+<section class="slide repay-learn-slide" id="s-9" data-title="把债务补回来，把关键练习留下来" aria-label="第 9 屏：偿还债务与保留练习">
+  <div class="eyebrow">第二层 / 人的提升 <span>09 — 再行动，再积累</span></div>
+  <h2>把债务补回来，把关键练习<em>留下来</em></h2>
+  <div class="debt-payments">
+    <div><b>技术债务</b><span>补实现</span><p>明确边界 · 小步交付 · 独立验证 · 持续整理</p></div>
+    <div><b>认知债务</b><span>补理解</span><p>读代码 · 走链路 · 做实验 · 自己讲清楚</p></div>
+    <div><b>意图债务</b><span>补理由</span><p>记录目标、约束、取舍，以及放弃的方案</p></div>
+  </div>
+  <div class="practice-guard"><h3>AI 完成工作的同时，也可能拿走你的练习机会。</h3><p>查文档、提出假设、排错和写测试，都曾在训练你的判断力。</p><div class="practice-actions"><span>先预测，再求解释</span><span>陌生机制做小实验</span><span>换条件，检验迁移</span><span>收尾时自己讲清楚</span></div><strong>任务完成之后，还要问一句：我这次学会了什么？</strong></div>
+  <div class="learning-reading"><span>推荐阅读</span><b>《学习能力决定你的职责范围》</b></div>
+  <aside class="reading-note">对应原稿二、2、3，以及二、4 的偿还动作。AI 可以辅助解释、提供反例和减少绕路，但理解的形成需要自己的认知参与。把掌握过的重复劳动交出去，保留关键练习，用笔记、skill 和仓库约定沉淀经验。Anthropic 对 52 名、主要为初级的工程师进行的小规模研究测量了短期学习效果，不能直接推出所有开发者的长期能力变化。<a href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank" rel="noopener">研究说明</a>。</aside>
+</section>
+
+<section class="slide closing" id="s-10" data-title="不积跬步，无以至千里" aria-label="第 10 屏：两个循环">
   <div class="eyebrow">带回工作中的三个动作 <span>10 — 收尾</span></div>
-  <h2>让今天的速度，成为<em>明天的能力</em></h2>
+  <h2>不积跬步，<em>无以至千里</em></h2>
+  <p class="quote-attribution">—— 荀子《劝学》 <a href="https://www.lnpc.edu.cn/jcsjc/2024/0506/c269a24286/page.htm" target="_blank" rel="noopener" aria-label="查看荀子劝学引文出处">出处 ↗</a></p>
   <div class="loop-layout"><div class="delivery-loop"><span class="small-label">交付循环 / 把生成变成结果</span><div class="loop-stages"><button type="button" data-loop="0" class="selected" aria-pressed="true">目标</button><i>→</i><button type="button" data-loop="1" aria-pressed="false">计划</button><i>→</i><button type="button" data-loop="2" aria-pressed="false">执行</button><i>→</i><button type="button" data-loop="3" aria-pressed="false">验证</button><i>→</i><button type="button" data-loop="4" aria-pressed="false">交付</button></div><p id="loop-detail" aria-live="polite">说清目标、边界和验收标准，把任务交代给 AI，也给自己的注意力减负。</p><div class="return-line">验证发现偏差，返回计划或执行</div></div><div class="learning-loop"><span class="small-label">学习循环 / 把协作变成能力</span><b>复盘 → 练习 → 沉淀 → 复用</b><p>每次任务，扩大理解和验证的范围。</p></div></div>
   <div class="closing-lines"><p><span>01</span>把重复劳动<em>交出去</em></p><p><span>02</span>把关键理解<em>练回来</em></p><p><span>03</span>把设计意图<em>记下来</em></p></div>
   <div class="slide-bottom"><span>AI Coding 提效实践：工作流与人的成长</span><span>下一次类似任务，我能比这次负责更多吗？</span></div>

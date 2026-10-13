@@ -27,5 +27,10 @@ body{{line-height:1.85}}.script-header{{max-width:1200px;margin:0 auto;padding:2
 </style></head><body><header class="script-header"><a href="index.html">← 返回演示</a><a href="{source_url}" target="_blank" rel="noopener">GitHub 原文 ↗</a><span>讲稿快照 · {COMMIT[:7]} · 正文保持原文，省略仓库维护检查项</span></header><div class="script-grid"><nav class="script-toc" aria-label="讲稿目录">{md.toc}</nav><article class="script-body">{content}</article></div></body></html>'''
 (ROOT / 'script.html').write_text(page, encoding='utf-8')
 manifest = {'title': 'AI Coding 提效实践：工作流与人的成长', 'source_repository': REPO, 'source_path': SOURCE, 'source_commit': COMMIT, 'source_sha256': hashlib.sha256((ROOT / 'source-snapshot.md').read_bytes()).hexdigest(), 'slides': 10, 'target_duration_minutes': '10–15', 'audience': '有 AI Coding 经验及初次接触的开发者', 'paper_table': 'arXiv:2603.08274v1, Table 9; all 11 models with all three lengths; best-case fabrication percentages'}
+previous_manifest = ROOT / 'source-manifest.json'
+if previous_manifest.exists():
+    prior = json.loads(previous_manifest.read_text(encoding='utf-8'))
+    if 'presentation_revision' in prior:
+        manifest['presentation_revision'] = prior['presentation_revision']
 (ROOT / 'source-manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 print('Generated script.html and source-manifest.json')

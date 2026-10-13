@@ -135,45 +135,7 @@
     });
   }, {passive: true});
 
-  // Source article's full transcription of arXiv:2603.08274v1, Table 9.
-  // All 11 models tested at all three lengths; percentages, best-case fabrication.
-  const fabrication = [
-    ['GLM 4.6', [7.04, 13.75, 69.53]],
-    ['Qwen3 Next 80B-A3B', [7.04, 7.99, 10.25]],
-    ['Qwen3 Coder 480B-A35B', [12.20, 16.88, 27.52]],
-    ['GLM 4.7', [16.27, 10.42, 46.73]],
-    ['Qwen3 235B-A22B', [19.84, 22.08, 33.15]],
-    ['Qwen3 235B-A22B FP8', [23.31, 21.81, 32.94]],
-    ['Qwen3 4B 2507', [25.30, 29.79, 26.02]],
-    ['Llama 4 Maverick', [28.08, 38.82, 43.29]],
-    ['Qwen3 30B-A3B 2507', [36.11, 35.07, 41.04]],
-    ['Qwen3 Coder 30B-A3B', [40.18, 43.82, 47.21]],
-    ['Llama 4 Scout', [44.44, 52.22, 52.09]]
-  ];
-  const table = document.querySelector('#fabrication-table');
-  fabrication.forEach(([name, values]) => {
-    const row = document.createElement('tr');
-    const model = document.createElement('th');
-    model.scope = 'row'; model.textContent = name; row.append(model);
-    values.forEach((value, column) => {
-      const cell = document.createElement('td');
-      cell.dataset.column = column;
-      cell.textContent = `${value.toFixed(2)}%`;
-      const t = Math.min(1, value / 70);
-      const start = [213, 231, 219], end = [210, 155, 125];
-      cell.style.backgroundColor = `rgb(${start.map((v, i) => Math.round(v + (end[i] - v) * t)).join(',')})`;
-      row.append(cell);
-    });
-    table.tBodies[0].append(row);
-  });
-  table.querySelectorAll('button').forEach(button => {
-    button.addEventListener('click', () => {
-      const off = button.getAttribute('aria-pressed') === 'true';
-      table.parentElement.classList.toggle('focus-column', !off);
-      table.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(!off && b === button)));
-      table.querySelectorAll('td').forEach(td => td.classList.toggle('focused', !off && td.dataset.column === button.dataset.column));
-    });
-  });
+  // The context-length evidence now uses the full source figure as a thumbnail.
 
   function selectable(selector, texts, target) {
     const buttons = [...document.querySelectorAll(selector)];
