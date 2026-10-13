@@ -128,11 +128,50 @@
   <aside class="reading-note">这是作者本机个人 skill。环境会变，因此流程先读取当前交付包文档并核对实际配置。知识整理也可复用：atomic-knowledge 固定原子笔记格式，knowledge-distillation 固定阶段性知识提炼流程。skill 需要持续维护。</aside>
 </section>
 
-<section class="slide" id="s-7" data-title="生成速度，已经超过我的判别速度" aria-label="第 7 屏：产出瓶颈">
+<section class="slide bottleneck-slide" id="s-7" data-title="生成速度，已经超过我的判别速度" aria-label="第 7 屏：产出瓶颈">
   <div class="eyebrow">从任务效率，走向人的成长 <span>07 — 转折</span></div>
   <h2>生成速度，已经超过<em>我的判别速度</em></h2>
-  <div class="judgment-pipe"><div class="candidates"><span class="small-label">候选内容</span><div><b>代码</b><b>测试</b><b>方案</b><b>评审</b><b>总结</b><b>修复</b></div><p>AI 可以不断生成</p></div><span class="big-arrow">→</span><div class="judgment-gate"><span>真正的瓶颈</span><b>理解<br>+ 验证</b><small>目标 · 边界 · 证据</small></div><span class="big-arrow">→</span><div class="accepted"><span class="small-label">有效产出</span><b>可交付<br>可负责</b><p>经过验收的结果</p></div></div>
-  <div class="overflow"><span>当候选内容超出消化能力</span><div><b>要么堆积</b><p>待审队列越来越长</p></div><div><b>要么放水</b><p>“看起来没问题”变成通过</p></div></div>
+  <div class="bottleneck-diagram">
+    <svg viewBox="0 0 1448 556" role="img" aria-labelledby="bottleneck-title bottleneck-desc">
+      <title id="bottleneck-title">生成与判别的瓶颈</title>
+      <desc id="bottleneck-desc">AI 生成的候选内容从宽入口进入，经过狭窄的理解与验证通道，才能成为有效产出。超出判别能力的内容要么堆积为待检视队列，要么因放水把风险带进交付。学习与练习、可靠的自动化验证可以扩大判别通道。图形宽度不表示实际数量或比例。</desc>
+      <defs>
+        <marker id="bottleneck-blue-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="bottleneck-blue-fill" /></marker>
+        <marker id="bottleneck-teal-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="bottleneck-teal-fill" /></marker>
+        <marker id="bottleneck-risk-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="bottleneck-risk-fill" /></marker>
+      </defs>
+      <text class="bottleneck-label bottleneck-blue-text" x="116" y="34">AI 生成</text>
+      <rect class="bottleneck-input" x="10" y="61" width="212" height="58" rx="12" />
+      <rect class="bottleneck-input" x="10" y="132" width="212" height="58" rx="12" />
+      <rect class="bottleneck-input" x="10" y="203" width="212" height="58" rx="12" />
+      <text class="bottleneck-content" x="116" y="99">代码与改动</text>
+      <text class="bottleneck-content" x="116" y="170">测试与报告</text>
+      <text class="bottleneck-content" x="116" y="241">方案与解释</text>
+      <polygon class="bottleneck-funnel" points="294,40 560,137 560,225 294,289" />
+      <path class="bottleneck-blue-line" d="M 236 181 H 322" marker-end="url(#bottleneck-blue-arrow)" />
+      <text class="bottleneck-label bottleneck-teal-text" x="732" y="90">判别通道</text>
+      <rect class="bottleneck-channel" x="560" y="137" width="345" height="88" />
+      <text class="bottleneck-channel-title" x="732" y="173">理解与验证</text>
+      <text class="bottleneck-channel-detail" x="732" y="206">关键边界 · 独立证据</text>
+      <polygon class="bottleneck-funnel" points="905,137 1073,101 1073,267 905,225" />
+      <path class="bottleneck-teal-line" d="M 1080 181 H 1125" marker-end="url(#bottleneck-teal-arrow)" />
+      <rect class="bottleneck-output" x="1140" y="91" width="295" height="180" rx="16" />
+      <text class="bottleneck-output-title" x="1287" y="166">有效产出</text>
+      <text class="bottleneck-output-detail" x="1287" y="216">可理解 · 有证据 · 能负责</text>
+      <text class="bottleneck-overflow-label" x="12" y="306">超出判别能力的候选内容</text>
+      <path class="bottleneck-risk-line" d="M 400 249 V 325 H 275 V 344" marker-end="url(#bottleneck-risk-arrow)" />
+      <path class="bottleneck-risk-line" d="M 765 237 V 325 H 1110 V 344" marker-end="url(#bottleneck-risk-arrow)" />
+      <rect class="bottleneck-risk-box" x="8" y="358" width="566" height="82" rx="12" />
+      <rect class="bottleneck-risk-box" x="872" y="358" width="564" height="82" rx="12" />
+      <text class="bottleneck-risk-title" x="32" y="391">堆积：形成待检视队列</text>
+      <text class="bottleneck-risk-detail" x="32" y="425">交付等待，后续检视成本累积</text>
+      <text class="bottleneck-risk-title" x="896" y="391">放水：把风险带进交付</text>
+      <text class="bottleneck-risk-detail" x="896" y="425">以“看起来正确”代替可靠证据</text>
+      <rect class="bottleneck-expansion" x="8" y="464" width="1428" height="62" rx="12" />
+      <text class="bottleneck-expansion-label" x="722" y="504">学习与练习 + 可靠的自动化验证 → 扩大判别通道</text>
+      <text class="bottleneck-concept-note" x="12" y="550">概念示意：图形宽度不表示实际数量或比例。</text>
+    </svg>
+  </div>
   <div class="takeaway">一个人的产出，取决于他理解的范围 + 他能验证的范围。</div>
   <aside class="reading-note">“+”表示两种能力共同支撑交付，不是把范围简单相加。成熟测试、静态分析、监控和可靠的独立检视能扩大验证范围。让生成服从消化能力，一次交付一个能理解、能验证的功能。<a href="assets/ai-coding-workflow/generation-judgment-bottleneck.png" target="_blank">查看原稿图示</a>。</aside>
 </section>
