@@ -58,7 +58,37 @@
   <h2>先判断任务，再决定 <em>plan</em> 的深度</h2>
   <p class="lead">plan = 开工前说清目标、改动范围和验收标准。</p>
   <div class="split plan-split">
-    <div class="decision-map"><span class="axis top-axis">不确定性高 ↑</span><div class="quadrants"><div><b>先调查，再小步做</b><p>缩小未知，快速验证假设</p></div><div class="important"><b>先澄清，再设计</b><p>写清边界，在关键决策处确认</p></div><div class="easy"><b>直接执行，及时验证</b><p>目标清楚，影响小</p></div><div><b>方案明确，设置验收点</b><p>检查影响，明确恢复方式</p></div></div><span class="axis bottom-axis">影响与恢复成本高 →</span></div>
+    <div class="decision-coordinate">
+      <svg viewBox="0 0 780 550" role="img" aria-labelledby="decision-chart-title decision-chart-desc">
+        <title id="decision-chart-title">按不确定性与影响、恢复成本选择工作方式</title>
+        <desc id="decision-chart-desc">横轴为影响与恢复成本，向右增加；纵轴为不确定性，向上增加。左下直接执行并验证，左上先调查再小步做，右下设置验收点，右上先澄清再设计。</desc>
+        <defs><marker id="decision-axis-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>
+        <rect class="decision-region" x="108" y="54" width="294" height="180" rx="5" />
+        <rect class="decision-region decision-cautious" x="430" y="54" width="294" height="180" rx="5" />
+        <rect class="decision-region decision-direct" x="108" y="264" width="294" height="180" rx="5" />
+        <rect class="decision-region" x="430" y="264" width="294" height="180" rx="5" />
+        <path class="decision-divider" d="M 416 42 V 458 M 96 249 H 738" />
+        <path class="decision-axis" d="M 80 480 V 24" marker-end="url(#decision-axis-arrow)" />
+        <path class="decision-axis" d="M 80 480 H 750" marker-end="url(#decision-axis-arrow)" />
+        <text class="decision-axis-label" x="30" y="249" transform="rotate(-90 30 249)">不确定性</text>
+        <text class="decision-axis-label" x="415" y="537">影响与恢复成本</text>
+        <text class="decision-level" x="59" y="70">高</text>
+        <text class="decision-level" x="59" y="450">低</text>
+        <text class="decision-level" x="111" y="514">低</text>
+        <text class="decision-level" x="724" y="514">高</text>
+        <text class="decision-strategy" x="255" y="112">先调查，再小步做</text>
+        <text class="decision-detail" x="255" y="161">缩小未知</text>
+        <text class="decision-detail" x="255" y="194">快速验证假设</text>
+        <text class="decision-strategy" x="577" y="112">先澄清，再设计</text>
+        <text class="decision-detail" x="577" y="161">写清边界</text>
+        <text class="decision-detail" x="577" y="194">在关键决策处确认</text>
+        <text class="decision-strategy" x="255" y="322">直接执行，及时验证</text>
+        <text class="decision-detail" x="255" y="372">目标清楚，影响小</text>
+        <text class="decision-strategy decision-strategy-long" x="577" y="322">方案明确，设置验收点</text>
+        <text class="decision-detail" x="577" y="371">检查影响</text>
+        <text class="decision-detail" x="577" y="404">明确恢复方式</text>
+      </svg>
+    </div>
     <div class="plan-copy"><p class="quote">改一行 plan，<br>往往比返工一段代码<br><em>更划算。</em></p><div class="rule-line"><span>目标</span><b>要解决什么问题？</b></div><div class="rule-line"><span>边界</span><b>这次做什么、不做什么？</b></div><div class="rule-line"><span>验收</span><b>什么证据说明做对了？</b></div><p class="small">小任务几句话走完，复杂任务再正式展开。</p></div>
   </div>
   <aside class="reading-note">改动行数只是一种信号。一行权限判断也可能比几十行样式更需要审慎。流程可以按轻重展开，目标、方案、实现和验证仍然需要有人负责。</aside>
