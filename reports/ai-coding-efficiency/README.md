@@ -16,11 +16,10 @@
 
 网页文件使用原样 HTML 报告接口发布，不修改共享模板、其他报告或鉴权行为。
 
-## 开场卡通图
+## 表情素材来源
 
-`assets/exploding-head.svg` 为 OpenMoji 的 Exploding Head（U+1F92F），保持原图，未修改。
+后续添加表情时，在此登记文件、来源、作者、许可、修改情况与使用位置。演示页面不展示来源文字。
 
-- 来源：https://openmoji.org/data/color/svg/1F92F.svg
-- 项目：https://github.com/hfg-gmuend/openmoji
-- 署名：OpenMoji，the open-source emoji and icon project。
-- 许可：CC BY-SA 4.0，https://creativecommons.org/licenses/by-sa/4.0/
+| 文件 | 表情 | 来源与署名 | 许可 | 修改情况 | 使用位置 |
+|---|---|---|---|---|---|
+| [assets/exploding-head.svg](assets/exploding-head.svg) | Exploding Head（U+1F92F，爆炸头） | [SVG 原图](https://openmoji.org/data/color/svg/1F92F.svg)；[OpenMoji，the open-source emoji and icon project](https://github.com/hfg-gmuend/openmoji) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | 未修改 | 第 1 屏 |
