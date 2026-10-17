@@ -22,7 +22,7 @@ InferTech 观察站(原智能体热度指数):以推理技术为重心,采集 Ag
 
 ## 当前迭代计划
 
-见 [PLAN.md](PLAN.md);**下期三方向(Harness/FM/NV)需求澄清稿**见 [docs/ROADMAP-三方向.md](docs/ROADMAP-三方向.md)——任务按表推进,完成后更新状态,不得丢弃。
+见 [PLAN.md](PLAN.md);**下期三方向(Harness/FM/NV)需求澄清稿**见 [docs/ROADMAP-三方向.md](docs/ROADMAP-三方向.md);**部署交付件与可搬迁性计划**见 [docs/PLAN-deploy.md](docs/PLAN-deploy.md)——任务按表推进,完成后更新状态,不得丢弃。
 
 ## 专家索引(skills/)
 
