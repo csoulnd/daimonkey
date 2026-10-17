@@ -30,7 +30,7 @@
 {% macro ai_summary_card(summary) -%}
 {% if summary %}
 <section class="ai-summary" aria-label="AI 摘要">
-  <div class="ai-summary-head"><span class="ai-badge">🤖 AI 摘要</span><span class="ai-tag">本期要点</span></div>
+  <div class="ai-summary-head"><span class="ai-badge"><svg class="mk" aria-hidden="true"><use href="#i-monkey"/></svg>马猴说</span><span class="ai-tag">AI 摘要 · 本期要点</span></div>
   <p class="ai-summary-body">{{ summary.content }}</p>
   <div class="ai-summary-foot dim">AI 摘要 · 更新于 {{ summary.created_at | dt }}</div>
 </section>

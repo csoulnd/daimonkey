@@ -25,6 +25,24 @@
       : n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
   }
 
+  /* ---- 大马猴表情:切换宠物/面板标题的 symbol 与 data-face 动效 ---- */
+  var _faceTimer = null;
+  function petFace(face) {
+    if (_faceTimer) { clearTimeout(_faceTimer); _faceTimer = null; }
+    ["asst-pet", "asst-panel-title"].forEach(function (id) {
+      var wrap = $(id);
+      if (!wrap) return;
+      var use = wrap.querySelector("use");
+      if (use) use.setAttribute("href", face ? "#i-monkey-" + face : "#i-monkey");
+      if (face) wrap.setAttribute("data-face", face);
+      else wrap.removeAttribute("data-face");
+    });
+  }
+  function petFaceThen(face, ms) {
+    petFace(face);
+    _faceTimer = setTimeout(function () { petFace(null); _faceTimer = null; }, ms);
+  }
+
   function api(path, options) {
     return fetch(API + path, Object.assign({ credentials: "same-origin" },
       options || {})).then(function (r) {
@@ -393,6 +411,7 @@
   function startRun(path, body) {
     state.running = true;
     $("asst-send").disabled = true;
+    petFace("thinking");
     msg("执行中…");
     api(path, {
       method: "POST",
@@ -411,6 +430,7 @@
   /* 启动即失败:收尾 + 撤回乐观气泡并还原输入(仅聊天路径设置了 rollback) */
   function failedRun(text) {
     finishRun();
+    petFaceThen("error", 2000);
     if (state.rollback) {
       try { state.rollback(); } catch (e) { /* 忽略 */ }
       state.rollback = null;
@@ -427,6 +447,7 @@
           // 网络错误:连续 10 次(约 20 秒)后放弃,避免按钮永久卡死
           if (++failures >= 10) {
             finishRun();
+            petFaceThen("error", 2000);
             msg("网络中断，任务状态未知；网络恢复后可重新打开面板查看", true);
           }
           return;
@@ -435,6 +456,7 @@
         if (!res.ok || res.body.state === "running") return;
         finishRun();
         if (res.body.state === "success") {
+          petFaceThen("happy", 1600);
           msg("完成");
           if (res.body.workflow && res.body.reply) {
             var box = $("asst-messages");
@@ -447,6 +469,7 @@
             selectSession(state.sessionId);
           }
         } else {
+          petFaceThen("error", 2000);
           msg(res.body.error || "执行失败", true);
         }
         refreshUsage();

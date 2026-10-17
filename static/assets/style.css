@@ -904,6 +904,31 @@ h3 { font-size: 0.96em; margin: 0.7em 0 0.35em; font-weight: 600; }
 .asst-pet:hover svg.pet-icon { color: var(--acc); }
 .asst-panel-title svg.pet-icon { width: 17px; height: 14px; color: var(--acc); vertical-align: -2px; }
 .asst-panel-title svg.pet-icon .eye { fill: var(--panel); }
+/* 表情集:嘴部开在口鼻区,负空间色由所在容器注入(mf=填充嘴,ms=线条嘴) */
+.asst-pet svg.pet-icon .mf { fill: var(--bg); stroke: none; }
+.asst-pet svg.pet-icon .ms { fill: none; stroke: var(--bg); }
+.asst-panel-title svg.pet-icon .mf { fill: var(--panel); stroke: none; }
+.asst-panel-title svg.pet-icon .ms { fill: none; stroke: var(--panel); }
+/* data-face 整体动效(表情几何在 symbol 内,use 阴影树不可从外部选中) */
+.asst-pet[data-face] svg.pet-icon, .asst-panel-title[data-face] svg.pet-icon { display: inline-block; transform-origin: 50% 60%; }
+.asst-pet[data-face="thinking"] svg.pet-icon, .asst-panel-title[data-face="thinking"] svg.pet-icon { animation: dm-think 2.6s ease-in-out infinite; }
+.asst-pet[data-face="loading"] svg.pet-icon, .asst-panel-title[data-face="loading"] svg.pet-icon { animation: dm-bob .9s ease-in-out infinite; }
+.asst-pet[data-face="happy"] svg.pet-icon, .asst-panel-title[data-face="happy"] svg.pet-icon { animation: dm-pop .55s cubic-bezier(.34,1.56,.64,1) 1; }
+.asst-pet[data-face="angry"] svg.pet-icon, .asst-panel-title[data-face="angry"] svg.pet-icon { animation: dm-shake .4s linear 3; }
+.asst-pet[data-face="calm"] svg.pet-icon, .asst-panel-title[data-face="calm"] svg.pet-icon { animation: dm-breathe 3.6s ease-in-out infinite; }
+.asst-pet[data-face="sleepy"] svg.pet-icon, .asst-panel-title[data-face="sleepy"] svg.pet-icon { animation: dm-drowse 3s ease-in-out infinite; }
+.asst-pet[data-face="wow"] svg.pet-icon, .asst-panel-title[data-face="wow"] svg.pet-icon { animation: dm-pop .5s ease 1; }
+.asst-pet[data-face="error"] svg.pet-icon, .asst-panel-title[data-face="error"] svg.pet-icon { animation: dm-no .34s ease-in-out 2; }
+@keyframes dm-think { 0%,100% { transform: rotate(0); } 35% { transform: rotate(-7deg); } 70% { transform: rotate(-4deg); } }
+@keyframes dm-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes dm-pop { 0% { transform: scale(1); } 45% { transform: scale(1.14); } 100% { transform: scale(1); } }
+@keyframes dm-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@keyframes dm-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes dm-drowse { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(2px) rotate(-3deg); } }
+@keyframes dm-no { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-6deg); } 70% { transform: rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .asst-pet[data-face] svg.pet-icon, .asst-panel-title[data-face] svg.pet-icon { animation: none; }
+}
 .login-link { color: var(--acc); font-size: 0.85em; text-decoration: none;
   border: 1px solid var(--line-strong); border-radius: 7px; padding: 5px 13px; white-space: nowrap; }
 .login-link:hover { border-color: var(--acc); text-decoration: none; }
