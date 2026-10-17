@@ -62,7 +62,7 @@ InferTech 观察站(原智能体热度指数):以推理技术为重心,采集 Ag
 ## 验证与交付
 
 ```bash
-cd /home/agent-heat-index
+cd /home/daimonkey
 .venv/bin/python -m unittest discover -s tests          # Python 全量
 node tests/test_knowledge_search.cjs && node tests/test_knowledge_lazy.cjs
 .venv/bin/python scripts/verify.py                      # 页面/结构/体积预算(更新后建议)

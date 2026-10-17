@@ -11,7 +11,7 @@ description: 本站 UI 美化专家。适用场景:页面视觉与布局优化�
 
 - **无构建链**:Jinja2 模板(`templates/`)+ 原生 JS(`static/assets/*.js`,IIFE 风格)+ 单一 CSS 文件(`static/assets/style.css`)。禁止引入 Node 构建、框架、npm 前端依赖。
 - **改完必须重建**:`dist/` 是构建产物。模板/静态文件改动后执行
-  `.venv/bin/python -m collector --build`(在 `/home/agent-heat-index` 下),浏览器才能看到。
+  `.venv/bin/python -m collector --build`(在 `/home/daimonkey` 下),浏览器才能看到。
 - **资源指纹**:`_assets_version()` 对 `static/assets` 做哈希,`?v=` 自动失效缓存,新文件无需手动改版本号。
 - **UI 语言为中文**,错误提示、按钮文案均用中文。
 

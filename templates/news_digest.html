@@ -13,7 +13,7 @@
 
 {% if ai_digest %}
 <section class="ai-summary" aria-label="AI 周报总结">
-  <div class="ai-summary-head"><span class="ai-badge">🤖 AI 总结</span><span class="ai-tag">AI 生成 · 非确定性数据</span></div>
+  <div class="ai-summary-head"><span class="ai-badge"><svg class="mk" aria-hidden="true"><use href="#i-monkey"/></svg>马猴说</span><span class="ai-tag">AI 生成 · 每期自动总结</span></div>
   <p class="ai-summary-body">{{ ai_digest.summary }}</p>
   <div class="ai-summary-foot dim">由 DSH agent 生成于 {{ ai_digest.created_at | dt }}</div>
 </section>

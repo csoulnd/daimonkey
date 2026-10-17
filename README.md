@@ -17,7 +17,7 @@
 ## 快速开始
 
 ```bash
-cd /home/agent-heat-index
+cd /home/daimonkey
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt   # 国内可加 -i 清华镜像
 

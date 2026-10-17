@@ -118,7 +118,15 @@
     } catch (e) { /* 隐私模式 */ }
   }
 
-  /* 顶栏账号区:未登录=「登录」链接;登录后=头像(首字母)+下拉(用户名/退出) */
+  /* 顶栏账号区:未登录=「登录」链接;登录后=猴子头像(可换表情)+下拉(用户名/换表情/退出) */
+  var AVATARS = [["monkey", "平静"], ["happy", "开心"], ["angry", "生气"], ["hat", "戴帽子"]];
+  function getAvatar() {
+    try {
+      var v = localStorage.getItem("dm-avatar");
+      for (var i = 0; i < AVATARS.length; i++) if (AVATARS[i][0] === v) return v;
+    } catch (e) { /* 隐私模式 */ }
+    return "monkey";
+  }
   function renderAccount(name) {
     var old = $("account-box");
     if (old) old.parentNode.removeChild(old);
@@ -130,16 +138,27 @@
     var avatar = el("button", "avatar");
     avatar.type = "button";
     avatar.title = name;
-    avatar.textContent = name.charAt(0).toUpperCase();
+    avatar.innerHTML = '<svg aria-hidden="true"><use href="#i-ava-' + getAvatar() + '"/></svg>';
     var menu = el("div", "avatar-menu");
     menu.hidden = true;
     var mi1 = el("div", "avatar-name", name);
-    var mi2 = el("button", "avatar-out", "退出登录");
+    var mi2 = el("button", "avatar-out", "换个表情");
     mi2.type = "button";
-    mi2.addEventListener("click", function () {
+    mi2.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var cur = getAvatar(), i = 0;
+      while (i < AVATARS.length && AVATARS[i][0] !== cur) i++;
+      var next = AVATARS[(i + 1) % AVATARS.length][0];
+      try { localStorage.setItem("dm-avatar", next); } catch (e) { /* 隐私模式 */ }
+      var use = avatar.querySelector("use");
+      if (use) use.setAttribute("href", "#i-ava-" + next);
+    });
+    var mi3 = el("button", "avatar-out", "退出登录");
+    mi3.type = "button";
+    mi3.addEventListener("click", function () {
       api("/logout", { method: "POST" }).then(function () { location.href = "/"; });
     });
-    menu.appendChild(mi1); menu.appendChild(mi2);
+    menu.appendChild(mi1); menu.appendChild(mi2); menu.appendChild(mi3);
     avatar.addEventListener("click", function (ev) {
       ev.stopPropagation();
       menu.hidden = !menu.hidden;

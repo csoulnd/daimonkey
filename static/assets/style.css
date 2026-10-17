@@ -909,6 +909,17 @@ h3 { font-size: 0.96em; margin: 0.7em 0 0.35em; font-weight: 600; }
 .asst-pet svg.pet-icon .ms { fill: none; stroke: var(--bg); }
 .asst-panel-title svg.pet-icon .mf { fill: var(--panel); stroke: none; }
 .asst-panel-title svg.pet-icon .ms { fill: none; stroke: var(--panel); }
+/* 马猴静态位:「马猴说」摘要卡 / 过期横幅 / 页脚署名 / 登录页 */
+.ai-badge { display: inline-flex; align-items: center; gap: 6px; }
+.ai-badge svg.mk { width: 16px; height: 13px; color: var(--acc); flex: none; }
+.ai-badge svg.mk .eye { fill: var(--panel); }
+.stale-banner svg.stale-mk { width: 16px; height: 13px; vertical-align: -2px; margin-right: 6px; }
+.stale-banner svg.stale-mk .mf { fill: var(--stale-bg); stroke: none; }
+.foot-end svg.foot-mk { width: 15px; height: 12px; color: var(--acc); vertical-align: -2px; margin-right: 5px; }
+.foot-end svg.foot-mk .eye { fill: var(--bg); }
+.login-mk { display: block; width: 76px; height: 62px; margin: 0 auto 10px; color: var(--acc); transform-origin: 50% 60%; animation: dm-breathe 3.6s ease-in-out infinite; }
+.login-mk .ms { fill: none; stroke: var(--panel); }
+@media (prefers-reduced-motion: reduce) { .login-mk { animation: none; } }
 /* data-face 整体动效(表情几何在 symbol 内,use 阴影树不可从外部选中) */
 .asst-pet[data-face] svg.pet-icon, .asst-panel-title[data-face] svg.pet-icon { display: inline-block; transform-origin: 50% 60%; }
 .asst-pet[data-face="thinking"] svg.pet-icon, .asst-panel-title[data-face="thinking"] svg.pet-icon { animation: dm-think 2.6s ease-in-out infinite; }
@@ -980,9 +991,9 @@ a.pcard:hover { border-color: var(--line-strong); text-decoration: none; transfo
 
 /* ---- 顶栏账号区(P5):头像+下拉 ---- */
 .account-box { position: relative; display: inline-flex; }
-.avatar { width: 30px; height: 30px; border-radius: 50%; border: none;
-  background: var(--grad); color: var(--acc-ink); font-weight: 600;
-  font-size: 0.85em; cursor: pointer; display: grid; place-items: center; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line-strong);
+  background: #0a0a10; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.avatar svg { width: 100%; height: 100%; display: block; border-radius: 50%; }
 .avatar:hover { filter: brightness(1.1); }
 .avatar-menu { position: absolute; right: 0; top: 38px; z-index: 60;
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-s);

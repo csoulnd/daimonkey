@@ -9,7 +9,7 @@ description: 本站数据更新操作与排障。适用场景：热度/新闻数
 
 1. **网页按钮**（推荐）：任意页面右上角「⟳ 更新」（全量）、新闻页「⟳ 仅更新新闻」（轻量，约 1 分钟）、知识库页「⟳ 同步知识库」（从 GitHub 同步代码仓，约 10~60 秒）。
    - 权限：已登录账号（Cookie 7 天有效）直接执行；未登录点按钮弹账号框（用户名+密码），登录一次本浏览器后续免密。账号用 `userctl add <用户名>` 在服务器任意目录创建。
-2. **CLI**（服务器上）：`cd /home/agent-heat-index && .venv/bin/python -m collector --update`（或 `--collect-news` 仅新闻；`scripts/sync_knowledge.py` 仅知识库）。
+2. **CLI**（服务器上）：`cd /home/daimonkey && .venv/bin/python -m collector --update`（或 `--collect-news` 仅新闻；`scripts/sync_knowledge.py` 仅知识库）。
 3. **API**：`POST /api/v1/update`（或 `/update/news`、`/update/knowledge`），需账号登录 Cookie（`X-Update-Password` 头已移除）；状态查询 `GET /api/v1/update/status`（公开，含 `kind` 字段区分 full/news/knowledge）。
 4. 三种更新互斥：任一进行中，其他触发返回 409。
 
