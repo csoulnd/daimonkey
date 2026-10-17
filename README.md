@@ -16,8 +16,21 @@
 
 ## 快速开始
 
+### 生产部署（推荐）
+
 ```bash
-cd /home/daimonkey
+git clone <仓库地址> <安装目录>
+cd <安装目录>
+sudo bash deploy/bootstrap.sh          # 装依赖/pi/venv/systemd,建库建站并启动
+userctl add <用户名>                    # 建登录账号
+```
+
+换服务器：旧机 `deploy/backup.sh` → 新机 `git clone` → `sudo bash deploy/bootstrap.sh --restore <备份包>`。完整依赖矩阵、备份恢复与排障见 **[docs/deploy.md](docs/deploy.md)**。
+
+### 本地开发
+
+```bash
+cd /path/to/daimonkey
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt   # 国内可加 -i 清华镜像
 
@@ -47,14 +60,19 @@ userctl repo <用户名> <github地址|->   # 配置该用户的知识库仓库(
 .venv/bin/python -m collector --collect-news   # 仅新闻(约 1 分钟)
 .venv/bin/python scripts/fetch_superclue.py    # 模型榜月更(改 registry 报告地址后)
 .venv/bin/python -m unittest discover -s tests # 测试
-.venv/bin/python scripts/verify.py             # 站点验收
+.venv/bin/python scripts/verify.py             # 站点验收 + 部署防回归
+deploy/backup.sh                               # 备份(热备 + 数据)
+deploy/smoke.sh --all                          # 在线 + 搬迁 + 重启演练
+sudo systemctl restart daimonkey               # 重启服务(systemd 托管)
+journalctl -u daimonkey -f                     # 服务日志
 ```
 
 ## 目录结构
 
 ```
 collector/    核心 Python 包(采集/评分/建站/PIAgent 助手/账号)
-scripts/      serve.py(服务+防护)/ userctl.py / fetch_superclue.py / sync_knowledge.py
+scripts/      serve.py(服务+防护)/ userctl.py / fetch_superclue.py / sync_knowledge.py / migrate_relpath.py
+deploy/       bootstrap.sh 安装 / backup.sh 备份 / smoke.sh 演练 / daimonkey.service
 templates/    页面模板   static/assets/  样式与前端 JS
 skills/       专家文档   AGENTS.md  开发工作流铁律   PLAN.md  迭代计划
 reports/      报告内容(进 git)
@@ -63,7 +81,8 @@ data/         SQLite/密钥/快照(不入库)   dist/  构建产物(不手改)
 
 ## 深入了解
 
-- **开发约定与专家体系**:根 [AGENTS.md](AGENTS.md)——任何开发任务先选专家、结束沉淀回专家文档;专家索引在 `skills/`(负载优化/UI 美化/数据更新/新闻汇总/模型评测/个人工作台/报告撰写)
+- **开发约定与专家体系**:根 [AGENTS.md](AGENTS.md)——任何开发任务先选专家、结束沉淀回专家文档;专家索引在 `skills/`(负载优化/UI 美化/数据更新/新闻汇总/模型评测/个人工作台/报告撰写/部署交付)
+- **部署与换机**:[docs/deploy.md](docs/deploy.md)——依赖矩阵、一条命令安装、备份恢复、GitHub SSH key 迁移、搬迁/重启演练
 - **当前迭代计划**:[PLAN.md](PLAN.md)
 - **评分口径**:站内各榜页面「评分说明」折叠块;AI 参与的环节在页面均有标注
 - **助手运行时**:PIAgent 一次性进程(pi.dev),无常驻内存;配额与护栏见 `registry.yaml → assistant`
@@ -72,5 +91,7 @@ data/         SQLite/密钥/快照(不入库)   dist/  构建产物(不手改)
 ## 安全要点
 
 - 密钥只进 `data/`(600 权限):`assistant.env`(DEEPSEEK_API_KEY);密码哈希存 SQLite(pbkdf2)
+- 服务由 systemd 托管(`Restart=always`、开机自启);日志进 journal,更新日志在 `data/logs/`
+- 备份归档含账号哈希与密钥,权限 600,勿放公开目录;备份排除 `dist/`、`data/cache/`
 - 防护按 10 并发/20 在线规格:每 IP 限流、在途上限、连接超时、看门狗;详见 `skills/load-optimization`
-- 数据抓取遵守源站限频与退避;每条数据保留原始响应可溯源
+- 数据抓取遵守源站限频与退避;每条数据保留原始响应可溯源(库内相对路径,换机不断链)

@@ -27,8 +27,8 @@ status: active
 | `#i-monkey-thinking` | 思考(眼望上方+点) | 助手执行中 | 歪头 dm-think |
 | `#i-monkey-loading` | 加载(旋涡眼) | 数据刷新/长任务 | 上下浮动 dm-bob |
 | `#i-monkey-happy` | 开心(^ ^+大笑) | 完成/成功 | 弹跳 dm-pop |
-| `#i-monkey-angry` | 生气(斜眉+头顶小火苗) | 限流/冲突(409/429) | 摇头 dm-shake |
-| `#i-monkey-calm` | 冷静闭目,猴子自己当木鱼(头顶开槽+木槌敲头) | 空闲/呼吸态 | 呼吸 dm-breathe |
+| `#i-monkey-angry` | 生气(头顶外扩成火焰剪影) | 限流/冲突(409/429) | 摇头 dm-shake |
+| `#i-monkey-calm` | 冷静闭目,头顶削平成木鱼面,大木槌敲平顶 | 空闲/呼吸态 | 呼吸 dm-breathe |
 | `#i-monkey-sleepy` | 犯困(Zzz) | 长时间无操作 | 打盹 dm-drowse |
 | `#i-monkey-wow` | 惊讶(圈眼+O嘴) | 突发大新闻/异常波动 | 后弹 dm-pop |
 | `#i-monkey-error` | 出错(X 眼) | 请求失败/网络中断 | 摇头 dm-no |

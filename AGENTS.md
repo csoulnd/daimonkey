@@ -22,7 +22,7 @@ InferTech 观察站(原智能体热度指数):以推理技术为重心,采集 Ag
 
 ## 当前迭代计划
 
-见 [PLAN.md](PLAN.md);**下期三方向(Harness/FM/NV)需求澄清稿**见 [docs/ROADMAP-三方向.md](docs/ROADMAP-三方向.md);**部署交付件与可搬迁性计划**见 [docs/PLAN-deploy.md](docs/PLAN-deploy.md)——任务按表推进,完成后更新状态,不得丢弃。
+见 [PLAN.md](PLAN.md);**三方向需求分析与设计**见 [docs/DESIGN-三方向.md](docs/DESIGN-三方向.md)(澄清记录:[docs/ROADMAP-三方向.md](docs/ROADMAP-三方向.md));**部署交付件与可搬迁性计划**见 [docs/PLAN-deploy.md](docs/PLAN-deploy.md)——D1-D6 已完成(2026-10-17),状态与验收证据在该文件末尾。
 
 ## 专家索引(skills/)
 
@@ -36,6 +36,7 @@ InferTech 观察站(原智能体热度指数):以推理技术为重心,采集 Ag
 | 报告撰写专家 | [skills/report-writing/SKILL.md](skills/report-writing/SKILL.md) | 报告厅内容撰写与登记 |
 | 模型评测专家 | [skills/model-eval/SKILL.md](skills/model-eval/SKILL.md) | 模型 benchmark 榜单:数据源接入/评分设计/官方链接 |
 | 个人工作台专家 | [skills/workspace/SKILL.md](skills/workspace/SKILL.md) | 工作台分区/用户隔离/自配知识库仓库 |
+| 部署交付专家 | [skills/deployment/SKILL.md](skills/deployment/SKILL.md) | 新机安装、换机/迁移、备份恢复、systemd 托管、依赖版本与部署自检 |
 
 专家文档格式:frontmatter 仅 `name` + `description`(含"适用场景:"触发语);正文按 职责边界 → runbook/约束 → 常见调整表 → 排障表 → 决策记录(带日期)组织。
 
@@ -44,7 +45,9 @@ InferTech 观察站(原智能体热度指数):以推理技术为重心,采集 Ag
 | 路径 | 内容 | 主责专家 |
 |---|---|---|
 | `collector/` | 核心 Python 包(采集/评分/建站/助手) | data-update、load-optimization |
-| `scripts/` | serve.py / userctl / verify / 同步脚本 | load-optimization、data-update |
+| `scripts/` | serve.py / userctl / verify / 同步与部署脚本 | load-optimization、data-update |
+| `deploy/` | 安装/备份/演练/systemd 交付件 | deployment |
+| `docs/deploy.md` | 部署与搬迁手册 | deployment |
 | `templates/` `static/assets/` | 页面模板 / 样式与 JS | ui-polish |
 | `skills/` | 专家文档(本约定的主体) | 全部 |
 | `reports/` | 报告内容(进 git) | report-writing、product-showcase |
@@ -62,10 +65,12 @@ InferTech 观察站(原智能体热度指数):以推理技术为重心,采集 Ag
 ## 验证与交付
 
 ```bash
-cd /home/daimonkey
+cd /path/to/daimonkey
 .venv/bin/python -m unittest discover -s tests          # Python 全量
 node tests/test_knowledge_search.cjs && node tests/test_knowledge_lazy.cjs
-.venv/bin/python scripts/verify.py                      # 页面/结构/体积预算(更新后建议)
+.venv/bin/python scripts/verify.py                      # 页面/结构/体积预算 + 部署防回归(更新后建议)
+deploy/smoke.sh                                         # 在线检查(服务/账号/溯源/测试/verify)
+deploy/smoke.sh --all                                   # 换机/重启演练(发布前或换机后)
 ```
 
 交付时说明:改动的文件、对应专家的更新内容、实际执行过的验证;只报告真实跑过的命令。

@@ -22,19 +22,22 @@ description: 本站负载优化专家。适用场景:内存/CPU 治理、常驻�
 
 清理基线(2026-10-16):codex 遗留进程 4 个约 222MB 已清;DSH 常驻 runtime 187MB 已随运行时替换移除。可用内存从 ~1.84GB 提升约 400MB。
 
+systemd 托管基线(2026-10-17):`daimonkey.service` 只跑 serve.py,systemd 自身开销可忽略;serve.py 启动实测 RSS 14.4MB(peak 14.9MB)、1 线程。`systemctl restart` 后主进程更换且 20 秒内恢复 200。
+
 ## 常驻进程白名单(审计 runbook)
 
 ```bash
 ps -eo pid,ppid,rss,args --sort=-rss | grep -vE "grep|zcode|sshd|journald" | head -15
 ```
 
-本站合法常驻进程**只有** `serve.py` 一个。出现下列任一情况即为异常:
+本站合法常驻进程**只有** `serve.py` 一个,由 systemd 单元 `daimonkey.service` 托管(`Restart=always`、开机自启、日志进 journal;不加采集定时器)。出现下列任一情况即为异常:
 
 | 异常进程 | 含义 | 处置 |
 |---|---|---|
 | `deepseek-harness-sdk-runtime-*` | DSH 遗留(已弃用) | 确认无引用后 kill;若被拉起,排查 runtime.py 残留 |
 | `codex app-server` / `codex proxy` | **外层 ZCode/codex CLI 环境的后端,不是本站进程** | 不要 kill:实测杀掉会自动重生,且可能影响当前编码会话;与本站内存账无关 |
 | 多个 `python -m collector` | 更新进程堆积(应同时只有一个) | 查 `data/update_status.json` 与 serve.py 互斥锁 |
+| `serve.py` 不在 systemd cgroup 下 | 旧的 nohup 裸跑残留 | `systemctl status daimonkey`;确认端口归属,停掉旧进程后重跑 `deploy/bootstrap.sh` |
 | serve.py 线程数持续增长 | pi 采样线程泄漏 | `ls /proc/$(pgrep -f serve.py)/task \| wc -l`;piagent 采样线程 stop 后 2s 内必退出,持续增长即为 bug |
 
 ## PIAgent 运行时策略
@@ -60,7 +63,8 @@ ps -eo pid,ppid,rss,args --sort=-rss | grep -vE "grep|zcode|sshd|journald" | hea
 | 调整限流/并发上限 | `scripts/serve.py` 限流常量(规格注释处),同步更新本文件规格段 |
 | 更换 AI 运行时 | 只改 `collector/piagent.py`,保持 `run()` 接口语义,回归 tests/test_piagent.py |
 | 调整内存预算 | 本文件预算表 + serve.py / registry 对应护栏值 |
-| 评估新依赖 | 记录体积与是否常驻,超预算须给出等量回收项 |
+| 调整服务托管 | 改 `deploy/daimonkey.service` 模板后重跑 `deploy/bootstrap.sh`(会把 `User/Host/Port` 渲染进 `/etc/systemd/system`) |
+| 评估新依赖 | 记录体积与是否常驻,超预算须给出等量回收项;优先精确版本锁定(见 deployment 专家) |
 
 ## 排障
 
@@ -74,3 +78,4 @@ ps -eo pid,ppid,rss,args --sort=-rss | grep -vE "grep|zcode|sshd|journald" | hea
 
 - 2026-10-16:弃用 deepseek-harness-sdk(常驻 187MB、守护线程越界风险),站内 agent 改用 Pi 一次性进程模式;codex 站外遗留进程清退(后发现属外层 ZCode 环境后端会重生,已从本站内存账移除)。规格定为 10 并发/20 在线。
 - 2026-10-16(规格化防护落地):serve.py 实测——静态 120/min/IP、API 60/min/IP 令牌桶(超限 429+Retry-After)、全局在途上限 30、连接超时 30s、%00 路径 400、nosniff+CSP 安全头;压测 20 线程 120 请求全部成功(p50 5ms)、35 并发迸发全部 200,压测后 serve.py RSS 27MB/线程归零。同步修复 pipeline 首源失败 UnboundLocalError 与状态卡 running 问题。
+- 2026-10-17(部署托管):serve.py 从 nohup 裸跑迁移到 systemd(`Restart=always`、开机自启、`KillMode=mixed` 连同更新子进程退出),服务仍只有 serve.py 一个常驻进程;bootstrap 幂等重跑不会重复起进程。未引入采集定时器,保持手动更新约定。依赖改为精确版本锁定,避免新机装到未验证行为。

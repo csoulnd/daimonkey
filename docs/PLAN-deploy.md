@@ -1,7 +1,7 @@
 ---
 title: "工程提升计划:安装部署交付件与可搬迁性"
 type: design
-status: draft
+status: done
 ---
 
 # 部署交付件与可搬迁性改造计划
@@ -78,3 +78,23 @@ D1(0.5d)→ D2+D3(1d)→ D4(0.5d)→ D5+D6(0.5d);合计约 2.5 个工作日,全�
 依赖关系:D1 → D2 → D4 → D6;D3/D5 可并行任意插空。单人全做约 2.5 天,两人并行(D1 一人,D2/D3/D5 一人)约 1.5 天。
 
 **接手人所需访问**:服务器 SSH、github.com/csoulnd/daimonkey 仓库写权限;知识库同步功能的联调需 GitHub SSH key(没有则跳过该项联调)。
+
+## 完成状态(2026-10-17)
+
+六项全部落地,生产服务已从 nohup 迁移到 systemd。换机流程收敛为:**旧机 `deploy/backup.sh` → 新机 `git clone` → `bootstrap.sh --restore` → 安全组放行 → `deploy/smoke.sh --all`**。
+
+| 工单 | 状态 | 交付/证据 |
+|---|---|---|
+| D1 相对路径 | ✅ | `collector/config.py::resolve_data_path`;`db.save_raw` 只写相对路径;`scripts/migrate_relpath.py`;生产库 1104 条绝对路径已迁移(0 缺失);`verify.py` 新增库内路径/硬编码防回归 |
+| D2 bootstrap | ✅ | `deploy/bootstrap.sh`(系统依赖/pi 1.3.0/venv/restore/迁移建库建站/userctl/systemd);幂等复跑通过;新目录恢复演练通过 |
+| D3 进程托管 | ✅ | `deploy/daimonkey.service`(Restart=always、开机自启、journal、无采集定时器);生产 `enabled + active`,重启演练主进程更换且 20s 内 200 |
+| D4 备份恢复 | ✅ | `deploy/backup.sh`:SQLite `.backup` 热备 + integrity_check、`data/` 关键内容、manifest/SHA256SUMS;实测 39MB/1067 文件,恢复后账号数一致、溯源完整 |
+| D5 环境声明 | ✅ | `docs/deploy.md`(依赖矩阵/安装/换机/GitHub SSH key/排障);`check_env.sh` 增加 pi、Node≥18、sqlite3 CLI、GitHub SSH、systemd 单元、交付件检查 |
+| D6 验收 | ✅ | `deploy/smoke.sh --all` 23/23 全绿（在线 9、搬迁 10、重启 4）;`verify.py` 42/42(含部署防回归);Python 117 测试 + node 测试全绿 |
+
+实施中发现并修复的两个额外问题:
+
+1. **bootstrap 工作目录**:从其他目录调用时 `python -m collector` 会误用调用者目录的代码/数据;已在脚本开头 `cd "$ROOT"` 并规范相对参数路径,由搬迁演练回归。
+2. **依赖漂移**:新 venv 装到 Markdown 3.11.1 后中文 `**研究判断：**` 不再渲染为 strong;`requirements.txt` 改为精确版本锁定,升级需跑全量测试 + verify。
+
+新增文件:`deploy/{bootstrap.sh,backup.sh,smoke.sh,daimonkey.service}`、`scripts/migrate_relpath.py`、`tests/test_deploy.py`、`docs/deploy.md`、`skills/deployment/SKILL.md`。运维后续只需按 `docs/deploy.md` 执行;GitHub SSH key 属环境事项,无 key 时知识库同步降级、站点不受影响。

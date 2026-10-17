@@ -34,6 +34,17 @@ def ensure_dirs() -> None:
         p.mkdir(parents=True, exist_ok=True)
 
 
+def resolve_data_path(value: str | Path, data_dir: Path | None = None) -> Path:
+    """把库内存储的路径解析为实际文件路径。
+
+    库内一律存相对 DATA_DIR 的路径（`raw/<源>/<日期>/<hash>.json.gz`），
+    换机器/改目录后依然可读；同时兼容迁移前遗留的绝对路径。
+    data_dir 显式传入时以调用方为准（便于测试替换数据目录）。
+    """
+    p = Path(value)
+    return p if p.is_absolute() else (data_dir or DATA_DIR) / p
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 

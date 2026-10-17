@@ -9,12 +9,26 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import os
 import random
 import re
+import sqlite3
+import subprocess
 import sys
 import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 CHECKS: list[tuple[str, bool]] = []
+
+# 部署防回归：允许保留这条历史问题记录（其中出现旧路径示例）
+HARDCODE_ALLOW = {"docs/PLAN-deploy.md"}
+# 拆开拼接，避免本文件自身命中检查
+HARDCODE_NEEDLE = "/home/" + "daimonkey"
+TEXT_SUFFIXES = {".py", ".sh", ".md", ".html", ".js", ".cjs", ".css",
+                 ".yaml", ".yml", ".txt", ".json", ".service", ".conf"}
 
 
 def check(name: str, ok: bool) -> None:
@@ -28,6 +42,76 @@ def get(url: str, timeout: int = 10):
 
 def page(url: str) -> str:
     return get(url).read().decode("utf-8")
+
+
+def _tracked_text_files() -> list[Path]:
+    """git 跟踪 + 未忽略的新文件（排除 data/dist 等未入库目录）；无 git 时回退遍历。"""
+    try:
+        rels = subprocess.check_output(
+            ["git", "-C", str(ROOT), "ls-files"], text=True,
+            stderr=subprocess.DEVNULL).splitlines()
+        rels += subprocess.check_output(
+            ["git", "-C", str(ROOT), "ls-files", "--others", "--exclude-standard"],
+            text=True, stderr=subprocess.DEVNULL).splitlines()
+        return [ROOT / r for r in dict.fromkeys(rels) if (ROOT / r).is_file()]
+    except (OSError, subprocess.CalledProcessError):
+        skip = {".git", ".venv", "data", "dist", "node_modules", "__pycache__"}
+        out = []
+        for dirpath, dirnames, filenames in os.walk(ROOT):
+            dirnames[:] = [d for d in dirnames if d not in skip]
+            out.extend(Path(dirpath) / f for f in filenames)
+        return out
+
+
+def deploy_checks() -> None:
+    """D1/D2-D6 防回归：相对路径、无硬编码旧目录、交付件齐全。"""
+    from collector.config import DB_PATH, resolve_data_path
+
+    print("== 5. 可搬迁性与部署交付件 ==")
+    if DB_PATH.is_file():
+        with sqlite3.connect(DB_PATH) as c:
+            total, absn = c.execute(
+                "SELECT COUNT(*), SUM(CASE WHEN body_path LIKE '/%' THEN 1 ELSE 0 END)"
+                " FROM raw_payloads WHERE body_path IS NOT NULL").fetchone()
+            rows = c.execute(
+                "SELECT id, body_path FROM raw_payloads WHERE body_path IS NOT NULL"
+                " AND body_evicted_at IS NULL").fetchall()
+        check(f"库内 body_path 全部相对路径（{total} 条）",
+              bool(total) and not absn)
+        missing = [(rid, p) for rid, p in rows
+                   if not resolve_data_path(p).is_file()]
+        check(f"溯源文件按当前 DATA_DIR 可解析（{len(rows)} 个）", not missing)
+        for rid, p in missing[:3]:
+            print(f"     raw#{rid} 缺失: {p}")
+    else:
+        check(f"数据库存在（{DB_PATH}）", False)
+
+    hits = []
+    for f in _tracked_text_files():
+        if f.suffix.lower() not in TEXT_SUFFIXES:
+            continue
+        rel = f.relative_to(ROOT).as_posix()
+        if rel in HARDCODE_ALLOW:
+            continue
+        try:
+            if HARDCODE_NEEDLE in f.read_text(encoding="utf-8"):
+                hits.append(rel)
+        except (OSError, UnicodeDecodeError):
+            continue
+    check("仓库代码/文档无旧安装目录硬编码", not hits)
+    for h in hits[:5]:
+        print(f"     硬编码: {h}")
+
+    required = [
+        ("bootstrap.sh", ROOT / "deploy/bootstrap.sh", True),
+        ("backup.sh", ROOT / "deploy/backup.sh", True),
+        ("smoke.sh", ROOT / "deploy/smoke.sh", True),
+        ("systemd 单元", ROOT / "deploy/daimonkey.service", False),
+        ("部署文档", ROOT / "docs/deploy.md", False),
+    ]
+    for name, path, need_exec in required:
+        ok = path.is_file() and (not need_exec or os.access(path, os.X_OK))
+        check(f"交付件 {name}", ok)
 
 
 def main() -> int:
@@ -93,6 +177,7 @@ def main() -> int:
     sample = random.sample(ids, min(args.n, len(ids))) if ids else []
     check(f"榜单页含溯源链接（{len(ids)} 个）", len(ids) > 0)
     full = 0
+    pages_ok = 0
     for rid in sample:
         try:
             d = json.load(get(f"{base}/api/v1/raw/{rid}.json"))
@@ -103,16 +188,24 @@ def main() -> int:
                 full += 1
             else:
                 print(f"     raw#{rid}: body={body_ok} extracted={ext_ok} sha={sha_ok}")
+            try:
+                if get(f"{base}/raw/{rid}").status == 200:
+                    pages_ok += 1
+            except Exception as e:
+                print(f"     raw#{rid} 页面: {e}")
         except Exception as e:
             print(f"     raw#{rid}: {e}")
     check(f"完整链路 {full}/{len(sample)}（原始体+提取指标+SHA256）",
           sample and full == len(sample))
+    check(f"溯源页可访问 {pages_ok}/{len(sample)}", sample and pages_ok == len(sample))
 
     print("== 4. 页面体积预算（gzip ≤ 200KB，不含图片） ==")
     for p in ["/", "/rankings/unified", "/product/claude-code"]:
         b = get(base + p).read()
         kb = len(gzip.compress(b, 9)) / 1024
         check(f"{p} gzip {kb:.0f}KB", kb <= 200)
+
+    deploy_checks()
 
     ok_n = sum(1 for _, ok in CHECKS if ok)
     print(f"\n验收结果: {ok_n}/{len(CHECKS)} 通过")

@@ -74,11 +74,50 @@ python3 -c "import sqlite3;sqlite3.connect(':memory:').execute('CREATE VIRTUAL T
 
 command -v git >/dev/null && ok "git: $(git --version | awk '{print $3}')" || warn "git 未安装"
 
-command -v node >/dev/null \
-  && { [ "$(node -v | tr -d 'v' | cut -d. -f1)" -ge 20 ] \
-       && ok "Node.js: $(node -v)（本项目构建不依赖，仅供未来 Astro 迁移）" \
-       || warn "Node.js 版本低（本项目当前不依赖）"; } \
-  || log "  [跳过] Node.js 未安装（当前技术栈不需要）"
+if command -v node >/dev/null 2>&1; then
+  NODEV=$(node -v)
+  NMAJ=$(printf '%s' "$NODEV" | tr -d 'v' | cut -d. -f1)
+  if [ "${NMAJ:-0}" -ge 18 ]; then
+    ok "Node.js: $NODEV（pi 运行时）"
+  else
+    fail "Node.js: $NODEV（需 >=18，pi 依赖）"
+  fi
+else
+  fail "Node.js 未安装（需 >=18，pi 依赖；sudo apt install nodejs npm）"
+fi
+
+if command -v pi >/dev/null 2>&1; then
+  PIV=$(pi --version 2>/dev/null | tail -1)
+  if [ "$PIV" = "1.3.0" ]; then
+    ok "pi: $PIV（AI 助手运行时，版本已锁定）"
+  else
+    warn "pi: ${PIV:-未知}（期望 1.3.0；重跑 deploy/bootstrap.sh 会重装锁定版本）"
+  fi
+else
+  warn "pi 未安装（AI 助手不可用；sudo npm i -g @earendil-works/pi-coding-agent@1.3.0）"
+fi
+
+command -v sqlite3 >/dev/null && ok "sqlite3 CLI: $(sqlite3 --version | awk '{print $1}')" \
+  || warn "sqlite3 CLI 未安装（备份脚本会用 Python API 兜底）"
+
+# ---------- 3b. 知识库同步（GitHub SSH，可选） ----------
+log ""
+log "## 3b. 知识库同步（GitHub SSH，可选）"
+if command -v ssh >/dev/null 2>&1; then
+  SSH_OPTS=(-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10)
+  if command -v timeout >/dev/null 2>&1; then
+    SSHG=$(timeout 15 ssh "${SSH_OPTS[@]}" -T git@github.com 2>&1) || true
+  else
+    SSHG=$(ssh "${SSH_OPTS[@]}" -T git@github.com 2>&1) || true
+  fi
+  if printf '%s' "$SSHG" | grep -q "successfully authenticated"; then
+    ok "GitHub SSH 可用（知识库同步）"
+  else
+    warn "GitHub SSH 不可用（知识库同步降级；检查 ~/.ssh 私钥与网络，见 docs/deploy.md §4.3）"
+  fi
+else
+  warn "ssh 未安装（知识库同步不可用）"
+fi
 
 # ---------- 4. 数据源可达性 ----------
 log ""
@@ -116,10 +155,20 @@ log ""
 log "## 5. 权限与进程管理"
 [ "$(whoami)" != "root" ] && ok "以非 root 用户运行" || warn "以 root 运行（本地开发可接受；对外部署建议专用用户）"
 [ -w . ] && ok "项目目录可写" || fail "项目目录不可写"
-if command -v systemctl >/dev/null && systemctl is-system-running >/dev/null 2>&1; then
-  ok "systemd 可用（本项目为手动更新模式，暂不使用）"
+if command -v systemctl >/dev/null 2>&1 && systemctl show-environment >/dev/null 2>&1; then
+  ok "systemd 可用"
+  if systemctl list-unit-files daimonkey.service 2>/dev/null | grep -q daimonkey; then
+    systemctl is-enabled --quiet daimonkey \
+      && ok "daimonkey.service 已设为开机自启" \
+      || warn "daimonkey.service 未 enable（sudo systemctl enable --now daimonkey）"
+    systemctl is-active --quiet daimonkey \
+      && ok "daimonkey.service 运行中" \
+      || fail "daimonkey.service 未运行（journalctl -u daimonkey -n 50）"
+  else
+    warn "daimonkey.service 未安装（sudo bash deploy/bootstrap.sh 一步完成）"
+  fi
 else
-  log "  [跳过] systemd 不可用（本项目为手动更新模式，不需要）"
+  log "  [跳过] systemd 不可用（容器环境；用 scripts/serve.sh 前台运行）"
 fi
 
 # ---------- 6. 站点服务状态 ----------
@@ -127,7 +176,18 @@ log ""
 log "## 6. 站点服务"
 code=$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:8080/ 2>/dev/null)
 [ "$code" = "200" ] && ok "本地服务运行中 (127.0.0.1:8080)" \
-  || warn "本地服务未运行（.venv/bin/python scripts/serve.py --host 0.0.0.0）"
+  || warn "本地服务未运行（systemctl start daimonkey 或 scripts/serve.sh）"
+
+log ""
+log "## 6b. 部署交付件"
+for f in deploy/bootstrap.sh deploy/backup.sh deploy/smoke.sh \
+         deploy/daimonkey.service docs/deploy.md scripts/migrate_relpath.py; do
+  if [ -f "$f" ]; then
+    ok "存在: $f"
+  else
+    fail "缺失: $f"
+  fi
+done
 
 # ---------- 汇总 ----------
 log ""

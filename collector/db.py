@@ -12,7 +12,7 @@ import hashlib
 import json
 import sqlite3
 
-from .config import RAW_DIR, DB_PATH, now_iso
+from .config import DATA_DIR, RAW_DIR, DB_PATH, now_iso, resolve_data_path
 
 DDL = """
 PRAGMA journal_mode = WAL;
@@ -326,7 +326,11 @@ def save_raw(c, source_id: int, source_key: str, product_id: int | None,
              request_url: str, http_status: int, body: bytes, content_type: str,
              parse_ok: bool, parse_error: str | None = None,
              parser_version: str = "") -> int:
-    """响应体落盘为 gzip 文件，元数据行入库，返回 raw_payload id。"""
+    """响应体落盘为 gzip 文件，元数据行入库，返回 raw_payload id。
+
+    body_path 存相对 DATA_DIR 的路径（可搬迁）；绝对路径会随目录变化断链，
+    迁移见 scripts/migrate_relpath.py。
+    """
     import re
     from datetime import datetime, timezone
     h = sha256_hex(body)
@@ -337,23 +341,29 @@ def save_raw(c, source_id: int, source_key: str, product_id: int | None,
     body_path = folder / f"{h}.json.gz"
     if not body_path.exists():
         body_path.write_bytes(gzip.compress(body, mtime=0))
+    rel_path = body_path.relative_to(DATA_DIR).as_posix()
     cur = c.execute(
         "INSERT INTO raw_payloads(source_id, product_id, request_url, http_status,"
         " fetched_at, body_sha256, body_path, body_bytes, content_type,"
         " parser_version, parse_ok, parse_error)"
         " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
         (source_id, product_id, request_url, http_status, now_iso(), h,
-         str(body_path), len(body), content_type, parser_version,
+         rel_path, len(body), content_type, parser_version,
          1 if parse_ok else 0, parse_error))
     return cur.lastrowid
 
 
 def load_body(c, raw_id: int) -> bytes | None:
+    """读取原始响应体；相对路径按当前 DATA_DIR 解析，兼容旧绝对路径。"""
     row = c.execute("SELECT body_path, body_evicted_at FROM raw_payloads WHERE id=?",
                     (raw_id,)).fetchone()
     if not row or not row["body_path"] or row["body_evicted_at"]:
         return None
-    return gzip.decompress(open(row["body_path"], "rb").read())
+    try:
+        return gzip.decompress(
+            resolve_data_path(row["body_path"], DATA_DIR).read_bytes())
+    except OSError:
+        return None
 
 
 def upsert_products(c, products: list[dict]) -> list[dict]:

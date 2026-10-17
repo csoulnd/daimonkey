@@ -7,6 +7,11 @@ __pycache__/
 data/
 dist/
 
+# 备份/恢复现场（含账号哈希与密钥，禁止入库）
+backups/
+data.pre-restore-*/
+daimonkey-backup-*.tar.gz
+
 # 环境检查报告（scripts/check_env.sh 生成）
 env_report.md
 

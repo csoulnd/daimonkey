@@ -917,9 +917,8 @@ h3 { font-size: 0.96em; margin: 0.7em 0 0.35em; font-weight: 600; }
 .stale-banner svg.stale-mk .mf { fill: var(--stale-bg); stroke: none; }
 .foot-end svg.foot-mk { width: 15px; height: 12px; color: var(--acc); vertical-align: -2px; margin-right: 5px; }
 .foot-end svg.foot-mk .eye { fill: var(--bg); }
-.login-mk { display: block; width: 76px; height: 62px; margin: 0 auto 10px; color: var(--acc); transform-origin: 50% 60%; animation: dm-breathe 3.6s ease-in-out infinite; }
+.login-mk { display: block; width: 76px; height: 62px; margin: 0 auto 10px; color: var(--acc); }
 .login-mk .ms { fill: none; stroke: var(--panel); }
-@media (prefers-reduced-motion: reduce) { .login-mk { animation: none; } }
 /* data-face 整体动效(表情几何在 symbol 内,use 阴影树不可从外部选中) */
 .asst-pet[data-face] svg.pet-icon, .asst-panel-title[data-face] svg.pet-icon { display: inline-block; transform-origin: 50% 60%; }
 .asst-pet[data-face="thinking"] svg.pet-icon, .asst-panel-title[data-face="thinking"] svg.pet-icon { animation: dm-think 2.6s ease-in-out infinite; }

@@ -1,0 +1,24 @@
+[Unit]
+Description=InferTech 观察站 (daimonkey) 站点服务
+Documentation=file://__INSTALL_ROOT__/docs/deploy.md
+After=network-online.target
+Wants=network-online.target
+# 无论失败多少次都由 systemd 持续拉起
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=__RUN_AS__
+WorkingDirectory=__INSTALL_ROOT__
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=__INSTALL_ROOT__/.venv/bin/python scripts/serve.py --host __HOST__ --port __PORT__
+Restart=always
+RestartSec=3
+# stop/restart 时连同更新子进程一起结束
+KillMode=mixed
+TimeoutStopSec=20
+SyslogIdentifier=daimonkey
+
+[Install]
+WantedBy=multi-user.target

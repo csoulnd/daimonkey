@@ -19,7 +19,9 @@ class TestRetention(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         db.DB_PATH = Path(self.tmp.name) / "t.sqlite"
-        db.RAW_DIR = Path(self.tmp.name) / "raw"
+        db.DATA_DIR = Path(self.tmp.name)
+        db.RAW_DIR = db.DATA_DIR / "raw"
+        retention.DATA_DIR = db.DATA_DIR
         retention.CACHE_DIR = Path(self.tmp.name) / "cache"
         retention.CACHE_DIR.mkdir(parents=True)
         db.init_db()
@@ -80,6 +82,15 @@ class TestRetention(unittest.TestCase):
                              (self.raw_new,)).fetchone()
         self.assertIsNotNone(row["body_path"])
         self.assertIsNone(row["body_evicted_at"])
+
+    def test_raw_body_path_is_relative(self):
+        """body_path 只存相对 DATA_DIR 的路径，换目录不断链。"""
+        row = self.c.execute("SELECT body_path FROM raw_payloads WHERE id=?",
+                             (self.raw_new,)).fetchone()
+        self.assertFalse(row["body_path"].startswith("/"))
+        self.assertTrue(row["body_path"].startswith("raw/"))
+        self.assertTrue((db.DATA_DIR / row["body_path"]).is_file())
+        self.assertEqual(db.load_body(self.c, self.raw_new), b'{"new":2}')
 
     def test_old_metrics_deleted_recent_kept(self):
         n = self.c.execute("SELECT COUNT(*) n FROM metrics").fetchone()["n"]

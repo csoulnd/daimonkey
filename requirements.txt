@@ -1,9 +1,12 @@
-httpx>=0.27
-jinja2>=3.1
-PyYAML>=6.0
-Markdown>=3.7,<4
-bleach>=6.2,<7
+# 直接依赖锁定为已验证版本（2026-10-17 跑通全部测试 + verify）。
+# 升级任何一项都要重跑 unittest、node 测试与 scripts/verify.py；
+# 不锁版本会让新服务器装到未验证行为（例：Markdown 3.11.1 改变中文加粗解析）。
+httpx==0.28.1
+jinja2==3.1.6
+PyYAML==6.0.3
+Markdown==3.11
+bleach==6.4.0
 # 智能助手运行时:PIAgent 一次性进程模式(pi.dev)。
 # pi 为 npm 全局安装(@earendil-works/pi-coding-agent,二进制名 pi),不走 pip。
-pypdf>=4
-pillow>=10
+pypdf==6.20.1
+pillow==12.3.0

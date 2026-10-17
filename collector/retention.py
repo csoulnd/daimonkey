@@ -9,9 +9,9 @@
 from __future__ import annotations
 
 import time
-from pathlib import Path
 
-from .config import CACHE_DIR, date_days_ago, days_ago, now_iso, registry
+from .config import (CACHE_DIR, DATA_DIR, date_days_ago, days_ago, now_iso,
+                     registry, resolve_data_path)
 
 
 def apply(c) -> dict:
@@ -28,7 +28,7 @@ def apply(c) -> dict:
             " AND fetched_at < ?", (cutoff,)).fetchall()
         ts = now_iso()
         for r in rows:
-            Path(r["body_path"]).unlink(missing_ok=True)
+            resolve_data_path(r["body_path"], DATA_DIR).unlink(missing_ok=True)
             c.execute("UPDATE raw_payloads SET body_path=NULL, body_evicted_at=?"
                       " WHERE id=?", (ts, r["id"]))
             counts["raw_bodies_evicted"] += 1

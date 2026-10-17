@@ -1,0 +1,191 @@
+---
+title: "部署与搬迁手册"
+type: reference
+status: active
+---
+
+# 部署与搬迁手册
+
+本项目的交付件就是 **git 仓库本身**：新服务器 `git clone` 后执行 `deploy/bootstrap.sh`，不再另外打包。日常换机收敛为三条命令：**clone → bootstrap（可带备份恢复）→ 安全组放行端口**。
+
+## 1. 前置依赖矩阵
+
+| 项 | 要求 | 说明 / 自检 |
+|---|---|---|
+| 操作系统 | Ubuntu 24.04+ / Debian 12+，x86_64 | 更旧的系统 Python/Node 版本不足，需先升级 |
+| Python | ≥ 3.11（含 venv/ensurepip） | `python3 --version`；bootstrap 会安装 `python3-venv` |
+| Node.js | ≥ 18（含 npm） | `node -v`；pi 运行时依赖 |
+| pi | `@earendil-works/pi-coding-agent@1.3.0`（锁定） | bootstrap 用 npm 全局安装，复跑时版本不符会重装 |
+| 系统工具 | git、sqlite3、curl、tar、sha256sum | bootstrap 自动 apt 安装（`--skip-system-deps` 可跳过） |
+| 端口 | TCP 8080（可改） | 云厂商安全组/防火墙需放行；服务默认监听 `0.0.0.0` |
+| 磁盘 | ≥ 10GB 可用 | raw 归档、知识库快照、备份都在本机 |
+| 内存 | 建议 3.3GB；最低 2GB | 规格 10 并发 / 20 在线，护栏见 `skills/load-optimization` |
+| GitHub SSH key | 可选 | 知识库同步走 `git@github.com:...`；没有 key 时该功能失败但站点不受影响 |
+| AI 密钥 | 可选 | `data/assistant.env` 内的 `DEEPSEEK_API_KEY`；缺失时助手/AI 复评降级 |
+| systemd | 建议可用 | bootstrap 安装并 `enable --now`；容器内无 systemd 时用 `--no-service` 手动起 |
+
+## 2. 首次安装（全新服务器）
+
+```bash
+git clone <仓库地址> <安装目录>
+cd <安装目录>
+sudo bash deploy/bootstrap.sh                      # 默认 0.0.0.0:8080
+# 或指定端口/运行用户：
+sudo bash deploy/bootstrap.sh --host 0.0.0.0 --port 8080 --run-as www-data
+```
+
+bootstrap 的七个步骤（每步幂等，可重复执行）：
+
+1. 系统依赖：Python ≥3.11、Node ≥18、git、sqlite3、curl；缺什么装什么。
+2. pi 运行时：锁定安装 `@earendil-works/pi-coding-agent@1.3.0`。
+3. `.venv` + `pip install -r requirements.txt`。
+4. 可选恢复：`--restore <backup.tar.gz>`（见第 4 节）。
+5. 数据库：旧库自动跑 `scripts/migrate_relpath.py` → `--init-db`；`dist/` 不存在则 `--build`。
+6. 安装 `/usr/local/bin/userctl`（包装器写入实际安装路径，任意目录可执行）。
+7. 渲染并安装 `/etc/systemd/system/daimonkey.service`，`enable --now`，做 HTTP 健康检查。
+
+完成后：
+
+```bash
+userctl add <用户名>                 # 交互式建号（≥8 位密码）
+curl -I http://127.0.0.1:8080/       # 200
+systemctl status daimonkey           # active (running)
+journalctl -u daimonkey -f           # 实时日志
+```
+
+> 服务运行用户默认取 `sudo` 发起者（或当前用户）。bootstrap 会把 `data/`、`.venv/`、`dist/` 的属主改为该用户，确保服务可读写。
+
+常用参数：
+
+| 参数 | 作用 |
+|---|---|
+| `--host` / `--port` | 监听地址与端口 |
+| `--run-as USER` | systemd `User=`（默认 sudo 发起者） |
+| `--restore FILE` | 从备份恢复数据后建站 |
+| `--force` | 覆盖非空 `data/`（旧目录改名为 `data.pre-restore-<时间>`） |
+| `--rebuild` | 强制重建 `dist/` |
+| `--no-service` | 不写 systemd、不启动（搬迁演练/调试） |
+| `--bin-dir DIR` | `userctl` 安装目录（演练时指向临时目录） |
+| `--skip-system-deps` | 跳过 apt（依赖已手工就绪） |
+
+## 3. 服务管理
+
+```bash
+systemctl status daimonkey
+systemctl restart daimonkey          # 重启（Restart=always，崩溃自动拉起）
+systemctl stop daimonkey
+journalctl -u daimonkey -n 100       # 最近日志
+journalctl -u daimonkey --since "-10 min"
+```
+
+- 单元文件源：`deploy/daimonkey.service`（占位符由 bootstrap 渲染，目标 `/etc/systemd/system/daimonkey.service`）。
+- 只托管常驻的 `serve.py`；**不加采集定时器**（产品约定：数据手动更新）。
+- `git pull` 更新代码后需 `sudo systemctl restart daimonkey` 才会加载新代码；bootstrap 在单元无变化时不会重启服务（避免误杀进行中的更新）。先看 `GET /api/v1/update/status` 是否为 running。
+- 更新子进程日志仍在 `data/logs/update-*.log`；看门狗 25 分钟超时。
+- 无 systemd 的环境：`scripts/serve.sh --host 0.0.0.0 --port 8080` 前台运行。
+
+## 4. 换服务器（备份 → 恢复闭环）
+
+### 4.1 旧机备份
+
+```bash
+deploy/backup.sh                       # 默认输出到 ~/daimonkey-backups/
+deploy/backup.sh --out /var/backups    # 指定目录
+```
+
+备份内容：
+
+- SQLite 热备（`sqlite3 .backup`，含 WAL 中未落盘数据；`integrity_check` 校验）
+- `data/` 关键内容：`assistant.env`、`assistant_secret`、`update_password.sha256`、`snapshots/`、`raw/`、`knowledge-repo/`、`knowledge-<用户>-repo/`、`knowledge_search*.json`、`update_status.json`
+- `manifest.json`（格式版本、主机、git commit、行数统计）+ `SHA256SUMS`
+- **排除**：`dist/`（可重建）、`data/cache/`（可再生）、`data/logs/`（诊断信息）
+- 归档权限 600，内含账号哈希与密钥，按敏感文件保管
+
+### 4.2 新机恢复
+
+```bash
+# 1. 新机拉代码
+git clone <仓库地址> <安装目录> && cd <安装目录>
+
+# 2. 恢复 + 安装 + 启动（备份需先 scp 到新机）
+sudo bash deploy/bootstrap.sh --restore /path/to/daimonkey-backup-YYYYmmdd-HHMMSS.tar.gz
+
+# 3. 安全组放行 TCP 8080；4. 验证
+deploy/smoke.sh --all
+```
+
+恢复流程会：校验归档路径安全与 SHA256 → 非空 `data/` 需 `--force`（自动改名保留）→ 复制数据 → 跑相对路径迁移 → 建库 → 重建站点 → 启动服务。**旧备份里的绝对路径会被自动迁移**，无需手工 SQL。
+
+### 4.3 GitHub SSH key 迁移（知识库同步）
+
+知识库同步拉取 `git@github.com:csoulnd/InferTechNote.git`（以及各用户自配仓库）：
+
+```bash
+# 旧机
+ls ~/.ssh/                        # id_ed25519 / id_rsa / known_hosts
+# 新机（复制到服务运行用户的家目录，权限 600/700）
+scp ~/.ssh/id_* ~/.ssh/known_hosts <新机>:~/.ssh/
+chmod 700 ~/.ssh && chmod 600 ~/.ssh/id_* ~/.ssh/known_hosts
+ssh -T git@github.com             # 看到 "successfully authenticated" 即可
+```
+
+没有 key 时：知识库同步报错、其他功能（榜单/新闻/账号/溯源）不受影响。HTTPS git 在某些网络被阻断，代码默认走 SSH；如需更换地址，用 `KNOWLEDGE_GIT`/`KNOWLEDGE_URL` 环境变量覆盖（见 `collector/knowledge.py`）。
+
+## 5. 数据更新（保持手动）
+
+```bash
+scripts/update.sh                  # 全量：采集→评分→LRU→导出→建站
+.venv/bin/python -m collector --collect-news
+.venv/bin/python scripts/sync_knowledge.py
+```
+
+网页右上角「⟳ 更新」等价于全量更新（需登录账号）。不存在 cron/定时器；LRU 窗口见 `collector/registry.yaml → retention`。
+
+## 6. 备份策略
+
+- 手动：`deploy/backup.sh`；建议每次大更新后、换机前各做一次。
+- 自动（可选，仅备份）：运维可自行加 cron，例如 `17 3 * * * <安装目录>/deploy/backup.sh --out /var/backups`。这不属于数据采集调度。
+- 恢复包必须与代码版本大致匹配（manifest 记录 git commit）；跨版本恢复后先跑 `deploy/smoke.sh`。
+
+## 7. 自检与验收
+
+```bash
+bash scripts/check_env.sh                 # 环境/数据源/systemd/pi/SSH 自检，报告 env_report.md
+.venv/bin/python scripts/verify.py        # 页面/溯源/体积 + 部署防回归（相对路径、硬编码、交付件）
+deploy/smoke.sh                           # 在线检查（服务/账号/溯源/知识库/测试/verify）
+deploy/smoke.sh --all                     # + 搬迁演练 + systemd 重启演练（D6 验收）
+```
+
+`smoke.sh --relocation` 会：备份 → 新目录 `bootstrap --restore --no-service`（临时端口）→ 临时实例全检（首页、账号数、登录、溯源、知识库、单测、verify）→ 清理。`--restart` 会 `systemctl restart` 并检查进程更换、服务自愈、journal 可查。
+
+## 8. 可搬迁性约定（防回归）
+
+- `raw_payloads.body_path` **只存相对 `DATA_DIR` 的路径**（`raw/<源>/<日期>/<hash>.json.gz`），读取时拼当前数据目录；旧绝对路径用 `scripts/migrate_relpath.py` 迁移（幂等）。
+- 禁止在代码/文档中硬编码具体安装目录；`verify.py` 会扫描仓库文本文件（白名单仅 `docs/PLAN-deploy.md` 的历史记录）并在库内发现绝对路径时失败。
+- `data/` 是唯一可变数据目录；`dist/` 可随时重建；部署脚本只写 `data/`、`dist/`、`.venv/` 与 systemd 单元。
+- 密钥只进 `data/`（600），不进 git、不进镜像、不进文档。
+
+## 9. 排障
+
+| 症状 | 排查 |
+|---|---|
+| bootstrap 报 Python < 3.11 | 升级到 Ubuntu 24.04+/Debian 12+，或手工装新版 Python 后加 `--skip-system-deps` |
+| 报 Node < 18 | 升级 Node（≥18）后重跑；旧发行版 apt 源版本不足 |
+| 端口被占用，服务起不来 | `ss -ltnp \| grep 8080`；常见为旧 `nohup serve.py`，停止后重跑 bootstrap |
+| 服务 active 但页面 502/超时 | 等构建完成（`data/update_status.json`）；看 `journalctl -u daimonkey` |
+| 知识库同步失败 | `ssh -T git@github.com`；确认服务用户有 key、remote 为 SSH |
+| 恢复后溯源 404/断链 | 跑 `scripts/migrate_relpath.py`；`verify.py` 第 5 节会列出缺失文件 |
+| 备份报 sqlite3 不可用 | 安装 `sqlite3` CLI；脚本自带 Python 备份 API 兜底 |
+| 重启后未自启 | `systemctl is-enabled daimonkey`；未 enabled 则 `sudo systemctl enable --now daimonkey` |
+
+## 10. 文件清单
+
+| 文件 | 作用 |
+|---|---|
+| `deploy/bootstrap.sh` | 一条命令安装/恢复/托管 |
+| `deploy/backup.sh` | 热备 + 数据打包（排除 dist/cache） |
+| `deploy/smoke.sh` | 在线检查 + 搬迁/重启演练 |
+| `deploy/daimonkey.service` | systemd 单元模板（bootstrap 渲染） |
+| `scripts/migrate_relpath.py` | body_path 绝对→相对迁移（幂等） |
+| `scripts/check_env.sh` | 环境与依赖自检 |
+| `scripts/verify.py` | 站点验收 + 部署防回归 |
