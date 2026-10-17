@@ -39,7 +39,7 @@ def main() -> int:
 
     print("== 1. 页面与 API 可访问性 ==")
     paths = ["/", "/rankings/unified", "/rankings/coding", "/product/claude-code",
-             "/methodology", "/sources", "/api.html", "/news",
+             "/sources", "/api.html", "/news",
              "/api/v1/boards.json", "/api/v1/rankings/unified.json",
              "/api/v1/meta.json", "/api/v1/news.json"]
     for p in paths:
@@ -52,7 +52,7 @@ def main() -> int:
     print("== 1b. 新闻功能结构 ==")
     news_html = page(base + "/news")
     for name, pat in [
-        ("新闻页标题", r"AI Agent 新闻汇总"),
+        ("新闻页标题", r"AI 新闻汇总"),
         ("导航第三入口", r'href="/news" data-path="/news"'),
         ("分类筛选 chips", r'id="news-filter"'),
         ("新闻条目", r'class="news-item"'),

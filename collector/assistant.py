@@ -1,48 +1,52 @@
-"""智能助手核心：DSH agent loop 的双通道封装。
+"""智能助手核心：PIAgent 一次性进程模式的双通道封装。
 
 两个通道共用一个执行引擎，配额相互隔离：
 - interactive: /assistant 登录后的对话窗口（serve.py 进程调用）
 - internal:    站点内部按需调用（周报总结 / 文案润色 / 优化建议，collector 进程调用）
 
 执行约束（registry.yaml → assistant）：
-- 全局并发 = 1：data/assistant.lock 文件锁跨进程互斥（serve.py 与 collector 都会起 DSH 子进程）
-- 每请求一个 SDK 上下文，用完即退，内存归还操作系统
-- RSS 守护线程监控 DSH 子进程，超 memory_rss_mb 直接 SIGKILL
+- 全局并发 = 1：data/assistant.lock 文件锁跨进程互斥（serve.py 与 collector 都会起 pi 子进程）
+- 每次任务一个 pi 一次性进程（collector/piagent.py），用完即退，内存归还操作系统
 - 每日请求数 / token 数按通道独立限额
+- 多轮上下文由本模块从 assistant_messages 表重组转写传入，不依赖外部会话状态
 
 安全边界：AI 产物在 assistant_messages 带 channel/workflow 标记，与确定性数据完全隔离；
-deepseek_harness SDK 延迟导入，避免拖慢 serve.py 启动。
+pi 子进程 --no-tools 全禁工具（纯文本对话），密钥经环境变量注入。
 """
 from __future__ import annotations
 
 import fcntl
-import math
 import os
-import signal
-import threading
 import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 from .config import DATA_DIR, registry
-from . import db
+from . import db, piagent
 
-DSH_HOME = DATA_DIR / "dsh-home"
 LOCK_PATH = DATA_DIR / "assistant.lock"
 ENV_FILE = DATA_DIR / "assistant.env"
 
 DEFAULTS: dict = {
     "enabled": True,
-    "profile": "sdk-minimal",
-    "provider": "deepseek-official",
-    "model": "deepseek-v4-flash",
+    "provider": "deepseek",
+    "model": "deepseek/deepseek-flash",
     "api_key_env": "DEEPSEEK_API_KEY",
-    "execution": {"max_concurrent": 1, "memory_rss_mb": 1200, "timeout_s": 300},
+    "thinking": "low",           # 推理档位:off/minimal/low/medium/high;低档省 token
+    "execution": {"max_concurrent": 1, "timeout_s": 300},
     "internal": {"daily_limit": 50, "daily_tokens": 1000000, "queue_depth": 3},
     "interactive": {"daily_limit": 100, "daily_tokens": 2000000,
-                    "max_message_chars": 8000, "max_output_tokens": 4000},
+                    "max_message_chars": 8000, "max_output_tokens": 4000,
+                    "history_messages": 16, "history_char_budget": 16000},
     "login": {"max_failures": 5, "lockout_minutes": 10},
 }
+
+SITE_SYSTEM_PROMPT = (
+    "你是「InferTech 观察站」网站的内嵌助手,用中文与用户对话。"
+    "这个站点以推理技术为重心,提供智能体热度榜单、AI 新闻、报告厅与个人知识库。"
+    "回答保持简洁、直接、可操作;不确定时如实说明,不要编造站点里不存在的数据;"
+    "涉及站点数据更新等问题时,提示用户使用页面右上角的更新按钮。"
+)
 
 
 class AssistantError(Exception):
@@ -114,58 +118,6 @@ def _execution_lock():
         fh.close()
 
 
-# ---- RSS 守护：监控 SDK 子进程，超限击杀 ----
-
-def _child_pids() -> list[int]:
-    me = os.getpid()
-    pids: list[int] = []
-    for pid in filter(str.isdigit, os.listdir("/proc")):
-        try:
-            with open(f"/proc/{pid}/stat") as f:
-                parts = f.read().rsplit(")", 1)[1].split()
-            if int(parts[1]) == me:
-                pids.append(int(pid))
-        except (OSError, ValueError, IndexError):
-            continue
-    return pids
-
-
-def _rss_mb(pid: int) -> float:
-    try:
-        with open(f"/proc/{pid}/status") as f:
-            for line in f:
-                if line.startswith("VmRSS"):
-                    return int(line.split()[1]) / 1024
-    except OSError:
-        pass
-    return 0.0
-
-
-class _RssGuard(threading.Thread):
-    """每 2 秒采样直系子进程 RSS；超限 SIGKILL，记录峰值。"""
-
-    def __init__(self, limit_mb: float):
-        super().__init__(daemon=True)
-        self.limit_mb = limit_mb
-        self.peak_mb = 0.0
-        self.killed = False
-
-    def run(self) -> None:
-        while not self.killed:
-            pids = _child_pids()
-            total = sum(_rss_mb(p) for p in pids)
-            self.peak_mb = max(self.peak_mb, total)
-            if total > self.limit_mb:
-                self.killed = True
-                for pid in pids:
-                    try:
-                        os.kill(pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                return
-            time.sleep(2)
-
-
 # ---- 用量与配额 ----
 
 def _usage_row(c, channel: str):
@@ -222,83 +174,81 @@ def _record_run(c, *, channel: str, workflow: str | None, session_id: int | None
          round(peak_rss_mb, 1), tokens_in, tokens_out, _now()))
 
 
-# ---- token 计量：优先取事件流里的 usage，取不到则按字符估算 ----
-
-def _find_usage(obj) -> dict | None:
-    if isinstance(obj, dict):
-        usage = obj.get("usage")
-        if isinstance(usage, dict):
-            return usage
-        for value in obj.values():
-            found = _find_usage(value)
-            if found:
-                return found
-    elif isinstance(obj, list):
-        for item in obj:
-            found = _find_usage(item)
-            if found:
-                return found
-    return None
+# ---- token 计量：pi 事件流精确返回 usage(input/output)，无需估算 ----
 
 
-def _tokens(result, prompt: str, reply: str) -> tuple[int, int, bool]:
-    usage = _find_usage(getattr(result, "events", None) or [])
-    if usage:
-        tin = int(usage.get("input_tokens") or usage.get("prompt_tokens") or 0)
-        tout = int(usage.get("output_tokens") or usage.get("completion_tokens") or 0)
-        if tin or tout:
-            return tin, tout, False
-    return math.ceil(len(prompt) / 2), math.ceil(len(reply) / 2), True
+# ---- 会话（对外通道;owner = 登录用户名,历史 NULL 会话对全体管理员可读） ----
 
-
-# ---- 会话（对外通道） ----
-
-def create_session(title: str) -> int:
+def create_session(title: str, owner: str | None = None) -> int:
     with _connect() as c:
         cur = c.execute(
-            "INSERT INTO assistant_sessions (title, created_at, updated_at)"
-            " VALUES (?, ?, ?)", (title[:80] or "新会话", _now(), _now()))
+            "INSERT INTO assistant_sessions (title, owner, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?)", (title[:80] or "新会话", owner, _now(), _now()))
         return int(cur.lastrowid)
 
 
-def list_sessions() -> list[dict]:
-    """会话下拉数据：只列活跃会话（默认近 7 天有使用，registry 可调）。
+def list_sessions(owner: str | None = None) -> list[dict]:
+    """会话下拉数据：只列该用户名下的活跃会话（默认近 7 天有使用，registry 可调）。
 
-    历史会话不删除（可溯源），只是不再出现在切换列表里。
+    历史会话不删除（可溯源），只是不再出现在切换列表里;
+    用户系统上线前的 NULL-owner 旧会话不进任何人的列表。
     """
     active_days = int(cfg().get("sessions", {}).get("active_days", 7))
     cutoff = (datetime.now(timezone.utc).astimezone()
               - timedelta(days=active_days)).isoformat(timespec="seconds")
     with _connect() as c:
         rows = c.execute(
-            "SELECT s.id, s.title, s.dsh_session, s.updated_at,"
+            "SELECT s.id, s.title, s.updated_at,"
             " (SELECT COUNT(*) FROM assistant_messages m WHERE m.session_id = s.id)"
             " AS messages FROM assistant_sessions s"
-            " WHERE s.updated_at >= ?"
-            " ORDER BY s.updated_at DESC LIMIT 100", (cutoff,)).fetchall()
+            " WHERE s.updated_at >= ? AND s.owner IS ?"
+            " ORDER BY s.updated_at DESC LIMIT 100",
+            (cutoff, owner)).fetchall()
     return [dict(r) for r in rows]
 
 
-def session_messages(session_id: int) -> list[dict]:
+def _session_owned(c, session_id: int, owner: str | None) -> bool:
+    """owner 非空时会话须属于该用户(NULL 旧会话放行);owner 为 None 不限制。"""
+    if owner is None:
+        return True
+    row = c.execute("SELECT owner FROM assistant_sessions WHERE id = ?",
+                    (session_id,)).fetchone()
+    return row is not None and (row["owner"] == owner or row["owner"] is None)
+
+
+def session_owned(session_id: int, owner: str | None) -> bool:
+    """会话是否归属该用户(NULL 旧会话对全体管理员放行);供 serve 层做 chat 前置校验。"""
     with _connect() as c:
+        return _session_owned(c, session_id, owner)
+
+
+def session_messages(session_id: int, owner: str | None = None) -> list[dict]:
+    with _connect() as c:
+        if not _session_owned(c, session_id, owner):
+            return []
         rows = c.execute(
             "SELECT role, content, workflow, created_at FROM assistant_messages"
             " WHERE session_id = ? ORDER BY id", (session_id,)).fetchall()
     return [dict(r) for r in rows]
 
 
-def delete_session(session_id: int) -> bool:
+def delete_session(session_id: int, owner: str | None = None) -> bool:
     with _connect() as c:
+        if not _session_owned(c, session_id, owner):
+            return False
         cur = c.execute("DELETE FROM assistant_sessions WHERE id = ?", (session_id,))
         return cur.rowcount > 0
 
 
-def rename_session(session_id: int, title: str) -> bool:
+def rename_session(session_id: int, title: str,
+                   owner: str | None = None) -> bool:
     """会话改名（截断 80 字符，空标题拒绝改为空串）。"""
     title = (title or "").strip()
     if not title:
         return False
     with _connect() as c:
+        if not _session_owned(c, session_id, owner):
+            return False
         cur = c.execute(
             "UPDATE assistant_sessions SET title = ?, updated_at = ? WHERE id = ?",
             (title[:80], _now(), session_id))
@@ -316,104 +266,32 @@ def _append_message(c, session_id: int | None, role: str, content: str,
                   (_now(), session_id))
 
 
-def _dsh_session_of(c, session_id: int) -> str | None:
-    row = c.execute("SELECT dsh_session FROM assistant_sessions WHERE id = ?",
-                    (session_id,)).fetchone()
-    return row["dsh_session"] if row else None
+def _chat_task(message: str, history: list[dict]) -> str:
+    """把 SQLite 里的历史消息重组为单次提示词(多轮上下文自管)。"""
+    if not history:
+        return message
+    conf = cfg()["interactive"]
+    keep = history[-int(conf.get("history_messages", 16)):]
+    lines, budget = [], int(conf.get("history_char_budget", 16000))
+    for m in keep:
+        role = "用户" if m["role"] == "user" else "助手"
+        text = (m["content"] or "")[:2000]
+        lines.append(f"{role}: {text}")
+    transcript = "\n\n".join(lines)
+    if len(transcript) > budget:
+        transcript = transcript[-budget:]
+    return (f"以下是你与用户此前的对话记录(按时间序,可能截断):\n\n"
+            f"{transcript}\n\n请直接回复用户的最新一条消息,不要复述历史。"
+            f"\n\n最新消息:\n用户: {message}")
 
 
 # ---- 执行引擎（两通道共用） ----
 
-def _run_sdk(task: str, *, dsh_session: str | None, max_tokens: int,
-             timeout_s: int) -> tuple[str, str | None, int, int, float]:
-    """起一个 SDK 上下文执行任务。
-
-    返回 (final_response, dsh_session_id, tokens_in, tokens_out, peak_rss_mb)；
-    异常统一包装为 AssistantError，超时/内存击杀会注明原因。
-    """
-    from deepseek_harness import DeepSeekHarness, DeepSeekHarnessConfig  # 延迟导入
-
-    conf = cfg()
-    load_env_file()
-    api_key = os.environ.get(conf["api_key_env"]) or None
-    if not api_key:
-        raise AssistantError(f"缺少 {conf['api_key_env']}（检查 data/assistant.env）")
-    DSH_HOME.mkdir(parents=True, exist_ok=True)
-
-    config = DeepSeekHarnessConfig(
-        provider=conf["provider"], model=conf["model"], api_key=api_key,
-        profile=conf["profile"], dsh_home=str(DSH_HOME),
-        max_tokens=max_tokens,
-        request_timeout_seconds=timeout_s,
-        initialize_timeout_seconds=30,
-        env={"DSH_TELEMETRY_MODE": "DISABLED"},
-    )
-    guard = _RssGuard(float(conf["execution"]["memory_rss_mb"]))
-    guard.start()
-    started = time.monotonic()
-    try:
-        with DeepSeekHarness(config) as harness:
-            result = harness.run(task, session_id=dsh_session)
-        reply = (result.final_response or "").strip()
-        if not reply:
-            raise AssistantError(f"DSH 未返回内容（finish_reason={result.finish_reason}）")
-        if guard.killed:
-            raise AssistantError(f"内存超限被终止（上限 {guard.limit_mb:.0f}MB）")
-        if time.monotonic() - started > timeout_s:
-            raise AssistantError("执行超时")
-        tokens_in, tokens_out, _ = _tokens(result, task, reply)
-        return reply, result.session_id, tokens_in, tokens_out, guard.peak_mb
-    except AssistantError:
-        raise
-    except Exception as e:  # SDK / 网络错误统一归类
-        if guard.killed:
-            raise AssistantError(f"内存超限被终止（上限 {guard.limit_mb:.0f}MB）") from e
-        if time.monotonic() - started > timeout_s:
-            raise AssistantError("执行超时") from e
-        raise AssistantError(f"{type(e).__name__}: {e}") from e
-
-
-def _run_resident(task: str, dsh_session: str | None) -> tuple[str, str | None, int, int, float]:
-    """长驻 runtime 路径（聊天通道）：复用 runtime.get_harness() 的常驻进程。
-
-    与一次性 _run_sdk 相比：无冷启动、DSH 原生保持多轮上下文；
-    出错由 runtime.mark_broken() 触发下次重建。max_tokens 在 runtime
-    启动时按 interactive.max_output_tokens 固定。
-    """
-    from . import runtime
-
-    conf = cfg()
-    timeout_s = int(conf["execution"]["timeout_s"])
-    guard = _RssGuard(float(conf["execution"]["memory_rss_mb"]))
-    guard.start()
-    started = time.monotonic()
-    try:
-        harness = runtime.get_harness()
-        result = harness.run(task, session_id=dsh_session)
-        reply = (result.final_response or "").strip()
-        if not reply:
-            raise AssistantError(f"DSH 未返回内容（finish_reason={result.finish_reason}）")
-        tokens_in, tokens_out, _ = _tokens(result, task, reply)
-        return reply, result.session_id, tokens_in, tokens_out, guard.peak_mb
-    except AssistantError:
-        runtime.mark_broken()
-        raise
-    except Exception as e:  # SDK / 网络错误：标记重建并归类
-        runtime.mark_broken()
-        if guard.killed:
-            raise AssistantError(f"内存超限被终止（上限 {guard.limit_mb:.0f}MB）") from e
-        if time.monotonic() - started > timeout_s:
-            raise AssistantError("执行超时") from e
-        raise AssistantError(f"{type(e).__name__}: {e}") from e
-
-
 def _execute(channel: str, task: str, *, session_id: int | None,
-             dsh_session: str | None, workflow: str | None,
-             max_tokens: int, resident: bool = False) -> dict:
+             workflow: str | None, system_prompt: str | None = None) -> dict:
     """配额检查 + 加锁执行 + 落库（消息 / 用量 / 审计）。
 
-    resident=True 走长驻 runtime（聊天，多轮上下文由 DSH 保持）；
-    默认一次性 SDK 上下文（内部工作流，用完即退、内存即时归还）。
+    每次任务一个 pi 一次性进程(piagent.run),用完即退、内存即时归还。
     """
     check_quota(channel)
     conf = cfg()
@@ -423,26 +301,23 @@ def _execute(channel: str, task: str, *, session_id: int | None,
     peak_rss = 0.0
     error: str | None = None
     reply = ""
-    new_dsh: str | None = None
+    load_env_file()
     try:
         with _execution_lock():
-            if resident:
-                reply, new_dsh, tokens_in, tokens_out, peak_rss = _run_resident(
-                    task, dsh_session)
-            else:
-                reply, new_dsh, tokens_in, tokens_out, peak_rss = _run_sdk(
-                    task, dsh_session=dsh_session, max_tokens=max_tokens,
-                    timeout_s=timeout_s)
+            result = piagent.run(
+                task, model=conf["model"], api_key_env=conf["api_key_env"],
+                system_prompt=system_prompt, thinking=conf.get("thinking"),
+                timeout_s=timeout_s)
+            reply, tokens_in, tokens_out = (
+                result.reply, result.tokens_in, result.tokens_out)
+            peak_rss = result.peak_rss_mb
     except AssistantBusy:
         raise
-    except AssistantError as e:
+    except piagent.PiAgentError as e:
         error = str(e)
     with _connect() as c:
         if error is None:
             _append_message(c, session_id, "assistant", reply, channel, workflow)
-            if new_dsh and session_id is not None:
-                c.execute("UPDATE assistant_sessions SET dsh_session = ? WHERE id = ?",
-                          (new_dsh, session_id))
         _record_usage(c, channel, tokens_in, tokens_out)
         _record_run(c, channel=channel, workflow=workflow, session_id=session_id,
                     status="failed" if error else "success", error=error,
@@ -454,7 +329,7 @@ def _execute(channel: str, task: str, *, session_id: int | None,
 
 
 def run_chat(session_id: int, message: str) -> dict:
-    """对外助手窗口：一次用户输入 → DSH 续聊 → 回复落库。"""
+    """对外助手窗口：一次用户输入 → PIAgent 续聊 → 回复落库。"""
     conf = cfg()["interactive"]
     message = (message or "").strip()
     if not message:
@@ -462,11 +337,11 @@ def run_chat(session_id: int, message: str) -> dict:
     if len(message) > conf["max_message_chars"]:
         raise AssistantError(f"消息过长（上限 {conf['max_message_chars']} 字符）")
     with _connect() as c:
-        dsh = _dsh_session_of(c, session_id)
+        history = session_messages(session_id)
         _append_message(c, session_id, "user", message, "interactive", None)
-    return _execute("interactive", message, session_id=session_id,
-                    dsh_session=dsh, workflow=None,
-                    max_tokens=int(conf["max_output_tokens"]), resident=True)
+    return _execute("interactive", _chat_task(message, history),
+                    session_id=session_id, workflow=None,
+                    system_prompt=SITE_SYSTEM_PROMPT)
 
 
 def run_internal(workflow_name: str, payload: dict | None = None,
@@ -476,14 +351,12 @@ def run_internal(workflow_name: str, payload: dict | None = None,
 
     channel: collector 进程调用走 internal（站点内部额度）；
     从 /assistant 页面手动触发时 serve.py 传 interactive（用户额度）。
-    max_tokens: 覆盖 spec 默认输出预算（推理模型需要为推理留足空间，
-    数据量大的任务过小预算会出现 finish_reason=max-tokens 空回复）。
+    max_tokens: 仅为兼容保留——pi 无 max_tokens 概念,输出预算由
+    timeout_s 与每日 token 配额约束(见 piagent 模块说明)。
     """
     spec = get_workflow(workflow_name)
     task = spec.build_task(payload or {})
-    result = _execute(channel, task, session_id=None, dsh_session=None,
-                      workflow=workflow_name,
-                      max_tokens=int(max_tokens or spec.max_tokens))
+    result = _execute(channel, task, session_id=None, workflow=workflow_name)
     spec.store(payload or {}, result["reply"])
     return result
 

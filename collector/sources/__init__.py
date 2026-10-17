@@ -3,6 +3,7 @@ from .appstore_lookup import AppstoreLookupSource
 from .appstore_rss import AppstoreRssSource
 from .github import GithubSource
 from .news_hn import NewsHnSource
+from .superclue import SuperClueSource
 from .news_rss import NewsRssSource
 from .npm import NpmSource
 from .pypi import PypiSource
@@ -17,6 +18,7 @@ SOURCE_REGISTRY = [
     VscodeMarketplaceSource,
     NewsRssSource,
     NewsHnSource,
+    SuperClueSource,
 ]
 
 __all__ = ["SOURCE_REGISTRY"]

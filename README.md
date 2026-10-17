@@ -1,10 +1,11 @@
-# 智能体热度指数（Agent Heat Index）
+# InferTech 观察站（InferTech Observatory,原智能体热度指数）
 
-汇总第三方智能体（Agent）生态数据、**每个数字都能溯源到原始 HTTP 响应**的热度榜单站。
+以推理技术为重心的技术观察站(daimonkey「大马猴」品牌):模型评测榜、智能体热度榜、AI 新闻,以及登录后的个人工作台(报告厅/个人知识库,按用户隔离),**每个数字都能溯源到原始 HTTP 响应**。当前迭代计划见 [PLAN.md](PLAN.md)。
 
 - **联合榜单**（第一个功能）：跨编码 / 开源框架 / 通用 / Claw 四个分类榜的数据整合榜，产品按"自己赛道内的组内分位分"跨榜排序，每条标注来源榜与覆盖率。
-- **AI Agent 新闻汇总**（第三个功能，`/news`）：公开 RSS/API 源的领域新闻，确定性关键词分类（无 LLM）、URL 规范化去重、每条可溯源；提到榜上产品自动关联产品页与当前名次，每周自动生成周报。
-- **报告厅**（第四个入口，`/reports`）：汇报报告模块化框架——网页报告（Markdown 站内渲染或原样 HTML 嵌入）在线阅读、PPT 原件下载；内容与代码同仓版本化（`reports/`），素材（知识库等）登记为参考材料。详见 [reports/README.md](reports/README.md)。
+- **AI 新闻汇总**（第三个功能，`/news`）：公开 RSS/API 源的领域新闻，确定性关键词分类（无 LLM）、URL 规范化去重、每条可溯源；提到榜上产品自动关联产品页与当前名次，每周自动生成周报。
+- **模型评测榜**(`/rankings/model`,v1.6):SuperCLUE 中文大模型月报口径,**API 与开源模型一起排**,开源权重另有分榜;每模型链到 ModelScope/官网;指标=总分+六维(数学/科学/代码/智能体/指令/幻觉),整份月报 PDF 归档可溯源,榜单图由 AI 辅助识别(标注);复用 v1.5 算法70%+AI复评30%。月更:改 `registry → sources.superclue.base_url` 指向新月报后跑 `scripts/fetch_superclue.py`。AA Index/Podium/LMArena Elo 待数据通道。
+- **报告厅**（第四个入口，`/reports`，登录后可见）：汇报报告模块化框架——网页报告（Markdown 站内渲染或原样 HTML 嵌入）在线阅读、PPT 原件下载；内容与代码同仓版本化（`reports/`），素材（知识库等）登记为参考材料。详见 [reports/README.md](reports/README.md)。
 - **数据手动更新**：无任何自动调度。前端右上角「⟳ 更新数据」按钮（经本地服务触发）或命令行手动执行；新闻页另有「仅更新新闻」轻量按钮（约 1 分钟，不重采热度数据）。全站显著展示**数据截至时间**，超 48 小时未更新自动挂横幅。
 - **历史数据 LRU**：原始响应体 30 天、指标时序 180 天、榜单快照 365 天、新闻条目 180 天、采集缓存 48 小时，到期自动清理（响应体清理后元数据与 SHA-256 永久保留，溯源链不断）。窗口在 `collector/registry.yaml → retention` 调整，`0` = 永久保留。
 
@@ -23,20 +24,36 @@
 
 普通 `collector --build` / 热度更新会保留并重建已有知识库快照，不自动拉取 GitHub。同步失败时保留旧快照。
 
-## AI Agent 新闻汇总（第三个功能）
+## AI 新闻汇总（第三个功能）
 
 与热度指数、知识库同级入口：`/news`。配置全部集中在 `registry.yaml → news`（源清单、分类关键词规则、HN 查询词、保留窗口）。
 
-## 智能助手（第四个功能，`/assistant`）
+## 智能助手(第四个功能,`/assistant`)
 
-DSH（DeepSeek Harness）agent loop 驱动的单用户助手，**双通道、配额隔离**：
+PIAgent 驱动的多用户助手,**双通道、配额隔离**:
 
-- **对外助手窗口**：全站悬浮宠物 🐱 点开即聊（面板支持最小化/大窗/会话重命名与删除），未登录浏览不受影响、权限动作按需登录；DSH 原生多轮上下文由**长驻 runtime**（`collector/runtime.py`）保持——懒启动复用、空闲 30 分钟自动回收、故障自动重建；登录复用更新密码，签名 Cookie（HttpOnly + SameSite=Strict，7 天），失败 5 次锁 10 分钟。
-- **内部通道**：站点进程按需调用（周报 AI 摘要 / 文案润色 / 优化建议），CLI：`.venv/bin/python -m collector --assistant news-digest`。
-- **资源护栏**（`registry.yaml → assistant`）：全局并发 1（跨进程文件锁 `data/assistant.lock`）、DSH 子进程 RSS ≤1200MB 守护（超限 SIGKILL）、单次超时 300s、每通道独立每日请求数 / token 硬顶；每次运行落 `assistant_runs` 审计表。
-- **安全边界**：AI 产出一律带标记（`insights.llm_generated=1` 或 `assistant_messages.workflow`），确定性管线（榜单评分 / 新闻分类）不受影响；API Key 放 `data/assistant.env`（600 权限，`DEEPSEEK_API_KEY=sk-...`），遥测已关闭。
-- **扩展**：新工作流 = `collector/workflows.py` 里一个 `WorkflowSpec` + 注册（build_task 组装提示词、store 决定产物去向）。
-- 表结构：`assistant_sessions / assistant_messages / assistant_usage / assistant_runs`（附加式迁移，`db.ensure_assistant_tables`）。
+- **运行时**:[Pi](https://pi.dev)(`@earendil-works/pi-coding-agent`)**一次性进程模式**(`collector/piagent.py`):每次任务 spawn pi 子进程、`--no-tools` 全禁工具、用完即退(实测峰值 ~130MB 仅任务期间,空闲零内存);多轮上下文从 SQLite 消息表重组传入。
+- **对外助手窗口**:全站悬浮宠物 🐱 点开即聊(面板支持最小化/大窗/会话重命名与删除),未登录浏览不受影响、权限动作按需登录;账号登录(见下),签名 Cookie 携带用户名(HttpOnly + SameSite=Strict,7 天),按用户名失败 5 次锁 10 分钟;每个账号有自己独立的会话列表。
+- **内部通道**:站点进程按需调用(周报 AI 摘要 / 文案润色 / 优化建议),CLI:`.venv/bin/python -m collector --assistant news-digest`。
+- **资源护栏**(`registry.yaml → assistant`):全局并发 1(跨进程文件锁 `data/assistant.lock`)、单次超时 300s(超时杀进程组)、每通道独立每日请求数 / token 硬顶;每次运行落 `assistant_runs` 审计表(含峰值 RSS 与精确 token 用量)。
+- **安全边界**:AI 产出一律带标记(`insights.llm_generated=1` 或 `assistant_messages.workflow`),确定性管线(榜单评分 / 新闻分类)不受影响;API Key 放 `data/assistant.env`(600 权限,`DEEPSEEK_API_KEY=sk-...`)。
+- **扩展**:新工作流 = `collector/workflows.py` 里一个 `WorkflowSpec` + 注册(build_task 组装提示词、store 决定产物去向)。
+- 表结构:`assistant_sessions(含 owner) / assistant_messages / assistant_usage / assistant_runs / users`(附加式迁移,`db.ensure_assistant_tables` + `ensure_users_tables`)。
+
+## 用户系统(账号,全部等权)
+
+- 匿名可浏览全部内容;登录后(全站 🐱 面板或更新按钮)可:触发数据更新、同步知识库、助手聊天、访问讲稿页 `/notes`。**全部账号等权(管理员模型),无角色分层**。
+- 账号只在服务器上手动创建:任意目录执行 `userctl add <用户名>`(子命令:add / passwd / list / disable / enable;密码 pbkdf2_hmac 20 万轮盐渍哈希,存 SQLite `users` 表)。
+- Cookie 值 = `{username}.{expires}.{HMAC(secret, username.expires)}`,不可伪造、携带身份。
+- **过渡**:尚无任何账号时,仅密码登录沿用旧 `data/update_password.sha256`(用户名留空);建号后旧密码路径自动失效。`X-Update-Password` 头路径已移除(防爆破绕过锁定)。
+
+## 访问规格与防护(10 并发 / 20 在线)
+
+按「最多 10 人并发访问、20 人同时在线」规格设定防护上限(`scripts/serve.py`,调整后同步 `skills/load-optimization`):
+
+- 每 IP 令牌桶限流:静态 120 req/min、API 60 req/min,超限 429 + Retry-After;
+- 全局在途请求上限 30,超限 503;连接读超时 30s;
+- 所有响应带 `X-Content-Type-Options: nosniff`,HTML 带基础 CSP(同源脚本/样式);空字节路径直接 400。
 
 ## AI 接入（第五个功能，v1.4 方法论）
 
@@ -89,14 +106,28 @@ python3 -m venv .venv
 
 ## 访问与令牌
 
-- 浏览（GET）公开：`http://<服务器IP>:8080`。**对外访问需在云控制台安全组放行 TCP 8080**（本机防火墙未启用，仅云安全组拦截）。
-- 「更新数据」按钮受密码保护：每次更新输入密码，浏览器不保存密码。服务端校验值存于 `data/update_password.sha256`，文件权限应为 600。
-- API 中 `POST /api/v1/update` 与 `POST /api/v1/update/news` 需带 `X-Update-Password` 头；不再接受旧令牌或 URL 参数。`GET /api/v1/update/status` 公开。
+- 登录:右上角「登录」按钮 → `/login`;账号 `userctl add <用户名>` 创建;知识库按用户自配 GitHub 仓库(`userctl repo <用户名> <url>`,默认 InferTechNote);个人工作台登录后可见。
+
+- 浏览(GET)公开:`http://<服务器IP>:8080`。**对外访问需在云控制台安全组放行 TCP 8080**(本机防火墙未启用,仅云安全组拦截)。
+- 登录:**右上角「登录」按钮** → `/login` 页;账号用 `userctl add <用户名>` 创建(任意目录)。
+- 知识库按用户隔离:登录后在知识库页顶部「我的知识库」卡直接配置自己的 GitHub 仓库(或 CLI `userctl repo`),点「同步我的知识库」生成专属页面;未配置走默认 InferTechNote。
+- 个人工作台(报告厅/知识库/讲稿页)登录后可见;更新等权限动作登录后即可用。
+- API 中 `POST /api/v1/update` 与 `POST /api/v1/update/news`、`/api/v1/update/knowledge` 需登录 Cookie(不再接受 `X-Update-Password` 头或 URL 参数)。`GET /api/v1/update/status` 公开。
+
+## 品牌
+
+[daimonkey「大马猴」](brand/daimonkey.md):极简猴头,表达好奇、聪明与探索。favicon/侧栏/助手宠物统一使用;炫彩版仅强调场景。
+
+## 开发工作流(专家/skill 为核心)
+
+任何开发任务开始前与结束后都必须经过专家(skill)的选择、创建或更新——见根 [AGENTS.md](AGENTS.md)。专家索引:`skills/`(负载优化、UI 美化、数据更新、新闻汇总、产品展示、报告撰写)。任务结束时把决策与踩坑沉淀回对应专家文档,没有更新专家的任务视为未完成。
 
 ## 目录结构
 
 ```
 agent-heat-index/
+├── AGENTS.md                   # ★ 仓库助手工作约定:专家工作流铁律 + 专家索引
+├── skills/                     # ★ 专家文档(负载优化/UI 美化/数据更新/新闻汇总/产品展示/报告撰写)
 ├── collector/                  # 核心 Python 包
 │   ├── registry.yaml           # ★ 运维核心：产品清单/榜单权重/LRU窗口/数据源开关/新闻源
 │   ├── config.py  db.py  http.py       # 配置、SQLite 10 表、限频退避 HTTP 客户端
@@ -106,8 +137,10 @@ agent-heat-index/
 │   ├── export.py              # 静态 API 导出（/api/v1/*.json，契约冻结）
 │   ├── queries.py             # export 与 sitegen 共享查询层
 │   ├── sitegen.py  svgchart.py        # Jinja2 建站 + 构建期 SVG 图表
+│   ├── piagent.py  users.py            # PIAgent 运行时适配 / 账号体系
+│   ├── sources/superclue.py            # 模型评测榜数据源(PDF→读榜)
 ├── templates/  static/assets/ # 页面模板 / 样式与 app.js·news.js
-├── scripts/                    # serve.py（本地服务+更新接口）/ update.sh / verify.py / check_env.sh
+├── scripts/                    # serve.py（服务+防护+看门狗）/ userctl.py（账号）/ fetch_superclue.py（模型榜首灌）/ sync_knowledge.py（--user 按用户）/ verify.py
 ├── tests/                      # 单元测试（评分/解析/LRU/新闻）
 ├── data/                       # SQLite 主库 / raw 响应归档 / 快照 / 日志 / 缓存
 └── dist/                       # 生成产物：HTML + /api/v1/*.json（可直接部署任意静态服务）
@@ -134,15 +167,15 @@ agent-heat-index/
 `GET /api/v1/boards.json` · `/rankings/{board}.json`（board ∈ unified/coding/framework/general/claw/domestic/domestic_app）
 · `/rankings/{board}/history.json` · `/products/{slug}.json`（含相关新闻） · `/raw/{id}.json`
 · `/insights.json` · `/news.json`（最近 200 条 + 分类计数） · `/meta.json`；
-动态端点（仅本地服务）：`POST /api/v1/update`、`POST /api/v1/update/news`、`GET /api/v1/update/status`、`GET /api/v1/knowledge/search`；
-助手端点（登录 Cookie）：`GET/POST /api/v1/assistant/session|login|logout`、`GET sessions|sessions/{id}/messages|status|usage|workflows`、`POST sessions|chat|workflows/{name}`、`DELETE sessions/{id}`。
+动态端点（仅本地服务）：`POST /api/v1/update`、`POST /api/v1/update/news`、`POST /api/v1/update/knowledge`、`GET /api/v1/update/status`、`GET /api/v1/knowledge/search`；
+助手端点（账号 Cookie，登录载荷 {username,password}）：`GET/POST /api/v1/assistant/session|login|logout`、`GET sessions|sessions/{id}/messages|status|usage|workflows`、`POST sessions|chat|workflows/{name}`、`DELETE sessions/{id}`。
 
 ## 扩展方式
 
 | 需求 | 改动点 |
 |---|---|
 | 新增产品 | `registry.yaml → products` 加一条（无需改代码） |
-| 新增榜单/调权重 | `registry.yaml → boards`（**必须**递增 `methodology.version` 并更新 /methodology 版本表） |
+| 新增榜单/调权重 | `registry.yaml → boards`（**必须**递增 `methodology.version` 并更新首页「评分方法」折叠块） |
 | 启用/禁用数据源 | `registry.yaml → sources` 的 `enabled` |
 | 新增数据源类型 | `collector/sources/` 写一个模块（实现 collect，返回带 raw_payload_id 的指标）+ 在 `SOURCE_REGISTRY` 注册 + registry 登记 |
 | 调整历史保留窗口 | `registry.yaml → retention` |
@@ -161,4 +194,4 @@ agent-heat-index/
 
 不抓 Google Play、不用 headless 浏览器、不抓声明禁止抓取的站点；
 每主机请求间隔 ≥1s，429/5xx 指数退避（5/15/45s），遵守 Retry-After。
-`serve.py` 更新接口需密码验证，默认只绑 127.0.0.1。
+`serve.py` 权限动作需账号登录，默认只绑 127.0.0.1；限流与并发上限按 10 并发/20 在线规格设定。

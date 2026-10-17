@@ -10,9 +10,7 @@
     <button class="tg" data-view="mom" type="button">动量视图</button>
   </div>
 </div>
-<p class="dim">快照 {{ snapshot_date }} · 口径 {{ meta.methodology_version }} ·
-  {% if board == 'unified' %}主分类综合分二次分位{% else %}榜内归一化{% endif %} ·
-  <a href="/methodology">评分方法</a> · 数字可点击查看原始响应</p>
+<p class="dim">数据截至 {{ snapshot_date }} · <a href="/#methodology">评分说明</a></p>
 
 {% if history_chart %}
 <div class="metric-card">
@@ -24,12 +22,12 @@
 {% macro rows(items) -%}
 {% for it in items %}
 <tr>
-  <td class="rank">{{ it.rank }}</td>
+  <td class="rank{% if it.rank <= 3 %} top{% endif %}">{{ it.rank }}</td>
   <td class="pname"><a href="/product/{{ it.slug }}">{{ it.name }}</a>
     {% if board == 'unified' %}{{ m.badge(it.board, board_names) }}{% endif %}
     {% if it.status == 'stale' %}<span class="stale-tag" title="仓库超过 90 天无推送">停滞</span>{% endif %}
     <span class="vendor">{{ it.vendor }}</span></td>
-  <td>{{ m.score(it.heat_score, 'heat') }}</td>
+  <td>{{ m.score(it.heat_score, 'heat', bar=True) }}</td>
   <td>{{ m.delta(it.delta_7d) }}</td>
   <td>{{ m.score(it.momentum_score, 'mom') }}</td>
   <td>{{ m.cov(it.coverage) }}</td>
@@ -51,10 +49,50 @@
   {% for mk in top_metrics %}<th>{{ metric_names.get(mk, mk) }}</th>{% endfor %}</tr></thead>
   <tbody>{{ rows(momentum_items) }}</tbody>
 </table>
-<p class="dim">动量视图按动量分降序（反映近期增长；增长类指标依赖本站自采历史，约 30 天后完整）。AI 列为 AI 分析分（悬停理由；不影响排序）。</p>
+<p class="dim">可切换按"热度"或"近期增长"排序;AI 列为 AI 复评(悬停查看理由)。</p>
+
+{% if board == 'model' %}
+<section class="duo" style="margin-top:26px">
+  <div class="blk">
+    <div class="sec-head"><h2>开源权重分榜</h2><span class="dim">同一评测,只看开放权重模型</span></div>
+    <table class="tbl">
+      <thead><tr><th>#</th><th>模型</th><th>总分</th><th>AI</th></tr></thead>
+      <tbody>
+      {% for it in open_items %}
+      <tr>
+        <td class="rank">{{ loop.index }}</td>
+        <td class="pname"><a href="/product/{{ it.slug }}">{{ it.name }}</a><span class="vendor">{{ it.vendor }}</span></td>
+        <td>{{ m.score(it.heat_score, 'heat') }}</td>
+        <td>{{ m.ai_cell(it) }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="blk">
+    <div class="sec-head"><h2>官方入口</h2><span class="dim">ModelScope / 官网</span></div>
+    <table class="tbl">
+      <thead><tr><th>模型</th><th>链接</th></tr></thead>
+      <tbody>
+      {% for slug, links in model_links.items() %}
+      <tr>
+        <td class="pname"><a href="/product/{{ slug }}">{{ items | selectattr('slug', 'equalto', slug) | map(attribute='name') | join(', ') or slug }}</a></td>
+        <td>
+          {% if links.modelscope %}<a class="chip" href="{{ links.modelscope }}">ModelScope</a> {% endif %}
+          {% if links.official %}<a class="chip" href="{{ links.official }}">官网</a>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<p class="dim">数据来自 SuperCLUE 中文大模型月度报告(六项任务综合),每月更新;更多评测维度将陆续接入。</p>
+{% endif %}
 
 {% if observation %}
-<h2 class="obs-h">观察区 <span class="dim">（覆盖率 &lt; {{ threshold_pct }}%，不参与排名）</span></h2>
+<details class="obs-fold">
+<summary>观察区 {{ observation | length }} 个（数据不足,暂不排名）</summary>
 <table class="tbl obs">
   <thead><tr><th>产品</th><th>覆盖率</th><th>已有指标</th></tr></thead>
   <tbody>
@@ -67,5 +105,6 @@
   {% endfor %}
   </tbody>
 </table>
+</details>
 {% endif %}
 {% endblock %}

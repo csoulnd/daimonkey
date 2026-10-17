@@ -25,12 +25,31 @@ def write_status(state: str, **extra) -> None:
 
 
 def _collect(only: set[str] | None = None) -> dict:
-    """采集编排核心。only=None 全量；only=NEWS_SOURCE_KEYS 仅新闻（跳过评分）。"""
+    """采集编排核心。only=None 全量；only=NEWS_SOURCE_KEYS 仅新闻（跳过评分）。
+
+    单源失败只隔离记 notes,不中断整轮;任何穿出本函数的异常都会把
+    update_status.json 落到 failed(不卡死在 running)。
+    """
     ensure_dirs()
     reg = registry()
     started = now_iso()
     write_status("running", started_at=started,
                  mode="news" if only else "full")
+    try:
+        return _collect_inner(only, reg, started)
+    except Exception as e:
+        write_status("failed", started_at=started,
+                     error=f"{type(e).__name__}: {e}")
+        raise
+
+
+def _collect_inner(only: set[str] | None, reg: dict, started: str) -> dict:
+    """分阶段执行(稳定性 2026-10-17:不再整轮单事务锁库):
+
+    1) 清单/运行行(短事务)  2) 逐源采集,每源独立短事务
+    3) 评分+LRU+运行汇总(短事务)  4) AI 评分在全部事务之外
+       (其内部自开连接写 usage/runs,放进主事务会自锁——历史卡顿主因)
+    """
     with db.conn() as c:
         db.ensure_news_tables(c)
         products = db.upsert_products(c, reg["products"])
@@ -38,19 +57,22 @@ def _collect(only: set[str] | None = None) -> dict:
         run_id = c.execute("INSERT INTO collect_runs(run_type, started_at)"
                            " VALUES(?, ?)",
                            ("news" if only else "full", started)).lastrowid
-        http = Http()
-        ctx = Ctx(conn=c, http=http, source_ids=source_ids,
-                  products=products, now=started)
-        enabled_keys = {s["key"] for s in reg["sources"] if s.get("enabled", True)}
-        board_of = {p["id"]: p["boards"][0] for p in products}
-        total_metrics = 0
-        ok = failed = 0
-        notes: list[str] = []
-        for cls in SOURCE_REGISTRY:
-            if cls.key not in enabled_keys:
-                continue
-            if only is not None and cls.key not in only:
-                continue
+    http = Http()
+    ctx = Ctx(conn=None, http=http, source_ids=source_ids,
+              products=products, now=started)
+    enabled_keys = {s["key"] for s in reg["sources"] if s.get("enabled", True)}
+    board_of = {p["id"]: p["boards"][0] for p in products}
+    total_metrics = 0
+    ok = failed = 0
+    notes: list[str] = []
+    for cls in SOURCE_REGISTRY:
+        if cls.key not in enabled_keys:
+            continue
+        if only is not None and cls.key not in only:
+            continue
+        src_notes: list[str] = []
+        with db.conn() as c:   # 每源独立提交:不长期持写锁,单源崩溃不丢全局
+            ctx.conn = c
             try:
                 metrics, src_notes = cls().collect(ctx)
                 total_metrics += db.save_metrics(c, source_ids[cls.key],
@@ -62,19 +84,12 @@ def _collect(only: set[str] | None = None) -> dict:
                 failed += 1
                 notes.append(f"[{cls.key}] 源失败(已隔离): {e}")
                 traceback.print_exc()
-            notes.extend(f"[{cls.key}] {n}" for n in src_notes)
+            finally:
+                notes.extend(f"[{cls.key}] {n}" for n in src_notes)
 
+    with db.conn() as c:
         summary = (scoring.compute_all(c, products, today_utc())
                    if only is None else {"skipped": "news-only run"})
-        # AI 分析评分：仅全量更新；失败只降级记 notes，不影响状态
-        ai_notes: list[str] = []
-        if only is None:
-            db.ensure_ai_tables(c)
-            try:
-                ai_notes = ai.score_boards(c, today_utc())
-            except Exception as e:  # 双保险：任何异常都不允许打挂采集
-                ai_notes = [f"[ai] 评分步骤异常（已跳过）: {type(e).__name__}: {e}"]
-            notes.extend(ai_notes)
         ret_counts = retention.apply(c)
         peak_mb = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1)
         status = "success" if failed == 0 else "partial"
@@ -84,6 +99,17 @@ def _collect(only: set[str] | None = None) -> dict:
             " WHERE id=?",
             (now_iso(), ok + failed, ok, failed, total_metrics, peak_mb, status,
              json.dumps(notes[-50:], ensure_ascii=False), run_id))
+
+    # AI 分析评分:全部主事务结束后执行(内部开独立连接写库,不可与主事务同锁)
+    ai_notes: list[str] = []
+    if only is None:
+        try:
+            with db.conn() as c:
+                db.ensure_ai_tables(c)
+            ai_notes = ai.score_boards_safe(today_utc())
+        except Exception as e:  # 双保险：任何异常都不允许打挂采集
+            ai_notes = [f"[ai] 评分步骤异常（已跳过）: {type(e).__name__}: {e}"]
+        notes.extend(ai_notes)
     # 日志留档
     (LOG_DIR / f"run-{started.replace(':', '').replace('-', '')}.log").write_text(
         "\n".join(notes), encoding="utf-8")

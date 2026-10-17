@@ -1,0 +1,76 @@
+---
+name: load-optimization
+description: 本站负载优化专家。适用场景:内存/CPU 治理、常驻进程审计、agent 运行时选型、并发与限流规格、服务器高负载排查、新增依赖评估。
+---
+
+# 负载优化专家(load-optimization)
+
+## 运行规格(一切上限的依据)
+
+- 服务器:单机 3.3GB 内存,**无 swap**。
+- 站点规格:**最多 10 人并发访问 / 20 人同时在线**。限流、并发上限、连接超时均按此规格设定(见 `scripts/serve.py`),规格变更时同步调整上限并在此记录。
+- 原则:**无常驻 agent 进程**。AI 任务按需起进程、用完即退(PIAgent 一次性模式);任何新功能引入常驻内存前必须先过本专家的预算表。
+
+## 内存预算表(2026-10-16 基线)
+
+| 项 | 预算 | 说明 |
+|---|---|---|
+| serve.py(站点服务) | ≤80MB RSS | stdlib http.server + SQLite |
+| AI 任务(按需) | ≤300MB,仅任务期间 | pi 子进程一次性执行,结束即释放 |
+| 构建任务(--update/--build) | ≤150MB,仅运行期间 | 采集+评分+建站 |
+| 系统 + 外部工具 | 其余 | journald、sshd、监控 agent 等非本站项 |
+
+清理基线(2026-10-16):codex 遗留进程 4 个约 222MB 已清;DSH 常驻 runtime 187MB 已随运行时替换移除。可用内存从 ~1.84GB 提升约 400MB。
+
+## 常驻进程白名单(审计 runbook)
+
+```bash
+ps -eo pid,ppid,rss,args --sort=-rss | grep -vE "grep|zcode|sshd|journald" | head -15
+```
+
+本站合法常驻进程**只有** `serve.py` 一个。出现下列任一情况即为异常:
+
+| 异常进程 | 含义 | 处置 |
+|---|---|---|
+| `deepseek-harness-sdk-runtime-*` | DSH 遗留(已弃用) | 确认无引用后 kill;若被拉起,排查 runtime.py 残留 |
+| `codex app-server` / `codex proxy` | **外层 ZCode/codex CLI 环境的后端,不是本站进程** | 不要 kill:实测杀掉会自动重生,且可能影响当前编码会话;与本站内存账无关 |
+| 多个 `python -m collector` | 更新进程堆积(应同时只有一个) | 查 `data/update_status.json` 与 serve.py 互斥锁 |
+| serve.py 线程数持续增长 | pi 采样线程泄漏 | `ls /proc/$(pgrep -f serve.py)/task \| wc -l`;piagent 采样线程 stop 后 2s 内必退出,持续增长即为 bug |
+
+## PIAgent 运行时策略
+
+- 站点 agent 一律走 **PIAgent 一次性进程模式**(`collector/piagent.py` 适配层):每次任务 spawn、结束退出,无空闲占用。
+- 跨进程文件锁 `data/assistant.lock` 保持并发 1(护配额语义);超时与 token 上限见 `registry.yaml → assistant.execution`。
+- 禁止引入新的常驻 SDK/runtime;若模型调用需要长驻(如流式),先在本专家记录内存实测再决策。
+
+## 已知负载问题台账
+
+| 问题 | 状态 | 备注 |
+|---|---|---|
+| DSH 常驻 187MB + _RssGuard 线程泄漏 | 已解决(2026-10-16 实测) | 运行时替换为 PIAgent;serve.py 重启后 1 线程起步、RSS 27MB;E2E 冒烟 pi 峰值 123MB 仅任务期间 |
+| codex 进程 | 结论修正 | 属外层 ZCode/codex CLI 环境后端,非本站进程,kill 后自动重生;不再纳入本站内存账(见白名单表) |
+| 整轮采集单个长事务锁库(可达 10 分钟) | 已解决(2026-10-17) | 逐源短事务+AI 评分移出主事务(自锁主因);另加更新子进程 25min 看门狗、慢请求(>5s)日志、前端轮询 15min 上限 | 影响:锁库期间 AI 评分/会话写入可能 busy;数据量小可接受,恶化时按源分事务 |
+| dist/raw 逐 payload 整页(约 270MB)且每次全量重压 | 待决策 | 方案:raw 页改按需 JSON 渲染或 .gz 按内容哈希判断;动 dist 结构前先过 data-update 专家 |
+| serve.py 子进程日志 fd 不显式关闭 | 低优先 | 每次更新泄漏一个 fd,量级极小 |
+
+## 常见调整
+
+| 需求 | 改动点 |
+|---|---|
+| 调整限流/并发上限 | `scripts/serve.py` 限流常量(规格注释处),同步更新本文件规格段 |
+| 更换 AI 运行时 | 只改 `collector/piagent.py`,保持 `run()` 接口语义,回归 tests/test_piagent.py |
+| 调整内存预算 | 本文件预算表 + serve.py / registry 对应护栏值 |
+| 评估新依赖 | 记录体积与是否常驻,超预算须给出等量回收项 |
+
+## 排障
+
+| 症状 | 排查 |
+|---|---|
+| 服务器内存持续走高 | 跑常驻白名单审计;`ls /proc/<serve_pid>/task \| wc -l` 查线程泄漏 |
+| 站点卡顿 | `data/update_status.json` 是否 running(构建锁库);并发是否顶到限流上限 |
+| AI 任务失败 | `assistant_runs` 表 status/error;pi 输出解析见 piagent.py 日志 |
+
+## 决策记录
+
+- 2026-10-16:弃用 deepseek-harness-sdk(常驻 187MB、守护线程越界风险),站内 agent 改用 Pi 一次性进程模式;codex 站外遗留进程清退(后发现属外层 ZCode 环境后端会重生,已从本站内存账移除)。规格定为 10 并发/20 在线。
+- 2026-10-16(规格化防护落地):serve.py 实测——静态 120/min/IP、API 60/min/IP 令牌桶(超限 429+Retry-After)、全局在途上限 30、连接超时 30s、%00 路径 400、nosniff+CSP 安全头;压测 20 线程 120 请求全部成功(p50 5ms)、35 并发迸发全部 200,压测后 serve.py RSS 27MB/线程归零。同步修复 pipeline 首源失败 UnboundLocalError 与状态卡 running 问题。

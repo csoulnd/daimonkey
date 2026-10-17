@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ sc_title }} · 报告厅{% endblock %}
 {% block content %}
+<style>
+.capture-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:24px 0}.capture-card{border:1px solid var(--border,#ccd0da);border-radius:14px;padding:16px}.capture-frame{aspect-ratio:16/9;border:1px dashed var(--border,#aab1c2);border-radius:10px;display:flex;flex-direction:column;justify-content:center;padding:24px;background:linear-gradient(130deg,rgba(239,126,39,.09),rgba(75,100,190,.07))}.capture-frame span{font-size:12px;opacity:.65}.capture-frame strong{font-size:23px;margin-top:14px}.capture-frame p{line-height:1.6}.sc-head h1{font-size:clamp(30px,4vw,48px)}.sc-subtitle{line-height:1.8}.sc-sec{scroll-margin-top:30px}@media(max-width:700px){.capture-grid{grid-template-columns:1fr}.capture-frame{padding:18px}}
+</style>
+{% if sc_title == '从定义理解 AgentCore' %}<p class="dim">证据基线：2026-10-10；阅读结构复核：2026-10-12。公开文档调研，未进行部署或性能实测。</p>{% endif %}
 <div class="kb-breadcrumb"><a href="/reports">报告厅</a> / <span>{{ sc_title }}</span></div>
 
 {% if showcase_error %}
@@ -16,6 +20,14 @@
 {% macro sc_section_body(s) %}
         {% if s.missing %}
         <div class="warn-box">文档已变更：{{ s.missing }}。请更新 showcase.yaml 映射（研究文档可能调整了标题）。</div>
+        {% elif s.mode == 'capture' %}
+        <p class="dim">截图尚未提供。以下是计划采集的真实控制台画面与讲解问题。</p>
+        <div class="capture-grid">
+          {% for name, question, shot in [('工作空间与 Agent 列表','平台如何统一组织智能体？','保留工作空间、Agent 类型及状态。'), ('创建与配置 Agent','用户能定制什么，执行引擎负责什么？','保留 Harness、模型与角色配置，注明部署模式。'), ('资产绑定与工具接入','模型、Skills 与 MCP 如何供 Agent 使用？','展示实际可用绑定项，区分资产存在与运行支持。'), ('会话与运行结果','托管运行如何承载一次实际任务？','保留 Session、工具调用及结果，记录使用的 Agent。')] %}
+          <article class="capture-card"><div class="capture-frame"><span>0{{ loop.index }} / 待补真实截图</span><strong>{{ name }}</strong><p>{{ question }}</p></div><p class="dim">采集建议：{{ shot }}</p></article>
+          {% endfor %}
+        </div>
+        <details class="sc-fold"><summary>截图采集与讲解约定</summary><p>以同一个工作空间、同一个 Agent 串联四张图。注明日期、地域与模式；遮盖凭据和个人信息。每张图讲一个动作、对应一个能力，并交代该模式的限制。</p></details>
         {% elif s.mode == 'fold' %}
         {% for f in s.folds %}
         <details class="sc-fold"><summary>{{ f.label }}</summary><div class="markdown-body">{{ f.html | safe }}</div></details>
@@ -52,7 +64,7 @@
             </div>
             {% endif %}
             <aside class="sc-panel">
-              <div class="sc-panel-hint dim">点击组件查看职责说明</div>
+              {% if s.diagram.components %}<div class="sc-panel-hint dim">点击组件查看职责说明</div>{% endif %}
               <div class="sc-panel-body" hidden>
                 <h4 class="sc-panel-title"></h4>
                 <div class="sc-panel-desc"></div>

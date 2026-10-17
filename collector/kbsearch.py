@@ -5,33 +5,38 @@ import json
 import threading
 from .config import DATA_DIR
 
-INDEX_FILE = DATA_DIR / "knowledge_search.json"
+DEFAULT_INDEX = DATA_DIR / "knowledge_search.json"
 _lock = threading.Lock()
-_signature = None
-_notes: list[dict] = []
+_cache: dict[str, tuple] = {}   # 签名 -> notes
 
 
-def index() -> list[dict]:
-    global _signature, _notes
+def index(user: str = "") -> list[dict]:
+    index_file = (DATA_DIR / f"knowledge_search-{user}.json" if user
+                  else DEFAULT_INDEX)
     try:
-        stat = INDEX_FILE.stat()
+        stat = index_file.stat()
     except FileNotFoundError:
         return []
-    signature = (str(INDEX_FILE), stat.st_mtime_ns, stat.st_size)
+    signature = (str(index_file), stat.st_mtime_ns, stat.st_size)
     with _lock:
-        if signature != _signature:
-            notes = json.loads(INDEX_FILE.read_text(encoding="utf-8"))
+        cached = _cache.get(signature)
+        if cached is None:
+            notes = json.loads(index_file.read_text(encoding="utf-8"))
             for note in notes:
                 note["_text"] = (note["title"] + " " + note["path"] + " " + note["body"]).lower()
                 note["_heading"] = (note["title"] + " " + note["path"]).lower()
-            _notes, _signature = notes, signature
-        return _notes
+            _cache[signature] = notes
+            if len(_cache) > 8:   # 简单防膨胀
+                _cache.clear()
+                _cache[signature] = notes
+        return _cache[signature]
 
 
-def search(query: str = "", group: str = "", path: str = "", offset: int = 0, limit: int = 40) -> dict:
+def search(query: str = "", group: str = "", path: str = "", offset: int = 0,
+           limit: int = 40, user: str = "") -> dict:
     terms = query[:256].strip().lower().split()
     offset, limit = max(0, offset), max(1, min(100, limit))
-    found = [n for n in index() if (not group or n["group"] == group)
+    found = [n for n in index(user) if (not group or n["group"] == group)
              and (not path or n["path"].startswith(path))
              and all(t in n["_text"] for t in terms)]
     if terms:

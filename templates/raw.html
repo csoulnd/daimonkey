@@ -13,7 +13,7 @@
 </table>
 
 {% if raw.evicted %}
-<div class="warn-box">📦 该响应体已按 <a href="/methodology#retention">LRU 保留策略</a>清理（{{ raw.body_evicted_at | dt }}）。
+<div class="warn-box">📦 该响应体已按 <a href="/#methodology">LRU 保留策略</a>清理（{{ raw.body_evicted_at | dt }}）。
 元数据与 SHA-256 永久保留，指标值仍指向该次采集；点击「更新数据」可重新采集最新响应。</div>
 {% endif %}
 

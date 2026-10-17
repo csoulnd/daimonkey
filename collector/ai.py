@@ -64,7 +64,29 @@ def data_signature(c, page: str) -> str | None:
         if not meta.get("commit"):
             return None
         return f"{meta['commit']}:{len(notes)}"
+    if page == "board":
+        # 联合榜单总结的指纹:最新快照日前 15 名次 + 对应 AI 分集合
+        row = c.execute(
+            "SELECT snapshot_date, COUNT(*) n FROM rankings"
+            " WHERE board = 'unified' GROUP BY snapshot_date"
+            " ORDER BY snapshot_date DESC LIMIT 1").fetchone()
+        if not row:
+            return None
+        top = c.execute(
+            "SELECT r.rank, r.heat_score, p.slug FROM rankings r"
+            " JOIN products p ON p.id = r.product_id"
+            " WHERE r.board='unified' AND r.snapshot_date=? ORDER BY r.rank LIMIT 15",
+            (row["snapshot_date"],)).fetchall()
+        ai_n = c.execute(
+            "SELECT COUNT(*) n FROM ai_scores WHERE board='unified'"
+            " AND snapshot_date=?", (row["snapshot_date"],)).fetchone()["n"]
+        digest = ",".join(f"{r['rank']}{r['slug']}:{_n(r['heat_score'])}" for r in top)
+        return f"{row['snapshot_date']}:{digest}:ai{ai_n}"
     return None
+
+
+def _n(v) -> str:
+    return f"{v:.1f}" if isinstance(v, (int, float)) else "-"
 
 
 def summary_of(c, page: str) -> dict | None:
@@ -111,6 +133,12 @@ def refresh_summaries_if_stale(c) -> list[str]:
         except Exception as e:
             notes.append(f"[ai:{page}] 摘要跳过: {type(e).__name__}: {e}")
     return notes
+
+
+def score_boards_safe(snapshot_date: str) -> list[str]:
+    """自带连接的包装:供主事务外的管线调用(内部 run_internal 会自开连接)。"""
+    with db.conn() as c:
+        return score_boards(c, snapshot_date)
 
 
 def score_boards(c, snapshot_date: str) -> list[str]:

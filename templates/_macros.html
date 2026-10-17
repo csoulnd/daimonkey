@@ -13,8 +13,8 @@
 {% if d is none %}<span class="dim">—</span>{% elif d > 0 %}<span class="up" title="名次上升">▲{{ d }}</span>{% elif d < 0 %}<span class="down" title="名次下降">▼{{ -d }}</span>{% else %}<span class="dim">—</span>{% endif %}
 {%- endmacro %}
 
-{% macro score(v, kind='heat') -%}
-{% if v is none %}<span class="dim" title="历史数据累积中（需约30天）">—</span>{% else %}<span class="score {{ kind }}">{{ '%.1f' | format(v) }}</span>{% endif %}
+{% macro score(v, kind='heat', bar=False) -%}
+{% if v is none %}<span class="dim" title="历史数据累积中（需约30天）">—</span>{% else %}<span class="score {{ kind }}">{{ '%.1f' | format(v) }}</span>{% if bar %}<i class="hbar" style="width: {{ (v * 0.9) | round(0) | int }}px"></i>{% endif %}{% endif %}
 {%- endmacro %}
 
 {% macro badge(board, names) -%}
@@ -30,9 +30,9 @@
 {% macro ai_summary_card(summary) -%}
 {% if summary %}
 <section class="ai-summary" aria-label="AI 摘要">
-  <div class="ai-summary-head"><span class="ai-badge">🤖 AI 摘要</span><span class="ai-tag">AI 生成 · 非确定性数据</span></div>
+  <div class="ai-summary-head"><span class="ai-badge">🤖 AI 摘要</span><span class="ai-tag">本期要点</span></div>
   <p class="ai-summary-body">{{ summary.content }}</p>
-  <div class="ai-summary-foot dim">由 DSH agent 于 {{ summary.created_at | dt }} 生成 · 依据 {{ summary.data_signature }}</div>
+  <div class="ai-summary-foot dim">AI 摘要 · 更新于 {{ summary.created_at | dt }}</div>
 </section>
 {% endif %}
 {%- endmacro %}

@@ -1,86 +1,104 @@
-# AgentCore 平台汇报 · 结构与映射清单
-#
-# 结构（2026-10-12 定稿口径，仅两章，两产品互不干扰）：
-#   第一章 · 阿里云 AgentCore —— 平台定义（官方口径）
-#   第二章 · Amazon Bedrock AgentCore —— 七大核心能力（官方口径）
-# 内容原则：
-#   - 页面只放官方定义；研究解读移到讲稿，由汇报现场进行；
-#   - 不含营销内容与发布/计费信息；
-#   - 来源：官方博客（阿里）与官方号文章（AWS），以 local: 素材文档登记，
-#     doc_urls 指向官方原文；调研文档仍作为背景来源保留在 docs。
-# 素材文档（sources/）为"更新文档"环节产出：来自官方口径的整理稿，进 git 可回溯。
 showcase:
-  title: AgentCore 平台汇报
-
-  # 附件：原始演示文稿（2026-10-09 版）。早期版本，页面内容以最新素材为准
-  attachments:
-    - label: 原始演示文稿（2026-10-09 · PPTX）
-      file: 01-AgentCore-20261009.pptx
-      note: 早期版本，结论以本站当前内容为准
-
-  # 演示文稿网页版：构建时解析 pptx 文字与表格，直接展示（可翻页/全屏）
-  slides:
-    file: 01-AgentCore-20261009.pptx
-    title: 演示文稿（2026-10-09 版）
-    note: 网页版按原件文字与表格内容重建；版式、配色与图形以原件为准（含图形页见原件下载）。
-
-  notes: notes.md          # 讲稿（渲染到 /notes/agentcore-platforms，登录可见）
-
+  title: 从定义理解 AgentCore
+  subtitle: 阿里云：从平台对象走向操作界面 · Amazon：从服务原语走向系统架构
+  notes: notes.md
   docs:
-    alibaba_definition: "local:sources/alibaba-definition.md"
-    amazon_capabilities: "local:sources/amazon-core-capabilities.md"
     alibaba_detail: agent/investigations/products/alibaba-agentcore/detail.md
     amazon_detail: agent/investigations/products/amazon-agentcore/detail.md
-
-  doc_urls:                # 本地素材对应的官方原文（来源行与 ★ 锚点指向）
-    alibaba_definition: "https://www.cnblogs.com/alisystemsoftware/p/23239636"
-    amazon_capabilities: "https://zhuanlan.zhihu.com/p/1929547160770295073"
-
-  sources_folds:           # 参考来源折叠表（调研文档的原始来源清单）
-    - {label: "阿里云来源表（A1–A6）", from: alibaba_detail, heading: 参考来源}
-    - {label: "Amazon 来源表（B1–B8）", from: amazon_detail, heading: 参考来源}
-
   overview:
-    title: 报告摘要
-    points: []             # 待撰写（按两章定稿后补）
-
+    title: 两个同名产品，两种理解入口
+    points:
+    - text: '**阿里云**：智能体构建和治理平台。从 Workspace、Agent 和资产绑定理解统一管理。'
+      kind: fact
+      anchor: alibaba_detail#研究背景与结论
+    - text: '**Amazon**：可组合的 Agent 构建与运行平台。从 Runtime、Harness 和平台服务理解执行责任。'
+      kind: fact
+      anchor: amazon_detail#结论与研究范围
+  diagrams:
+    aws:
+      file: diagram.svg
+      caption: 执行关系 · 点步骤追踪一次调用
+      doc_note: 依据公开职责重构的研究视图，不表示 AWS 内部部署拓扑；服务按需选择。
+      desc_table_from: amazon_detail
+      components: []
   chapters:
-    - id: ch-a
-      num: "一"
-      title: 阿里云 AgentCore
-      gist: 智能体构建和治理平台
-      lead: 先看阿里云 AgentCore 是什么。
-      points:
-        - text: "定义为**智能体构建和治理平台**：企业可以创建、接入和统一管理智能体。"
-          kind: fact
-          anchor: alibaba_definition#官方定义
-        - text: "以「**统一构建、统一纳管、统一治理**」组织平台能力；核心理念 **Agent = Model + Harness**。"
-          kind: fact
-          anchor: alibaba_definition#官方定义
-        - text: "**平台、执行引擎与模型入口是三件事**：AgentCore 是平台；QwenPaw／Qoder 是托管 Harness 的执行引擎；模型连接提供模型访问配置。"
-          kind: fact
-          anchor: alibaba_definition#概念与边界
-      sections:
-        - {id: a-def, title: 它是什么, from: alibaba_definition, heading: 官方定义}
-        - {id: a-audience, title: 面向谁, from: alibaba_definition, heading: 面向谁}
-        - {id: a-concepts, title: 概念与边界, from: alibaba_definition, heading: 概念与边界}
-        - {id: a-access, title: 接入路径, from: alibaba_definition, heading: 接入路径}
-
-    - id: ch-b
-      num: "二"
-      title: Amazon Bedrock AgentCore
-      gist: 可组合的能力体系
-      lead: 再看 Amazon Bedrock AgentCore——能力体系由七项核心服务组成。
-      points:
-        - text: "架构由**七项核心能力**组成：Runtime、Memory、Identity、Gateway、Code Interpreter、Browser Tool、Observability。"
-          kind: fact
-          anchor: amazon_capabilities#七大核心能力
-        - text: "七项服务**既可单独使用，也可协同工作**；兼容开源或自定义 Agent 框架。"
-          kind: fact
-          anchor: amazon_capabilities#组合方式
-        - text: "通过 **AgentCore SDK** 集成到现有代码；支持托管于 Amazon Bedrock 或其他服务的任意框架和模型。"
-          kind: fact
-          anchor: amazon_capabilities#组合方式
-      sections:
-        - {id: b-caps, title: 七大核心能力, from: amazon_capabilities, heading: 七大核心能力}
-        - {id: b-compose, title: 组合方式, from: amazon_capabilities, heading: 组合方式}
+  - id: ch-a
+    num: 一
+    title: 阿里云 AgentCore
+    gist: 从定义到平台能力
+    lead: 先识别平台、执行引擎和模型入口，再沿着创建、绑定、运行、治理的操作路径理解它。
+    sections:
+    - id: a-definition
+      title: 01 / 定义：它统一了什么
+      from: alibaba_detail
+      heading: 研究背景与结论
+    - id: a-boundary
+      title: 02 / 入口：三种 Agent 接入模式
+      from: alibaba_detail
+      heading: 产品边界
+    - id: a-objects
+      title: 03 / 对象：Workspace → Agent → 实例 → Session
+      from: alibaba_detail
+      heading: 关键对象关系
+    - id: a-host
+      title: 04 / 托管：平台承担哪些运行责任
+      from: alibaba_detail
+      heading: 托管运行的责任
+  - id: ch-b
+    num: 二
+    title: Amazon Bedrock AgentCore
+    gist: 从定义到系统架构
+    lead: 从执行循环与运行环境的分工入手；把初始七项服务与完整系统的七个分析维度分开理解。
+    sections:
+    - id: b-definition
+      title: 01 / 定义：可组合的 Agent 平台
+      from: amazon_detail
+      heading: 结论与研究范围
+    - id: b-seven
+      title: 02 / 七层：服务清单与架构维度
+      from: amazon_detail
+      heading: “七层”实际上对应两种不同表述
+    - id: b-flow
+      title: 03 / 架构：一次调用如何穿过平台
+      from: amazon_detail
+      heading: 一次请求如何执行
+      mode: flow
+      diagram: aws
+      steps_note: 来自调研文档的典型调用解释，未进行部署实测。
+      step_highlights:
+        '1':
+        - harness
+        - userapp
+        - runtime
+        '2':
+        - caller
+        - endpoint
+        - runtime
+        '3':
+        - harness
+        - userapp
+        - model
+        - tools
+        - gateway
+        '4':
+        - tools
+        - observability
+        '5':
+        - runtime
+        - endpoint
+        - caller
+    - id: b-config
+      title: 04 / 定制：托管循环与自带代码
+      from: amazon_detail
+      heading: 两种定制入口
+    - id: b-host
+      title: 05 / 托管：企业平台的责任边界
+      from: amazon_detail
+      heading: 企业托管责任
+  sources_folds:
+  - label: 阿里云官方证据与参考来源
+    from: alibaba_detail
+    heading: 参考来源
+  - label: Amazon 官方证据与参考来源
+    from: amazon_detail
+    heading: 参考来源

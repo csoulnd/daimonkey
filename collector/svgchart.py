@@ -84,13 +84,16 @@ def line_chart(points: list[tuple[str, float]], width: int = 640, height: int = 
         f'<text x="{pad_l - 6}" y="{Y(v) + 4:.1f}" text-anchor="end" class="ax">'
         f'{_fmt(v)}</text>'
         for v in (hi, (hi + lo) / 2, lo))
+    # CSS 变量必须走 style 属性:写在 SVG 展示属性(fill=/stroke=)里浏览器
+    # 会忽略整个属性,折线将不可见。
+    accent = f"stroke:{stroke};fill:{stroke}"
     return (
         f'<svg viewBox="0 0 {width} {height}" class="chart" role="img">'
-        f'<polygon points="{area}" fill="{stroke}" opacity="0.08"/>'
+        f'<polygon points="{area}" style="{accent}" fill="none" opacity="0.08"/>'
         f'{grid}'
-        f'<polyline points="{poly}" fill="none" stroke="{stroke}" '
+        f'<polyline points="{poly}" fill="none" style="stroke:{stroke}" '
         f'stroke-width="2" stroke-linejoin="round"/>'
-        f'<circle cx="{last_x:.1f}" cy="{last_y:.1f}" r="3.5" fill="{stroke}"/>'
+        f'<circle cx="{last_x:.1f}" cy="{last_y:.1f}" r="3.5" style="fill:{stroke}"/>'
         f'<text x="{min(last_x, width - 60):.0f}" y="{max(last_y - 8, 12):.0f}" '
         f'class="last">{_fmt(vals[-1])}</text>'
         f'{xlabels}</svg>')

@@ -3,8 +3,8 @@
   "use strict";
 
   var API = "/api/v1/assistant";
-  var state = { authed: false, sessionId: null, running: false, pollTimer: null,
-                open: false, renameTarget: null, deleteTarget: null };
+  var state = { authed: false, user: null, sessionId: null, running: false,
+                pollTimer: null, open: false, renameTarget: null, deleteTarget: null };
 
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) {
@@ -31,59 +31,131 @@
       return r.json().catch(function () { return {}; }).then(function (body) {
         return { ok: r.ok, status: r.status, body: body };
       });
+    }).catch(function () {
+      // 网络层失败(断网/服务重启):返回统一形状,调用方按非 2xx 处理
+      return { ok: false, status: 0, body: {} };
     });
   }
 
-  /* ---- 按需登录：需要权限时展示密码行，成功后重试原动作 ---- */
+  /* ---- 按需登录：需要权限时展示用户名+密码行，成功后重试原动作 ---- */
   function askPassword() {
     return new Promise(function (resolve) {
       var row = $("asst-login-row");
+      var userInput = $("asst-user");
       var input = $("asst-password");
       row.hidden = false;
+      userInput.value = "";
       input.value = "";
-      input.focus();
+      if (!state.user) userInput.focus(); else input.focus();
       function done(value) {
         row.hidden = true;
+        userInput.removeEventListener("keydown", onUserKey);
         input.removeEventListener("keydown", onKey);
         resolve(value);
       }
-      function onKey(ev) {
+      function credentials() {
+        return { username: userInput.value.trim(), password: input.value };
+      }
+      function onUserKey(ev) {
         if (ev.key === "Enter") {
           ev.preventDefault();
-          var v = input.value.trim();
-          if (v) done(v);
+          input.focus();  // 用户名回车跳到密码框
         } else if (ev.key === "Escape") {
           done(null);
         }
       }
+      function onKey(ev) {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          if (input.value) done(credentials());
+        } else if (ev.key === "Escape") {
+          done(null);
+        }
+      }
+      userInput.addEventListener("keydown", onUserKey);
       input.addEventListener("keydown", onKey);
-      msg("此操作需要登录，请输入密码", true);
+      msg("此操作需要登录，请输入用户名与密码", true);
     });
   }
 
-  function login(password) {
+  function showUser(name) {
+    state.user = name || null;
+    var label = $("asst-user-label");
+    if (label) {
+      label.textContent = name || "";
+      label.hidden = !name;
+    }
+    renderAccount(name);
+    // 工作台入口显隐:localStorage 记录 + html.authed 类,
+    // head 预载脚本在首帧前挂类,已登录刷新不再闪烁;探针失败自动摘除。
+    document.documentElement.classList.toggle("authed", !!name);
+    try {
+      if (name) {
+        localStorage.setItem("authed", "1");
+        localStorage.setItem("authuser", name);
+      } else {
+        localStorage.removeItem("authed");
+        localStorage.removeItem("authuser");
+      }
+    } catch (e) { /* 隐私模式 */ }
+  }
+
+  /* 顶栏账号区:未登录=「登录」链接;登录后=头像(首字母)+下拉(用户名/退出) */
+  function renderAccount(name) {
+    var old = $("account-box");
+    if (old) old.parentNode.removeChild(old);
+    var loginLink = $("nav-login");
+    if (loginLink) loginLink.style.display = name ? "none" : "";
+    if (!name || !loginLink || !loginLink.parentNode) return;
+    var box = el("span", "account-box");
+    box.id = "account-box";
+    var avatar = el("button", "avatar");
+    avatar.type = "button";
+    avatar.title = name;
+    avatar.textContent = name.charAt(0).toUpperCase();
+    var menu = el("div", "avatar-menu");
+    menu.hidden = true;
+    var mi1 = el("div", "avatar-name", name);
+    var mi2 = el("button", "avatar-out", "退出登录");
+    mi2.type = "button";
+    mi2.addEventListener("click", function () {
+      api("/logout", { method: "POST" }).then(function () { location.href = "/"; });
+    });
+    menu.appendChild(mi1); menu.appendChild(mi2);
+    avatar.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      menu.hidden = !menu.hidden;
+    });
+    document.addEventListener("click", function () { menu.hidden = true; });
+    box.appendChild(avatar); box.appendChild(menu);
+    loginLink.parentNode.insertBefore(box, loginLink);
+  }
+
+  function login(credentials) {
     return api("/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: password })
+      body: JSON.stringify(credentials)
     }).then(function (res) {
       if (res.ok) {
         state.authed = true;
+        showUser(res.body.user || credentials.username);
         var btn = $("asst-logout");
         if (btn) btn.hidden = false;
         return true;
       }
-      msg(res.status === 429 ? "尝试次数过多，已临时锁定" : "密码错误", true);
+      if (res.status === 401) state.authed = false;  // 过期/伪造态自愈
+      msg(res.status === 429 ? "尝试次数过多，已临时锁定" : "用户名或密码错误", true);
       return false;
     });
   }
 
-  /* 需要登录的动作包装：未登录 → 密码行 → 登录 → 重试一次 */
+  /* 需要登录的动作包装：未登录 → 登录行 → 登录 → 重试一次 */
   function withAuth(action) {
     if (state.authed) return action();
-    return askPassword().then(function (password) {
-      if (!password) return null;
-      return login(password).then(function (ok) { return ok ? action() : null; });
+    return askPassword().then(function (credentials) {
+      if (!credentials) return null;
+      return login(credentials).then(function (ok) { return ok ? action() : null; });
     });
   }
 
@@ -187,7 +259,7 @@
       .some(function (id) { var n = $(id); return n && !n.hidden; });
   }
   function hideInlineRows() {
-    ["asst-rename-row", "asst-delete-row"].forEach(function (id) {
+    ["asst-rename-row", "asst-delete-row", "asst-login-row"].forEach(function (id) {
       var n = $(id); if (n) n.hidden = true;
     });
   }
@@ -279,6 +351,12 @@
         box.scrollTop = box.scrollHeight;
         input.value = "";
         msg("");
+        // 发送失败(401/409/配额/网络):撤回气泡并还原输入,长文不丢
+        var rollback = function () {
+          if (bubble.parentNode) bubble.parentNode.removeChild(bubble);
+          input.value = text;
+        };
+        state.rollback = rollback;
         startRun("/chat", { session_id: sid, message: text });
       });
     });
@@ -321,20 +399,39 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     }).then(function (res) {
-      if (res.status === 401) { state.authed = false; finishRun(); msg("登录已过期，请重试", true); return; }
-      if (res.status === 409) { finishRun(); msg("已有一个任务进行中", true); return; }
-      if (!res.ok) { finishRun(); msg(res.body.error || ("HTTP " + res.status), true); return; }
+      if (res.status === 401) { state.authed = false; failedRun("登录已过期，请重试"); return; }
+      if (res.status === 409) { failedRun("已有一个任务进行中"); return; }
+      if (!res.ok) { failedRun(res.body.error || ("HTTP " + res.status)); return; }
       pollStatus();
     }).catch(function () {
-      finishRun();
-      msg("网络错误", true);
+      failedRun("网络错误");
     });
+  }
+
+  /* 启动即失败:收尾 + 撤回乐观气泡并还原输入(仅聊天路径设置了 rollback) */
+  function failedRun(text) {
+    finishRun();
+    if (state.rollback) {
+      try { state.rollback(); } catch (e) { /* 忽略 */ }
+      state.rollback = null;
+    }
+    msg(text, true);
   }
 
   function pollStatus() {
     stopPolling();
+    var failures = 0;
     state.pollTimer = setInterval(function () {
       api("/status").then(function (res) {
+        if (res.status === 0) {
+          // 网络错误:连续 10 次(约 20 秒)后放弃,避免按钮永久卡死
+          if (++failures >= 10) {
+            finishRun();
+            msg("网络中断，任务状态未知；网络恢复后可重新打开面板查看", true);
+          }
+          return;
+        }
+        failures = 0;
         if (!res.ok || res.body.state === "running") return;
         finishRun();
         if (res.body.state === "success") {
@@ -362,6 +459,7 @@
   function finishRun() {
     stopPolling();
     state.running = false;
+    state.rollback = null;  // 任务已进入执行,乐观消息由服务端落库,不再回滚
     $("asst-send").disabled = false;
   }
 
@@ -445,10 +543,11 @@
       api("/logout", { method: "POST" }).then(function () {
         state.authed = false;
         state.sessionId = null;
+        showUser(null);
         $("asst-logout").hidden = true;
         renderMessages([]);
         refreshAll();
-        msg("已退出登录（下次使用需重新输入密码）");
+        msg("已退出登录（下次使用需重新输入账号密码）");
       });
     });
     $("asst-new").addEventListener("click", newSession);
@@ -478,7 +577,13 @@
     // 启动时静默探一次登录态（Cookie 7 天有效，多数时候直接就绪）
     api("/session").then(function (res) {
       state.authed = !!(res.ok && res.body.authed);
-      if (state.authed) $("asst-logout").hidden = false;
+      if (state.authed) {
+        showUser(res.body.user || null);
+        $("asst-logout").hidden = false;
+      } else {
+        // 过期/伪造态:清除首帧标记,工作台入口收回
+        showUser(null);
+      }
     });
   }
 

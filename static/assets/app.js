@@ -16,11 +16,10 @@
   document.querySelectorAll(".tree a").forEach(function (a) {
     var dp = a.dataset.path || "";
     var on = false;
-    if (dp === "/") {
-      // 热度首页是除新闻/知识库/报告厅/助手外所有页面的归属（榜单/产品/方法论/数据源…）
-      on = here !== "/news" && here !== "/knowledge" && here !== "/reports" && here !== "/assistant"
-        && !here.startsWith("/news/") && !here.startsWith("/knowledge/")
-        && !here.startsWith("/reports/") && !here.startsWith("/assistant/");
+    if (dp === "/rankings/unified") {
+      // 热度榜单为兜底归属:产品页/溯源页/数据源等不在其他分区的页面
+      var sections = ["/news", "/knowledge", "/reports", "/rankings/model", "/assistant"];
+      on = sections.every(function (s) { return here !== s && !here.startsWith(s + "/"); });
     } else {
       on = dp === here || here.startsWith(dp + "/");
     }
@@ -67,9 +66,12 @@
   function askPassword() {
     return new Promise(function (resolve) {
       var dialog = document.createElement("dialog");
-      dialog.setAttribute("aria-label", "输入密码");
+      dialog.setAttribute("aria-label", "输入账号密码");
       dialog.className = "pwd-dialog";
-      dialog.innerHTML = '<form><h3 style="margin-top:0">需要权限</h3><label>密码<input type="password" name="password" required autocomplete="off" style="display:block;margin:12px 0;padding:10px;font-size:16px"></label><div style="display:flex;gap:12px;justify-content:flex-end"><button type="button">取消</button><button type="submit">确定</button></div></form>';
+      dialog.innerHTML = '<form><h3 style="margin-top:0">需要权限</h3>'
+        + '<label>用户名<input type="text" name="username" required maxlength="32" autocomplete="username" style="display:block;margin:12px 0;padding:10px;font-size:16px"></label>'
+        + '<label>密码<input type="password" name="password" required autocomplete="current-password" style="display:block;margin:12px 0;padding:10px;font-size:16px"></label>'
+        + '<div style="display:flex;gap:12px;justify-content:flex-end"><button type="button">取消</button><button type="submit">确定</button></div></form>';
       document.body.appendChild(dialog);
       var finished = false;
       function finish(value) {
@@ -81,23 +83,35 @@
       }
       dialog.querySelector("form").addEventListener("submit", function (e) {
         e.preventDefault();
-        finish(dialog.querySelector("input").value);
+        finish({
+          username: dialog.querySelector('input[name="username"]').value.trim(),
+          password: dialog.querySelector('input[name="password"]').value
+        });
       });
       dialog.querySelector('button[type="button"]').addEventListener("click", function () { finish(null); });
       dialog.addEventListener("cancel", function (e) { e.preventDefault(); finish(null); });
       dialog.showModal();
-      dialog.querySelector("input").focus();
+      dialog.querySelector('input[name="username"]').focus();
     });
   }
 
-  /* 用密码建立助手会话（一次登录，本浏览器获得完全权限） */
-  function establishSession(password) {
+  /* 用账号建立助手会话（一次登录，本浏览器获得完全权限） */
+  function establishSession(credentials) {
     return fetch("/api/v1/assistant/login", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: password })
-    }).then(function (r) { return r.ok; }).catch(function () { return false; });
+      body: JSON.stringify(credentials)
+    }).then(function (r) {
+      if (r.ok) {
+        try {
+          localStorage.setItem("authed", "1");
+          if (credentials && credentials.username)
+            localStorage.setItem("authuser", credentials.username);
+        } catch (e) { /* 忽略 */ }
+      }
+      return r.ok;
+    }).catch(function () { return false; });
   }
 
   function sessionAuthed() {
@@ -108,7 +122,15 @@
   }
 
   function poll(btn, orig) {
+    var ticks = 0;
     var timer = setInterval(function () {
+      if (++ticks > 360) {   // ~15 分钟仍 running:放弃轮询,提示人工查看
+        clearInterval(timer);
+        btn.disabled = false;
+        btn.textContent = orig;
+        alert("更新耗时异常(超过15分钟仍在运行)。\n可查看 data/logs/ 下最新日志,或刷新页面查看状态。");
+        return;
+      }
       fetch("/api/v1/update/status", { cache: "no-store" })
         .then(function (r) { return r.json(); })
         .then(function (s) {
@@ -130,13 +152,13 @@
     }, 2500);
   }
 
-  function trigger(btn, endpoint, password) {
+  function trigger(btn, endpoint) {
     var orig = btn.textContent;
-    var headers = password ? { "X-Update-Password": password } : {};
-    fetch(endpoint, { method: "POST", headers: headers, credentials: "same-origin" })
+    fetch(endpoint, { method: "POST", credentials: "same-origin" })
       .then(function (res) {
         if (res.status === 401) {
-          alert("密码错误或登录已过期，请重新点击并输入密码。");
+          btn.disabled = false;
+          alert("未登录或登录已过期，请重新点击并输入账号密码。");
           return;
         }
         if (!res.ok && res.status !== 409) throw new Error("HTTP " + res.status);
@@ -144,6 +166,7 @@
         poll(btn, orig);
       })
       .catch(function () {
+        btn.disabled = false;
         alert("更新接口不可用。\n\n请先启动本地服务：python3 scripts/serve.py\n"
               + "或在项目目录手动执行：python3 -m collector --update，完成后刷新页面。");
       });
@@ -151,23 +174,27 @@
 
   function bindUpdate(btn, endpoint) {
     btn.addEventListener("click", function () {
+      btn.disabled = true;  // 异步链全程防重复点击
+      var restore = function () { btn.disabled = false; };
       fetch("/api/v1/update/status", { cache: "no-store" })
         .then(function (r) { return r.json(); })
         .then(function (st) {
           if (st.state === "running") {
-            btn.disabled = true;
             poll(btn, btn.textContent);
             return;
           }
           sessionAuthed().then(function (authed) {
-            if (authed) { trigger(btn, endpoint, null); return; }
-            askPassword().then(function (password) {
-              if (password === null || password === "") return;
-              establishSession(password).then(function () { trigger(btn, endpoint, null); });
+            if (authed) { trigger(btn, endpoint); return; }
+            askPassword().then(function (credentials) {
+              if (!credentials || !credentials.password) { restore(); return; }
+              establishSession(credentials).then(function (ok) {
+                if (ok) { trigger(btn, endpoint); } else { restore(); }
+              });
             });
           });
         })
         .catch(function () {
+          restore();
           alert("更新接口不可用。\n\n请先启动本地服务：python3 scripts/serve.py\n"
                 + "或在项目目录手动执行：python3 -m collector --update，完成后刷新页面。");
         });

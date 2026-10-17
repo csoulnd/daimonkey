@@ -16,6 +16,25 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+# --user 须在导入 collector 之前生效(knowledge 模块在导入时读环境变量)
+_user = None
+if "--user" in sys.argv:
+    i = sys.argv.index("--user")
+    if i + 1 < len(sys.argv):
+        _user = sys.argv[i + 1]
+        sys.argv = [sys.argv[0]] + sys.argv[:i] + sys.argv[i + 2:]
+if _user:
+    from collector import users as _users
+    _repo = _users.get_knowledge_repo(_user)
+    if not _repo:
+        raise SystemExit(f"用户 {_user} 未配置知识库仓库")
+    _repo = _repo.removesuffix(".git").removesuffix("/")
+    os.environ["KNOWLEDGE_USER"] = _user
+    os.environ["KNOWLEDGE_URL"] = _repo
+    _https = _repo.replace("https://github.com/", "").rstrip("/")
+    os.environ["KNOWLEDGE_GIT"] = f"git@github.com:{_https}.git"
+
 from collector import pipeline
 from collector.knowledge import GIT_URL, REPO_DIR
 
@@ -57,7 +76,12 @@ def main():
                          GIT_URL])
                 print(f"origin 已迁移: {current} -> {GIT_URL}")
             git_run(["-C", str(REPO_DIR), "pull", "--ff-only", "origin", "main"])
-        ai_notes = pipeline.run_build()   # 含 AI 摘要刷新（指纹=commit，变更才生成）
+        if _user:
+            from collector import knowledge as _kb
+            _kb.build_user_standalone(_user)
+            ai_notes = []
+        else:
+            ai_notes = pipeline.run_build()   # 含 AI 摘要刷新(指纹=commit,变更才生成)
         pipeline.write_status("success", mode="knowledge", ai=ai_notes)
         for line in ai_notes:
             print(line)

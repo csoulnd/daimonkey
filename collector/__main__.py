@@ -18,7 +18,7 @@ from .config import ensure_dirs
 
 def main() -> None:
     ap = argparse.ArgumentParser(prog="collector",
-                                 description="智能体热度指数采集与建站")
+                                 description="InferTech 观察站采集与建站")
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--init-db", action="store_true", help="仅初始化数据库")
     g.add_argument("--collect", action="store_true", help="仅采集+评分+LRU")

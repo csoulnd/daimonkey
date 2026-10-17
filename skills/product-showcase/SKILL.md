@@ -114,3 +114,9 @@ description: 把 InferTechNote 产品调研文档接成报告厅展示的重复�
 - 引擎：`collector/showcase.py`；集成：`collector/reports.py`（kind=showcase）
 - 模板/交互：`templates/report_showcase.html`、`static/assets/showcase.js`
 - 测试：`tests/test_showcase.py`（10 例）；示例：`reports/agentcore-platforms/`
+
+## 定义与界面证据优先（2026-10-12）
+
+用户关注定义时，先定义平台及执行引擎边界，再按产品分别展开。控制台截图未提供时可用 `mode: capture` 展示采集计划，必须明确待补，不制作伪造界面。截图按同一个 Agent 的列表、创建、资产绑定、会话结果串联，注明日期、地域与模式。AWS 的初始七项服务与七个完整系统分析维度分别呈现，流程用同一张交互图承载。旧 PPT 不再自动插入正文，源文件保留。讲稿与报告列表摘要同时调整。
+
+用户采用真实控制台现场演示时，移除截图占位和采集说明；讲稿提示切换真实页面，报告列表摘要同步去掉截图计划。

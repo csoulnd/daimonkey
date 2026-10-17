@@ -25,7 +25,7 @@ class SearchTests(unittest.TestCase):
             notes = [dict(title="KV Cache", path="knowledge/kv.md", body="缓存 memory", group="knowledge", group_name="知识", url="/kb/kv"),
                      dict(title="Agent", path="agent/a.md", body="KV Cache production", group="agent", group_name="Agent", url="/kb/a")]
             source.write_text(json.dumps(notes), encoding="utf-8")
-            with patch.object(kbsearch, "INDEX_FILE", source):
+            with patch.object(kbsearch, "DEFAULT_INDEX", source), patch.dict(kbsearch.__dict__, {"_cache": {}}):
                 self.assertEqual(kbsearch.search("kv")["total"], 2)
                 self.assertEqual(kbsearch.search("缓存")["results"][0]["title"], "KV Cache")
                 self.assertEqual(kbsearch.search("KV memory")["total"], 1)
@@ -49,7 +49,11 @@ class HttpPerformanceTests(unittest.TestCase):
         (self.dist / "assets").mkdir()
         (self.dist / "assets/test.js").write_bytes(b"console.log('test');" * 1000)
         compress_site(self.dist)
-        self.patches = [patch.object(server, "DIST", self.dist), patch.object(server.Handler, "log_message")]
+        from collector import db as _db
+        db_file = Path(self.temp.name) / "test.sqlite3"
+        self.patches = [patch.object(server, "DIST", self.dist),
+                        patch.object(server.Handler, "log_message"),
+                        patch.object(_db, "DB_PATH", db_file)]   # 数据库必须隔离,严禁写入生产库
         for item in self.patches:
             item.start()
         self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
@@ -99,12 +103,22 @@ class HttpPerformanceTests(unittest.TestCase):
         self.assertEqual(self.request("/%2e%2e/private")[0], 403)
 
     def test_search_route_and_bad_pagination(self):
+        # 知识库内容登录后可见:匿名 401,合法账号 Cookie 放行
+        self.assertEqual(self.request("/api/v1/knowledge/search?q=KV")[0], 401)
+        cookie = f"assistant_session={server.make_cookie_value('perf')}"
+        auth = {"Cookie": cookie, "Accept-Encoding": "gzip"}
+        from collector import db as _db, users as _users
+        with _db.conn() as c:
+            _db.ensure_users_tables(c)
+        if not _users.has_any_user():
+            self.assertTrue(_users.create_user("perf", "perf-password-1"))
         with patch.object(kbsearch, "search", return_value={"total": 1, "results": [{"title": "cache" * 500}]}):
-            status, headers, body = self.request("/api/v1/knowledge/search?q=KV", headers={"Accept-Encoding": "gzip"})
+            status, headers, body = self.request("/api/v1/knowledge/search?q=KV", headers=auth)
             self.assertEqual(status, 200)
             self.assertEqual(json.loads(gzip.decompress(body))["total"], 1)
             self.assertEqual(headers["Cache-Control"], "no-store")
-        self.assertEqual(self.request("/api/v1/knowledge/search?offset=bad")[0], 400)
+        self.assertEqual(self.request("/api/v1/knowledge/search?offset=bad",
+                                      headers={"Cookie": cookie})[0], 400)
 
 
 if __name__ == "__main__":

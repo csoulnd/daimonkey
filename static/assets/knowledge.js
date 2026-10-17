@@ -157,3 +157,55 @@
     if (observer) observer.observe(figure);
   });
 })();
+
+/* ---- 我的知识库配置(P2):加载/保存仓库地址 + 触发同步 ---- */
+(function () {
+  "use strict";
+  function $(id) { return document.getElementById(id); }
+  var box = $("kb-config");
+  if (!box) return;
+  fetch("/api/v1/assistant/session", { credentials: "same-origin" })
+    .then(function (r) { return r.json(); })
+    .then(function (s) {
+      if (!s || !s.authed) return;
+      box.hidden = false;
+      return fetch("/api/v1/assistant/knowledge-repo", { credentials: "same-origin" });
+    })
+    .then(function (r) { if (!r) return; return r.json(); })
+    .then(function (d) {
+      if (!d) return;
+      if (d.repo) $("kb-repo-input").value = d.repo;
+    }).catch(function () { /* 忽略 */ });
+  $("kb-repo-save").addEventListener("click", function () {
+    var msg = $("kb-config-msg");
+    msg.textContent = "保存中…";
+    fetch("/api/v1/assistant/knowledge-repo", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repo: $("kb-repo-input").value.trim() })
+    }).then(function (r) { return r.json(); })
+      .then(function (d) { msg.textContent = d.ok ? (d.note || "已保存") : (d.error || "保存失败"); })
+      .catch(function () { msg.textContent = "网络错误"; });
+  });
+  $("kb-sync-mine").addEventListener("click", function () {
+    var msg = $("kb-config-msg");
+    msg.textContent = "同步已启动,完成后刷新页面…";
+    fetch("/api/v1/update/knowledge", { method: "POST", credentials: "same-origin" })
+      .then(function (r) {
+        if (r.status === 401) { msg.textContent = "请先登录"; return; }
+        var tick = 0;
+        var timer = setInterval(function () {
+          if (++tick > 120) { clearInterval(timer); msg.textContent = "同步耗时异常,请查看日志"; return; }
+          fetch("/api/v1/update/status", { cache: "no-store" })
+            .then(function (r2) { return r2.json(); })
+            .then(function (st) {
+              if (st.state === "running") return;
+              clearInterval(timer);
+              msg.textContent = st.state === "success" ? "同步完成,刷新中…" : ("同步失败:" + (st.error || st.state));
+              if (st.state === "success") setTimeout(function () { location.reload(); }, 800);
+            });
+        }, 3000);
+      })
+      .catch(function () { msg.textContent = "网络错误"; });
+  });
+})();

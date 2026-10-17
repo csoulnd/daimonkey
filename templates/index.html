@@ -2,62 +2,60 @@
 {% import "_macros.html" as m %}
 {% block title %}{{ site.name }}{% endblock %}
 {% block content %}
+<section class="hero">
+  <div>
+    <h1 class="hero-h">看清 AI 世界的<span class="grad">真实热度</span></h1>
+    <p class="hero-sub">模型评测、智能体热度、AI 资讯,一处看全</p>
+  </div>
+  <span class="meta-chip"><i></i>数据截至 {{ meta.last_collected_at | dt }}</span>
+</section>
+<div class="kpis">
+  <div class="kpi"><div class="k">收录产品</div><div class="v">{{ unified_total }}<small>个</small></div></div>
+  <div class="kpi"><div class="k">评测模型</div><div class="v">{{ model_top | length + 15 }}<small>个</small></div></div>
+  <div class="kpi"><div class="k">库内资讯</div><div class="v">{{ kpi_news_count }}<small>条 · {{ kpi_news_date }}</small></div></div>
+  <div class="kpi"><div class="k">数据源</div><div class="v">{{ kpi_sources }}<small>/ {{ kpi_sources_enabled }} 可达</small></div></div>
+</div>
 {{ m.ai_summary_card(ai_home) }}
-<section>
-  <div class="sec-head">
-    <h1>联合榜单</h1>
-    <span class="dim">{{ unified_total }} 个产品 · <a href="/methodology">方法</a></span>
-  </div>
-  <table class="tbl">
-    <thead><tr><th>#</th><th>产品</th><th>来源</th><th>热度</th><th>7d</th><th>动量</th><th>覆盖</th><th>AI</th><th>Stars</th><th>npm 月下载</th></tr></thead>
-    <tbody>
-    {% for it in unified %}
-      <tr>
-        <td class="rank">{{ it.rank }}</td>
-        <td class="pname"><a href="/product/{{ it.slug }}">{{ it.name }}</a><span class="vendor">{{ it.vendor }}</span></td>
-        <td>{{ m.badge(it.board, board_names) }}</td>
-        <td>{{ m.score(it.heat_score, 'heat') }}</td>
-        <td>{{ m.delta(it.delta_7d) }}</td>
-        <td>{{ m.score(it.momentum_score, 'mom') }}</td>
-        <td>{{ m.cov(it.coverage) }}</td>
-        <td>{{ m.ai_cell(it) }}</td>
-        <td>{% if it.metrics.github_stars %}{{ m.mval(it.metrics.github_stars) }}{% else %}<span class="dim">—</span>{% endif %}</td>
-        <td>{% if it.metrics.npm_monthly_downloads %}{{ m.mval(it.metrics.npm_monthly_downloads) }}{% else %}<span class="dim">—</span>{% endif %}</td>
-      </tr>
-    {% endfor %}
-    {% if not unified %}<tr><td colspan="10" class="dim">暂无数据，点击右上「⟳ 更新」发起首次采集。</td></tr>{% endif %}
-    </tbody>
-  </table>
-  <p class="dim">联合榜仅取产品主分类，并将分类综合分再做一次分类内分位数。国产开源榜与国产应用榜采用不同数据口径，分别排名，不重复计入联合榜。<strong>AI 列</strong>为 AI 分析分（v1.4 新增，默认仅展示、不参与排序）。</p>
-</section>
 
-<section class="duo">
-  {% for b in blocks %}
-  <div class="blk">
-    <div class="sec-head">
-      <h2>{{ b.name }}</h2>
-      <a class="dim" href="/rankings/{{ b.key }}">完整指标 →</a>
-    </div>
-    <table class="tbl">
-      <thead><tr><th>#</th><th>产品</th><th>热度</th><th>动量</th><th>覆盖</th></tr></thead>
-      <tbody>
-      {% for it in b.rows %}
-      <tr>
-        <td class="rank">{{ it.rank }}</td>
-        <td class="pname"><a href="/product/{{ it.slug }}">{{ it.name }}</a><span class="vendor">{{ it.vendor }}</span>
-          {% if it.status == 'stale' %}<span class="stale-tag">停滞</span>{% endif %}</td>
-        <td>{{ m.score(it.heat_score, 'heat') }}</td>
-        <td>{{ m.score(it.momentum_score, 'mom') }}</td>
-        <td>{{ m.cov(it.coverage) }}</td>
-      </tr>
-      {% endfor %}
-      {% if not b.rows %}<tr><td colspan="5" class="dim">暂无上榜产品</td></tr>{% endif %}
-      </tbody>
-    </table>
-    {% if b.obs %}<p class="dim">观察区 {{ b.obs }} 个（覆盖不足 {{ threshold_pct }}%，不参与排名）</p>{% endif %}
+<div class="portal">
+  <a class="pcard" href="/rankings/model">
+    <div class="pcard-head"><h2>模型评测</h2><span class="dim">中文基准 · 月更</span></div>
+    <ol class="plist">
+      {% for it in model_top %}<li><span class="pname">{{ it.name }}</span><span class="score heat">{{ '%.1f' | format(it.heat_score) }}</span></li>{% endfor %}
+    </ol>
+    <span class="pcard-more">查看完整榜单 →</span>
+  </a>
+  <a class="pcard" href="/rankings/unified">
+    <div class="pcard-head"><h2>智能体热度</h2><span class="dim">多源数据 · 手动更新</span></div>
+    <ol class="plist">
+      {% for it in unified[:5] %}<li><span class="pname">{{ it.name }}</span><span class="score heat">{{ '%.1f' | format(it.final_score or it.heat_score) }}</span></li>{% endfor %}
+    </ol>
+    <span class="pcard-more">查看完整榜单 →</span>
+  </a>
+  <a class="pcard" href="/news">
+    <div class="pcard-head"><h2>AI 资讯</h2><span class="dim">持续聚合</span></div>
+    <ul class="plist news">
+      {% for n in latest_news %}<li>{{ n.title[:40] }}{% if n.title | length > 40 %}…{% endif %}</li>{% endfor %}
+    </ul>
+    <span class="pcard-more">进入资讯流 →</span>
+  </a>
+  <div class="pcard workbench">
+    <div class="pcard-head"><h2>个人工作台</h2><span class="dim">登录后使用</span></div>
+    <ul class="plist links">
+      <li><a href="/reports">报告厅</a></li>
+      <li><a href="/knowledge">个人知识库</a></li>
+      <li><a href="#" id="portal-assistant">智能助手</a></li>
+    </ul>
+    <span class="pcard-more dim">知识库可配置自己的 GitHub 仓库</span>
   </div>
-  {% endfor %}
-</section>
+</div>
 
-<p class="dim note-end">观察区共 {{ obs_total }} 个产品：数据覆盖率不足，为避免"数据少"被误判为"热度低"而不参与排名，<a href="/methodology">详见方法论</a>。数据手动更新，点右上「⟳ 更新」。</p>
+<details id="methodology" class="method-fold">
+  <summary>评分说明</summary>
+  <div class="method-body dim">
+    <p><strong>智能体热度</strong>:汇总 GitHub、npm、PyPI、应用商店等公开数据,按占比算出热度与动量两项;再由 AI 复评各打一次分,两部分按比例合成最终排名。长期未更新的产品不展示。</p>
+    <p><strong>模型评测</strong>:采用 SuperCLUE 中文大模型月度报告(数学/科学/代码/智能体/指令/幻觉六大任务),原始报告存档可查,同样叠加 AI 复评。</p>
+    <p>覆盖率不足的产品放入观察区,不参与排名,避免数据少被误判为热度低。</p>
+  </div>
+</details>
 {% endblock %}

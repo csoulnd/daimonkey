@@ -179,6 +179,34 @@ def _page_summary_task(payload: dict) -> str:
             data = ("最近 40 条新闻（分类计数：" +
                     "、".join(f"{r['category']}{r['n']}" for r in counts) + "）：\n"
                     + "\n".join(lines))
+        elif page == "board":
+            snap = c.execute(
+                "SELECT MAX(snapshot_date) d FROM rankings"
+                " WHERE board='unified'").fetchone()["d"]
+            rows = (c.execute(
+                "SELECT r.rank, r.heat_score, r.momentum_score, r.delta_7d,"
+                " r.coverage, r.product_id, p.name, p.vendor FROM rankings r"
+                " JOIN products p ON p.id = r.product_id"
+                " WHERE r.board='unified' AND r.snapshot_date=?"
+                " ORDER BY r.rank LIMIT 15", (snap,)).fetchall()
+                if snap else [])
+            if not rows:
+                raise assistant.AssistantError("暂无榜单数据")
+            ai = {r["product_id"]: (r["ai_score"], r["rationale"])
+                  for r in c.execute(
+                      "SELECT product_id, ai_score, rationale FROM ai_scores"
+                      " WHERE board='unified' AND snapshot_date=?", (snap,))}
+            obs = c.execute(
+                "SELECT COUNT(*) n FROM rankings WHERE board='unified'"
+                " AND coverage < 0.5 AND snapshot_date=?", (snap,)).fetchone()["n"]
+            lines = []
+            for r in rows:
+                a = ai.get(r["product_id"])
+                lines.append(
+                    f"{r['rank']}. {r['name']}（{r['vendor']}）算法{_num(r['heat_score'])}"
+                    f" 动量{_num(r['momentum_score'])}"
+                    + (f" AI复评{_num(a[0], 'd')}:{a[1]}" if a else " 无AI复评"))
+            data = (f"联合榜快照 {snap}(前 15,观察区 {obs} 个):\n" + "\n".join(lines))
         elif page == "knowledge":
             from .knowledge import load_notes
             meta, notes = load_notes()

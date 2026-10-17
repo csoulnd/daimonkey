@@ -18,10 +18,17 @@ import yaml
 
 from .config import DATA_DIR, DIST_DIR
 
-REPO_DIR = DATA_DIR / "knowledge-repo"
-REPO_URL = "https://github.com/csoulnd/InferTechNote"   # 展示链接（浏览器可访问）
+import os as _os
+# 用户作用域(2026-10-17 P2):KNOWLEDGE_USER 环境变量把仓库/输出/索引
+# 全部切到 knowledge-<user> 命名空间;默认空 = 全局 InferTechNote。
+USER = _os.environ.get("KNOWLEDGE_USER", "").strip()
+REPO_DIR = DATA_DIR / (f"knowledge-{USER}-repo" if USER else "knowledge-repo")
+KNOWLEDGE_ROOT = None   # 在 build() 内按用户推导
+REPO_URL = _os.environ.get("KNOWLEDGE_URL",
+             "https://github.com/csoulnd/InferTechNote")   # 展示链接(浏览器可访问)
 # 服务端 git 拉取地址：本机 HTTPS git 协议被阻断（ls-remote 超时），走 SSH（实测 ~5s）
-GIT_URL = "git@github.com:csoulnd/InferTechNote.git"
+GIT_URL = _os.environ.get("KNOWLEDGE_GIT",
+          "git@github.com:csoulnd/InferTechNote.git")
 GROUPS = {
     "agent": ("Agent", "业务设计、调研、实践报告与学习笔记"),
     "infra": ("Infra", "推理服务与基础设施工程"),
@@ -170,7 +177,7 @@ def directory_tree(notes: list[dict]) -> dict:
 
 def build(env, common: dict, notes: list[dict]) -> None:
     """与热度站同一次建站生成，保留旧页面直到新快照生成完成。"""
-    root = DIST_DIR / "knowledge"
+    root = DIST_DIR / ("knowledge-" + USER if USER else "knowledge")
     root.mkdir(parents=True, exist_ok=True)
     ctx = {**common, "knowledge_page": True, "kb_tree": directory_tree(notes)}
 
@@ -186,7 +193,12 @@ def build(env, common: dict, notes: list[dict]) -> None:
     page("knowledge_index.html", "index.html", kb_groups=groups,
          kb_notes=sorted(notes, key=lambda n: n["updated"], reverse=True))
     # /knowledge resolves via the existing extensionless static route.
-    shutil.copyfile(root / "index.html", DIST_DIR / "knowledge.html")
+    if not USER:
+        shutil.copyfile(root / "index.html", DIST_DIR / "knowledge.html")
+    else:
+        # 无扩展名路由回退 .html 需要 user 别名页(dist/knowledge-<user>.html)
+        shutil.copyfile(root / "index.html",
+                        DIST_DIR / f"knowledge-{USER}.html")
     known = {n["path"] for n in notes}
     commit = common["kb"].get("commit", "main")
     outputs = set()
@@ -208,8 +220,33 @@ def build(env, common: dict, notes: list[dict]) -> None:
             shutil.copyfile(source, target)
     search = [{k: n[k] for k in ("title", "path", "url", "group", "group_name", "body", "updated")} for n in notes]
     # Full text stays on the server; atomic replacement keeps ongoing queries consistent.
-    staging = DATA_DIR / "knowledge_search.json.tmp"
+    search_file = (DATA_DIR / f"knowledge_search-{USER}.json" if USER
+                   else DATA_DIR / "knowledge_search.json")
+    staging = search_file.with_suffix(".json.tmp")
     staging.write_text(json.dumps(search, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    staging.replace(DATA_DIR / "knowledge_search.json")
+    staging.replace(search_file)
     manifest = [{k: v for k, v in n.items() if k != "body"} for n in search]
     (root / "search.json").write_text(json.dumps(manifest, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+
+
+def build_user_standalone(user: str) -> None:
+    """单用户知识库独立构建(同步后调用):渲染到 dist/knowledge-<user>/。"""
+    import os
+    os.environ["KNOWLEDGE_USER"] = user
+    globals()["USER"] = user
+    globals()["REPO_DIR"] = DATA_DIR / f"knowledge-{user}-repo"
+    from .config import registry
+    from . import sitegen
+    env = sitegen._env()
+    reg = registry()
+    kb_meta, notes = load_notes()
+    if not kb_meta.get("available"):
+        raise RuntimeError(f"用户 {user} 的知识库尚未同步")
+    common = {
+        "site": reg["site"],
+        "meta": {"methodology_version": reg["methodology"]["version"],
+                 "last_collected_at": None},
+        "assets_v": sitegen._assets_version(),
+        "kb": kb_meta,
+    }
+    build(env, common, notes)

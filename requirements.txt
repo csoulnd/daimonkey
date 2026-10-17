@@ -3,5 +3,7 @@ jinja2>=3.1
 PyYAML>=6.0
 Markdown>=3.7,<4
 bleach>=6.2,<7
-# 智能助手（DSH agent loop）：developer preview，升级需显式操作
-deepseek-harness-sdk==0.1.5rc1
+# 智能助手运行时:PIAgent 一次性进程模式(pi.dev)。
+# pi 为 npm 全局安装(@earendil-works/pi-coding-agent,二进制名 pi),不走 pip。
+pypdf>=4
+pillow>=10

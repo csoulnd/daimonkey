@@ -5,12 +5,12 @@
 # =============================================================================
 
 site:
-  name: 智能体热度指数
+  name: InferTech 观察站
   tagline: 每个数字都能溯源到原始响应的第三方智能体榜单
   lang: zh-CN
 
 methodology:
-  version: v1.4                # v1.4: 新增 AI 分析维度（摘要 + AI 分，默认不影响排序）
+  version: v1.6                # v1.6: 新增模型评测榜(SuperCLUE 月报口径,overlay 不并入联合榜);v1.5: 联合榜=算法70%+AI复评30%、前10、剔停滞
   observation_threshold: 0.5    # 加权覆盖率低于该值的产品进观察区，不参与排名
 
 # ---- 历史数据 LRU 保留窗口（天）。0 = 永久保留。每次更新后执行清理 ----
@@ -52,6 +52,13 @@ metric_definitions:
   appstore_rating_count:    {unit: count, direction: higher}
   appstore_rating_growth_30d: {unit: pct, direction: higher}
   vscode_installs:          {unit: count, direction: higher}
+  sc_total:                 {unit: score, direction: higher}
+  sc_math:                  {unit: score, direction: higher}
+  sc_science:               {unit: score, direction: higher}
+  sc_code:                  {unit: score, direction: higher}
+  sc_agent:                 {unit: score, direction: higher}
+  sc_instruction:           {unit: score, direction: higher}
+  sc_hallucination:         {unit: score, direction: higher}
 
 # 由历史指标推导的增长率（评分期计算，不单独存储）
 derived_growth:
@@ -64,8 +71,15 @@ derived_growth:
 # 榜单与权重（权重改动必须递增 methodology.version）
 # =============================================================================
 boards:
+  model:
+    name: 模型评测
+    overlay: true               # 独立评测榜,不并入 Agent 联合榜
+    heat:
+      sc_total: 1.0
+    momentum:
+      sc_total: 1.0
   coding:
-    name: 编码智能体
+    name: Agent Harness
     heat:
       github_stars: 0.25
       npm_monthly_downloads: 0.35
@@ -145,6 +159,11 @@ boards:
 # 数据源登记表（sources 表 + /sources 页面的数据基础）
 # =============================================================================
 sources:
+  - key: superclue
+    type: superclue
+    name: SuperCLUE 中文大模型月报
+    base_url: "https://www.cluebenchmarks.com/superclue_2509"
+    enabled: true
   - key: github
     name: GitHub REST API
     type: api
@@ -209,7 +228,7 @@ sources:
     enabled: false
     notes: 2026-09-23 本机实测不可达，跳过
   - key: news_rss
-    name: AI Agent 新闻 RSS/Atom 聚合
+    name: AI 新闻 RSS/Atom 聚合
     type: rss
     auth: none
     rate_limit: 每主机 ≥1s（http.py 统一限频）
@@ -721,17 +740,40 @@ products:
 # ---- 智能助手（DSH agent loop 双通道） ----
 # interactive = /assistant 登录后的对话窗口；internal = 站点内部按需调用（周报总结/润色/建议）。
 # API Key 放 data/assistant.env（600 权限，KEY=VALUE），不进 git。
+
+  # ---------- model(模型评测榜,SuperCLUE 月报口径) ----------
+  - {slug: gpt-5, name: "GPT-5(high)", vendor: OpenAI, category: model, open_weight: false, model_links: {official: "https://openai.com"}}
+  - {slug: o4-mini-high, name: "o4-mini(high)", vendor: OpenAI, category: model, open_weight: false, model_links: {official: "https://openai.com"}}
+  - {slug: claude-sonnet-4-5-reasoning, name: Claude-Sonnet-4.5-Reasoning, vendor: Anthropic, category: model, open_weight: false, model_links: {official: "https://www.anthropic.com"}}
+  - {slug: claude-opus-4-1-reasoning, name: Claude-Opus-4.1-Reasoning, vendor: Anthropic, category: model, open_weight: false, model_links: {official: "https://www.anthropic.com"}}
+  - {slug: gemini-2-5-pro, name: Gemini-2.5-Pro, vendor: Google, category: model, open_weight: false, model_links: {official: "https://deepmind.google/models/gemini"}}
+  - {slug: o3-high, name: "o3(high)", vendor: OpenAI, category: model, open_weight: false, model_links: {official: "https://openai.com"}}
+  - {slug: deepseek-v3-2-exp-thinking, name: DeepSeek-V3.2-Exp-Thinking, vendor: DeepSeek, category: model, open_weight: true, model_links: {official: "https://chat.deepseek.com", modelscope: "https://modelscope.cn/models/deepseek-ai/DeepSeek-V3.2-Exp"}}
+  - {slug: deepseek-v3-1-terminus-thinking, name: DeepSeek-V3.1-Terminus-Thinking, vendor: DeepSeek, category: model, open_weight: true, model_links: {official: "https://chat.deepseek.com", modelscope: "https://modelscope.cn/models/deepseek-ai/DeepSeek-V3.1-Terminus"}}
+  - {slug: doubao-seed-1-6-thinking, name: Doubao-Seed-1.6-thinking-250715, vendor: 字节跳动, category: model, open_weight: false, model_links: {official: "https://www.volcengine.com/product/doubao"}}
+  - {slug: ernie-x1-1, name: ERNIE-X1.1, vendor: 百度, category: model, open_weight: false, model_links: {official: "https://yiyan.baidu.com"}}
+  - {slug: qwen3-max, name: Qwen3-Max, vendor: 阿里巴巴, category: model, open_weight: false, model_links: {official: "https://tongyi.aliyun.com", modelscope: "https://modelscope.cn/models/Qwen/Qwen3-Max"}}
+  - {slug: gemini-2-5-flash, name: Gemini-2.5-Flash, vendor: Google, category: model, open_weight: false, model_links: {official: "https://deepmind.google/models/gemini"}}
+  - {slug: openpangu-ultra-moe-718b, name: openPangu-Ultra-MoE-718B, vendor: 华为, category: model, open_weight: true, model_links: {official: "https://www.huawei.com", modelscope: "https://modelscope.cn/models/openPangu/OpenPangu-Ultra-MoE-718B"}}
+  - {slug: qwen3-235b-thinking, name: Qwen3-235B-A22B-Thinking-2507, vendor: 阿里巴巴, category: model, open_weight: true, model_links: {official: "https://tongyi.aliyun.com", modelscope: "https://modelscope.cn/models/Qwen/Qwen3-235B-A22B-Thinking-2507"}}
+  - {slug: gpt-oss-120b, name: gpt-oss-120b, vendor: OpenAI, category: model, open_weight: true, model_links: {official: "https://openai.com", modelscope: "https://modelscope.cn/models/OpenAI/gpt-oss-120b"}}
+  - {slug: glm-4-6, name: GLM-4.6, vendor: 智谱AI, category: model, open_weight: true, model_links: {official: "https://chatglm.cn", modelscope: "https://modelscope.cn/models/ZhipuAI/GLM-4.6"}}
+  - {slug: kimi-k2-0905, name: kimi-k2-0905-preview, vendor: 月之暗面, category: model, open_weight: true, model_links: {official: "https://www.moonshot.cn", modelscope: "https://modelscope.cn/models/moonshotai/Kimi-K2-Instruct"}}
+  - {slug: qwen3-next-80b-thinking, name: Qwen3-Next-80B-A3B-Thinking, vendor: 阿里巴巴, category: model, open_weight: true, model_links: {official: "https://tongyi.aliyun.com", modelscope: "https://modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Thinking"}}
+  - {slug: minimax-m1, name: MiniMax-M1, vendor: MiniMax, category: model, open_weight: true, model_links: {official: "https://www.minimax.io", modelscope: "https://modelscope.cn/models/MiniMaxAI/MiniMax-M1"}}
+  - {slug: hunyuan-t1, name: Hunyuan-T1-20250822, vendor: 腾讯, category: model, open_weight: false, model_links: {official: "https://yun.tencent.com/products/hunyuan"}}
+
 assistant:
   enabled: true
-  profile: sdk-minimal            # DSH 精简运行档（实测空闲内存 ~160MB）
-  provider: deepseek-official
-  model: deepseek-v4-flash
+  # PIAgent 一次性进程模式(pi.dev,collector/piagent.py):任务期间起 pi 子进程、
+  # 用完即退(实测峰值 ~130MB),无常驻 runtime。--no-tools 全禁工具。
+  provider: deepseek
+  model: deepseek/deepseek-flash     # pi 模型目录里的 provider/model 标识
   api_key_env: DEEPSEEK_API_KEY
+  thinking: low                      # 推理档位 off/minimal/low/medium/high,低档省 token
   execution:
-    max_concurrent: 1             # 全局并发（跨进程文件锁强制）
-    memory_rss_mb: 1200           # DSH 子进程 RSS 上限，超限 SIGKILL
-    timeout_s: 300
-    idle_recycle_s: 1800          # 聊天长驻 runtime 空闲 30 分钟自动回收（内存归还系统）
+    max_concurrent: 1               # 全局并发（跨进程文件锁强制）
+    timeout_s: 300                  # 超时即杀 pi 进程组（兼作输出预算上限）
   internal:
     daily_limit: 50
     daily_tokens: 1000000
@@ -750,11 +792,11 @@ assistant:
   ai:
     summaries:
       enabled: true
-      pages: [home, news, knowledge]   # 三板块顶部 AI 摘要
+      pages: [home, news, knowledge, board]   # 四板块顶部 AI 摘要(board=联合榜单总结)
       max_tokens: 3000             # 推理+输出总预算（过小会出现 max-tokens 空回复）
     scoring:
       enabled: true
       boards: []                    # 空 = 自动取当日有数据的所有榜；可填 [unified, coding]
       top_n: 15                     # 每榜取前 N 名送 AI 分析
       max_tokens: 4000
-      ai_weight: 0.0                # 0 = AI 分仅展示不改排序；调 >0 启用加权融合（方法论同步升级）
+      ai_weight: 0.3                # AI 复评在联合榜最终分中的权重(v1.5);0=仅展示

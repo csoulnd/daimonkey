@@ -241,9 +241,38 @@ CREATE TABLE IF NOT EXISTS assistant_runs (
 """
 
 
+# 轻量用户表:服务器上 CLI 手动建号(scripts/userctl.py),全部账号等权(管理员)。
+USERS_DDL = """
+CREATE TABLE IF NOT EXISTS users (
+    username     TEXT PRIMARY KEY,
+    pw_hash      TEXT NOT NULL,          -- pbkdf2$<iterations>$<salt_hex>$<dk_hex>
+    created_at   TEXT NOT NULL,
+    enabled      INTEGER NOT NULL DEFAULT 1
+);
+"""
+
+
+def ensure_users_tables(c) -> None:
+    c.executescript(USERS_DDL)
+    cols = {row[1] for row in c.execute("PRAGMA table_info(users)")}
+    if "knowledge_repo" not in cols:
+        c.execute("ALTER TABLE users ADD COLUMN knowledge_repo TEXT")
+
+
+def ensure_sessions_owner_column(c) -> None:
+    """附加式迁移:assistant_sessions 增加 owner 列(用户系统上线前的旧会话为 NULL)。"""
+    cols = {row[1] for row in c.execute("PRAGMA table_info(assistant_sessions)")}
+    if "owner" not in cols:
+        c.execute("ALTER TABLE assistant_sessions ADD COLUMN owner TEXT")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_asst_sessions_owner"
+              " ON assistant_sessions(owner)")
+
+
 def ensure_assistant_tables(c) -> None:
     """助手功能上线 / serve 启动时调用，旧库在线补表。"""
     c.executescript(ASSISTANT_DDL)
+    ensure_users_tables(c)
+    ensure_sessions_owner_column(c)
 
 
 # AI 摘要与 AI 分析分：与确定性 rankings 平行存储，永不改写规则分。

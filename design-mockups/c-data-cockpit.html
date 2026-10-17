@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方向 C · 数据驾驶舱 — 智能体热度指数</title>
+<style>
+:root {
+  --bg: #0d1117; --panel: #151b24; --panel2: #1b2330; --line: #263042;
+  --ink: #dde5f0; --dim: #7d8ba1; --acc: #58a6ff; --gold: #f0b429;
+  --up: #3fb950; --down: #f85149; --mono: ui-monospace, "SF Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink);
+  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px; line-height: 1.55; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+/* 顶栏 */
+.topbar { display: flex; align-items: center; gap: 18px; padding: 10px 22px;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 5; }
+.topbar .brand { font-weight: 700; font-size: 14px; display: flex; gap: 9px; align-items: center; }
+.topbar .brand .dot { width: 9px; height: 9px; border-radius: 2px; background: var(--gold); }
+.tabs { display: flex; gap: 2px; flex: 1; }
+.tabs a { padding: 6px 13px; font-size: 13px; color: var(--dim); text-decoration: none;
+  border-radius: 6px; }
+.tabs a.on { color: var(--ink); background: var(--panel2); }
+.clock { font-size: 12px; color: var(--dim); }
+.btn { background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 13px; font-size: 12.5px; cursor: pointer; }
+/* 布局 */
+.grid { display: grid; grid-template-columns: 250px 1fr; gap: 14px; padding: 14px 22px 60px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.panel h4 { font-size: 11.5px; font-weight: 600; color: var(--dim); letter-spacing: .08em;
+  padding: 12px 14px 8px; border-bottom: 1px solid var(--line); text-transform: uppercase; }
+/* 左列:市场状态 */
+.ticker { padding: 6px 0; }
+.ticker .t { display: flex; justify-content: space-between; padding: 7px 14px;
+  font-size: 12.5px; border-bottom: 1px solid color-mix(in srgb, var(--line) 45%, transparent); }
+.ticker .t:last-child { border-bottom: none; }
+.ticker .t b { font-weight: 550; }
+.ticker .t .num.up { color: var(--up); } .ticker .t .num.down { color: var(--down); }
+/* 右列 */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 14px; }
+.kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px; }
+.kpi .k { color: var(--dim); font-size: 11.5px; letter-spacing: .05em; }
+.kpi .v { font-family: var(--mono); font-size: 21px; font-weight: 650; margin-top: 3px; }
+.kpi .v small { font-size: 11px; color: var(--dim); font-weight: 400; }
+.kpi .spark { margin-top: 8px; height: 22px; }
+.kpi .spark polyline { fill: none; stroke: var(--acc); stroke-width: 1.5; }
+/* 主榜 */
+.board { overflow: hidden; }
+.board .head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; }
+.board .head .title { font-size: 15px; font-weight: 650; }
+.board .head .title small { color: var(--dim); font-weight: 400; font-size: 12px; margin-left: 8px; }
+.filters { display: flex; gap: 6px; }
+.filters a { font-size: 11.5px; color: var(--dim); text-decoration: none;
+  border: 1px solid var(--line); padding: 3px 10px; border-radius: 999px; }
+.filters a.on { color: var(--ink); background: var(--panel2); border-color: var(--acc); }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: right; font-size: 10.5px; color: var(--dim); font-weight: 550;
+  padding: 8px 10px; border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line); background: #121821; letter-spacing: .06em; }
+th:first-child, td:first-child { text-align: left; padding-left: 16px; }
+th:nth-child(2), td:nth-child(2) { text-align: left; }
+td { padding: 8px 10px; text-align: right; border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent); font-size: 13px; }
+tbody tr:hover { background: var(--panel2); }
+.rank { color: var(--dim); font-family: var(--mono); }
+.rank.g1 { color: var(--gold); } .rank.g2 { color: #c9d1d9; } .rank.g3 { color: #d29a6a; }
+.pname { font-weight: 550; font-size: 13px; }
+.pname .cat { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 8px; vertical-align: 1px; }
+.c-coding { background: #bc8cff; } .c-framework { background: var(--acc); } .c-general { background: var(--gold); }
+.hbar { display: inline-block; width: 92px; height: 14px; background: #10161f;
+  border-radius: 3px; overflow: hidden; vertical-align: middle; margin-right: 8px;
+  border: 1px solid var(--line); }
+.hbar i { display: block; height: 100%; background: linear-gradient(90deg, #1f6feb, var(--acc)); }
+.delta { font-family: var(--mono); font-size: 11.5px; }
+.delta.up { color: var(--up); } .delta.down { color: var(--down); } .delta.flat { color: var(--dim); }
+.cov { font-family: var(--mono); font-size: 11.5px; color: var(--dim); }
+.cov.low { color: var(--gold); }
+.note { color: var(--dim); font-size: 11.5px; padding: 10px 2px 0; }
+@media (max-width: 960px) { .grid { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2,1fr); } }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>智能体热度指数</div>
+  <nav class="tabs">
+    <a class="on" href="#">联合榜</a><a href="#">编码</a><a href="#">框架</a><a href="#">通用</a><a href="#">国产</a><a href="#">新闻</a><a href="#">报告厅</a><a href="#">知识库</a>
+  </nav>
+  <span class="clock num">2026-10-16 09:53 UTC+8</span>
+  <button class="btn">⟳ 更新</button>
+</header>
+<div class="grid">
+  <aside>
+    <div class="panel">
+      <h4>市场状态</h4>
+      <div class="ticker">
+        <div class="t"><b>GitHub API</b><span class="num up">正常</span></div>
+        <div class="t"><b>npm Downloads</b><span class="num up">正常</span></div>
+        <div class="t"><b>PyPI</b><span class="num up">正常</span></div>
+        <div class="t"><b>App Store</b><span class="num up">正常</span></div>
+        <div class="t"><b>VS Code 市场</b><span class="num up">正常</span></div>
+        <div class="t"><b>HN Algolia</b><span class="num down">429 退避</span></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:14px">
+      <h4>今日热点</h4>
+      <div class="ticker">
+        <div class="t"><b>OpenClaw</b><span class="num up">+3 位</span></div>
+        <div class="t"><b>OpenCode</b><span class="num up">+4 位</span></div>
+        <div class="t"><b>Codex CLI</b><span class="num down">-2 位</span></div>
+        <div class="t"><b>LangChain</b><span class="num up">+2 位</span></div>
+      </div>
+    </div>
+  </aside>
+  <main>
+    <div class="kpis">
+      <div class="kpi"><div class="k">上榜产品</div><div class="v">58</div>
+        <svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none"><polyline points="0,18 12,17 24,17 36,14 48,12 60,13 72,9 84,7 100,4"/></svg></div>
+      <div class="kpi"><div class="k">热度均值</div><div class="v">61.4</div>
+        <svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none"><polyline points="0,14 12,15 24,12 36,13 48,10 60,11 72,8 84,9 100,6"/></svg></div>
+      <div class="kpi"><div class="k">今日新闻</div><div class="v">37</div>
+        <svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none"><polyline points="0,10 12,14 24,8 36,12 48,16 60,9 72,13 84,6 100,8"/></svg></div>
+      <div class="kpi"><div class="k">平均覆盖率</div><div class="v">88<small>%</small></div>
+        <svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none"><polyline points="0,12 12,11 24,11 36,9 48,10 60,8 72,8 84,7 100,6"/></svg></div>
+    </div>
+    <div class="panel board">
+      <div class="head">
+        <div class="title">联合榜单<small>TOP 12 / 58 · 快照 2026-10-16</small></div>
+        <div class="filters"><a class="on" href="#">全部</a><a href="#">编码</a><a href="#">框架</a><a href="#">通用</a></div>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7D</th><th>30D</th><th>动量</th><th>覆盖</th><th>AI 分</th></tr></thead>
+        <tbody>
+          <tr><td class="rank g1">01</td><td class="pname"><span class="cat c-framework"></span>LangChain</td><td><span class="hbar"><i style="width:100%"></i></span><span class="num">100.0</span></td><td class="delta up">+1.2</td><td class="delta up">▲2</td><td class="num">74.2</td><td class="cov">100%</td><td class="num">92</td></tr>
+          <tr><td class="rank g2">02</td><td class="pname"><span class="cat c-coding"></span>Claude Code</td><td><span class="hbar"><i style="width:100%"></i></span><span class="num">100.0</span></td><td class="delta up">+0.8</td><td class="delta up">▲1</td><td class="num">81.5</td><td class="cov">100%</td><td class="num">95</td></tr>
+          <tr><td class="rank g3">03</td><td class="pname"><span class="cat c-general"></span>ChatGPT</td><td><span class="hbar"><i style="width:92%"></i></span><span class="num">91.7</span></td><td class="delta flat">0.0</td><td class="delta flat">—</td><td class="num">58.3</td><td class="cov">100%</td><td class="num">88</td></tr>
+          <tr><td class="rank">04</td><td class="pname"><span class="cat c-general"></span>OpenClaw</td><td><span class="hbar"><i style="width:92%"></i></span><span class="num">91.7</span></td><td class="delta up">+4.1</td><td class="delta up">▲3</td><td class="num">90.8</td><td class="cov">96%</td><td class="num">93</td></tr>
+          <tr><td class="rank">05</td><td class="pname"><span class="cat c-framework"></span>MCP</td><td><span class="hbar"><i style="width:91%"></i></span><span class="num">90.9</span></td><td class="delta up">+2.3</td><td class="delta up">▲1</td><td class="num">77.0</td><td class="cov">100%</td><td class="num">90</td></tr>
+          <tr><td class="rank">06</td><td class="pname"><span class="cat c-coding"></span>Codex CLI</td><td><span class="hbar"><i style="width:83%"></i></span><span class="num">83.3</span></td><td class="delta down">-1.5</td><td class="delta down">▼2</td><td class="num">52.4</td><td class="cov">92%</td><td class="num">85</td></tr>
+          <tr><td class="rank">07</td><td class="pname"><span class="cat c-framework"></span>n8n</td><td><span class="hbar"><i style="width:82%"></i></span><span class="num">81.8</span></td><td class="delta flat">0.0</td><td class="delta flat">—</td><td class="num">49.9</td><td class="cov">88%</td><td class="num">81</td></tr>
+          <tr><td class="rank">08</td><td class="pname"><span class="cat c-framework"></span>OpenAI Agents SDK</td><td><span class="hbar"><i style="width:73%"></i></span><span class="num">72.7</span></td><td class="delta up">+1.9</td><td class="delta up">▲1</td><td class="num">66.1</td><td class="cov">84%</td><td class="num">79</td></tr>
+          <tr><td class="rank">09</td><td class="pname"><span class="cat c-coding"></span>OpenCode</td><td><span class="hbar"><i style="width:67%"></i></span><span class="num">66.7</span></td><td class="delta up">+5.2</td><td class="delta up">▲4</td><td class="num">88.7</td><td class="cov">80%</td><td class="num">84</td></tr>
+          <tr><td class="rank">10</td><td class="pname"><span class="cat c-general"></span>Hermes Agent</td><td><span class="hbar"><i style="width:67%"></i></span><span class="num">66.7</span></td><td class="delta flat">0.0</td><td class="delta flat">—</td><td class="num">41.2</td><td class="cov">76%</td><td class="num">70</td></tr>
+          <tr><td class="rank">11</td><td class="pname"><span class="cat c-framework"></span>crewAI</td><td><span class="hbar"><i style="width:64%"></i></span><span class="num">63.6</span></td><td class="delta down">-0.7</td><td class="delta down">▼1</td><td class="num">44.5</td><td class="cov">72%</td><td class="num">68</td></tr>
+          <tr><td class="rank">12</td><td class="pname"><span class="cat c-framework"></span>Langflow</td><td><span class="hbar"><i style="width:55%"></i></span><span class="num">54.5</span></td><td class="delta flat">0.0</td><td class="delta flat">—</td><td class="num">38.9</td><td class="cov">68%</td><td class="num">62</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">* 演示数据取自真实快照(动量/AI 分为示意)。方向 C「数据驾驶舱」:高密度表格 + 热度条 + 迷你走势 + 市场状态侧栏,金融终端气质(参考 Bloomberg / Grafana)。</p>
+  </main>
+</div>
+</body>
+</html>

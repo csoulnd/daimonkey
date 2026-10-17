@@ -197,7 +197,7 @@ def sources_health(c) -> list[dict]:
         " FROM sources ORDER BY enabled DESC, key")]
 
 
-# ---- AI Agent 新闻（export 与 sitegen 共用口径） ----
+# ---- AI 新闻（export 与 sitegen 共用口径） ----
 
 def _product_ids_of(row) -> list[int]:
     try:

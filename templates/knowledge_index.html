@@ -2,6 +2,15 @@
 {% import "_macros.html" as m %}
 {% block title %}个人知识库 · InferTechNote{% endblock %}
 {% block content %}
+<div class="kb-config auth-only" id="kb-config" hidden>
+  <div class="kb-config-head">我的知识库</div>
+  <div class="kb-config-row">
+    <input type="url" id="kb-repo-input" placeholder="https://github.com/用户名/仓库名(留空使用默认)" maxlength="200">
+    <button id="kb-repo-save" type="button">保存</button>
+    <button id="kb-sync-mine" type="button" title="同步我配置的仓库并生成页面">⟳ 同步我的知识库</button>
+  </div>
+  <div class="dim" id="kb-config-msg" style="font-size:0.8em;margin-top:6px"></div>
+</div>
 <section class="kb-intro">
   <div class="dim">INFER TECH NOTE</div>
   <h1>个人知识库</h1>

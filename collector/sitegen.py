@@ -15,6 +15,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from . import ai as ai_mod
 from . import db, queries, svgchart, knowledge, news as newslib
+from . import ai as ai_mod
 from . import reports as reportslib
 from .config import (DIST_DIR, STATIC_DIR, TEMPLATES_DIR, ensure_dirs, now_iso,
                      registry, today_utc)
@@ -94,6 +95,23 @@ def _assets_version() -> str:
     return h.hexdigest()[:8]
 
 
+def _unified_display(items: list[dict], ai_weight: float) -> list[dict]:
+    """联合榜展示层变换(v1.5):剔除停滞产品 → 算法/AI 加权融合 → 重排名 → 前 10。
+
+    只影响页面呈现;export 的 /api/v1/rankings/*.json 契约冻结,仍为算法分全量。
+    """
+    rows = [dict(it) for it in items if it.get("status") != "stale"]
+    for it in rows:
+        base, ai_s = it.get("heat_score"), it.get("ai_score")
+        it["final_score"] = (round(base * (1 - ai_weight) + ai_s * ai_weight, 1)
+                             if ai_weight > 0 and base is not None and ai_s is not None
+                             else base)
+    rows.sort(key=lambda x: (x["final_score"] is None, -(x["final_score"] or 0)))
+    for i, it in enumerate(rows, 1):
+        it["rank"] = i
+    return rows[:10]
+
+
 def build() -> None:
     ensure_dirs()
     reg = registry()
@@ -135,22 +153,45 @@ def build() -> None:
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(html, encoding="utf-8")
 
-        # ---- 首页（单页：联合榜单 + 编码/通用并排块）----
+        # ---- 首页（单页：联合榜单 + 各赛道并排块）----
         def board_block(bkey: str) -> dict:
-            return {"key": bkey, "name": reg["boards"][bkey]["name"],
+            return {"key": bkey, "name": reg["boards"].get(bkey, {}).get("name", bkey),
                     "rows": bitems.get(bkey, []), "obs": len(bobs.get(bkey, []))}
+        # KPI 数据:数据源健康 + 最新入库日新闻量
+        src_rows = queries.sources_health(c)
+        src_ok = sum(1 for r in src_rows if r["enabled"] and r["reachable"])
+        src_enabled = sum(1 for r in src_rows if r["enabled"])
+        nday = c.execute(
+            "SELECT substr(published_at, 1, 10) d, COUNT(*) n FROM news_items"
+            " WHERE published_at IS NOT NULL GROUP BY d ORDER BY d DESC LIMIT 1"
+        ).fetchone()
+        ai_weight = float(ai_mod.cfg()["scoring"].get("ai_weight", 0.0))
+        unified_display = _unified_display(bitems.get("unified", []), ai_weight)
+        model_items = bitems.get("model", [])
         render("index.html", "index.html",
-               unified=bitems.get("unified", []),
+               unified=unified_display,
+               model_top=model_items[:5],
+               latest_news=queries.news_recent(c, 6),
+               ai_board=ai_mod.summary_of(c, "board"),
+               ai_weight_pct=round(ai_weight * 100),
                unified_total=len(bitems.get("unified", [])),
-               blocks=[board_block("coding"), board_block("general"),
-                       board_block("domestic"), board_block("domestic_app")],
+               blocks=[board_block(b) for b in order
+                       if b not in ("unified", "model") and bitems.get(b)],
+               kpi_sources=src_ok, kpi_sources_enabled=src_enabled,
+               kpi_news_count=(nday["n"] if nday else 0),
+               kpi_news_date=(nday["d"] if nday else "—"),
                obs_total=sum(len(v) for k, v in bobs.items() if k != "unified"))
 
         # ---- 榜单页 ----
         for b in order:
             if b not in snaps:
                 continue
-            items = bitems[b]
+            if b == "unified":
+                items = _unified_display(bitems[b], ai_weight)
+            elif b == "model":
+                items = bitems[b][:20]
+            else:
+                items = bitems[b][:15]   # 各赛道页统一前 15,页面长短一致
             mom = sorted((i for i in items if i["momentum_score"] is not None),
                          key=lambda x: -x["momentum_score"])
             hist = queries.history_series(c, b, 90)
@@ -159,8 +200,20 @@ def build() -> None:
                        for h in hist}
             series = {it["name"]: [by_slug.get(d, {}).get(it["slug"]) for d in dates]
                       for it in items[:5]}
+            extra = {}
+            if b == "model":
+                reg_models = {p["slug"]: p for p in reg["products"]
+                              if p.get("category") == "model"}
+                extra = {
+                    "open_items": [it for it in items
+                                   if reg_models.get(it["slug"], {})
+                                   .get("open_weight")],
+                    "model_links": {p["slug"]: p.get("model_links", {})
+                                    for p in reg["products"]
+                                    if p.get("category") == "model"},
+                }
             render("rankings.html", f"rankings/{b}.html",
-                   board=b, name=reg["boards"][b]["name"],
+                   board=b, name=reg["boards"][b]["name"], **extra,
                    snapshot_date=snaps[b], items=items, momentum_items=mom,
                    observation=bobs[b], top_metrics=_top_metrics(b, reg),
                    history_chart=svgchart.multi_line_chart(dates, series))
@@ -189,11 +242,9 @@ def build() -> None:
                    raw=d, body_txt=body_txt[:200_000])
 
         # ---- 静态说明页 ----
-        render("methodology.html", "methodology.html",
-               boards_cfg={k: v for k, v in reg["boards"].items()
-                           if v.get("enabled", True) and not v.get("derived")},
-               retention=reg.get("retention", {}))
+        # 方法论 v1.5 起不再独立成页,内容并入首页底部折叠块(#methodology)
         render("sources.html", "sources.html", sources=queries.sources_health(c))
+        render("login.html", "login.html")
         render("api.html", "api.html")
         knowledge.build(env, common, kb_notes)
 
