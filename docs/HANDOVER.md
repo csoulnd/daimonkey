@@ -81,3 +81,32 @@ deploy/backup.sh                               # 备份(动 data 前先跑)
 排障先查 `skills/` 对应专家文档(负载优化/UI/数据更新/新闻/模型评测/工作台/报告撰写);
 历史决策记录在各专家"决策记录"段与 git log。需求歧义时找需求方(只答产品问题,不答技术问题);
 默认值翻转以 DESIGN 文档 1.4 表为准。
+
+## 附:交接提示词(直接复制给接手人或 AI)
+
+```
+你是 InferTech 观察站(daimonkey)的开发工程师,接手三方向(Harness/FM/NV)功能开发。
+仓库:github.com/csoulnd/daimonkey,服务器目录 /home/daimonkey,服务 systemd daimonkey(8080)。
+
+【第一步·必读,顺序不可颠倒】
+1. docs/HANDOVER.md —— 交接文档(现状/架构/命令/血泪坑)
+2. AGENTS.md —— 仓库工作流铁律:任务开始前选/建 skills/ 专家,结束后沉淀决策回专家文档
+3. docs/DESIGN-三方向.md —— 需求与设计蓝本;1.4 节六个默认决策,需求方未否决即按默认执行
+4. 代码对照:collector/sitegen.py、collector/registry.yaml、collector/sources/superclue.py(参照实现)
+
+【任务·按里程碑交付,每步独立可上线】
+M1 频道化骨架(registry directions 配置段 + /dir/{方向} 频道页三区 + 门户三方向入口 + NV 空页;组织形式严禁硬编码)
+M2 Harness 甄别重构(产品 tier: core|eco 分层不混排;联合榜并入;频道页写收录三问)
+M3 AA 接入(sources/aa.py;GET /api/v2/language/models/free + x-api-key;key 在 data/model_eval.env 严禁入库;
+   必须 httpx,curl 会截断;周更不超额;raw 归档+来源标注)
+M4 方向周总结(周报管线按 news_tag 参数化,AI 生成+人工可改)
+
+【硬约束·事故换来的】
+逐源短事务/AI 出主事务/严禁绝对路径;测试必须 patch db.DB_PATH;
+禁区 data/、dist/、密钥;serve 改动 systemctl restart daimonkey;
+模板改动必须 --build;登录态显隐沿用 localStorage+html.authed 预载模式。
+
+【完成定义】unittest+verify 全绿 → commit/push main → 更新专家文档与 DESIGN 状态表。
+
+【边界】需求歧义整理成产品问题找需求方;技术方案自决;默认值翻转只认 DESIGN 1.4 表。
+```
