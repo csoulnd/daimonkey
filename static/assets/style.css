@@ -1031,6 +1031,27 @@ html.authed .tree a.auth-only { display: flex !important; }
 .obs-fold summary:hover { color: var(--ink); }
 .obs-fold .tbl { margin-top: 10px; }
 
+/* ---- 三方向频道(配置驱动:新闻/榜单/每周总结三区) ---- */
+.dir-section { margin-top: 34px; }
+.dir-section > .sec-head { margin-bottom: 12px; }
+.dir-section > .sec-head h2 { margin: 0; }
+.dir-board { margin-top: 12px; }
+.dir-board .sec-head { margin-bottom: 6px; }
+.dir-board .sec-head h3 { margin: 0; font-size: 1em; }
+.empty-state { border: 1px dashed var(--line); border-radius: var(--r-m);
+  padding: 18px 20px; color: var(--dim); background: var(--panel); }
+.planned-box { margin-top: 16px; border: 1px solid var(--line); border-radius: var(--r-m);
+  background: var(--panel); padding: 14px 18px; }
+.planned-box h3 { font-size: 0.95em; margin: 0 0 10px; }
+.planned-list { list-style: none; margin: 0; padding: 0; display: flex;
+  flex-direction: column; gap: 8px; }
+.planned-list li { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.planned-list .dim { flex: 1; min-width: 160px; }
+.dir-inclusion { margin-top: 8px; }
+.dir-inclusion-body { padding: 8px 0 2px; }
+.dir-questions { margin: 6px 0 10px; padding-left: 22px; color: var(--ink); }
+.dir-questions li { margin: 4px 0; }
+
 /* ---- 账号区防闪烁兜底:已登录态绝不显示登录按钮 ---- */
 html.authed #nav-login { display: none; }
 

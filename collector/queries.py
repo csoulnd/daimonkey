@@ -249,6 +249,56 @@ def news_recent(c, limit: int = 60) -> list[dict]:
     return _attach_products(c, rows)
 
 
+def _category_filter(categories: list[str] | None) -> tuple[str, list[str]]:
+    cats = [str(x) for x in (categories or []) if x]
+    if not cats:
+        return "0", []
+    return ",".join("?" * len(cats)), cats
+
+
+def news_for_categories(c, categories: list[str] | None,
+                        limit: int = 12) -> list[dict]:
+    """方向频道新闻流：按 news_categories 过滤；空配置返回空列表（NV 空页）。"""
+    clause, params = _category_filter(categories)
+    if not params:
+        return []
+    rows = c.execute(
+        "SELECT * FROM news_items WHERE category IN (" + clause + ")"
+        " ORDER BY COALESCE(published_at, fetched_at) DESC LIMIT ?",
+        (*params, limit)).fetchall()
+    return _attach_products(c, rows)
+
+
+def news_count_for_categories(c, categories: list[str] | None) -> int:
+    clause, params = _category_filter(categories)
+    if not params:
+        return 0
+    return c.execute(
+        "SELECT COUNT(*) n FROM news_items WHERE category IN (" + clause + ")",
+        params).fetchone()["n"]
+
+
+def latest_direction_digest(c, direction_tag: str) -> dict | None:
+    """方向每周总结：已发布的 AI 产物，优先当周，回退最近一期。"""
+    from datetime import datetime, timezone
+    from . import news as newslib
+    tag = f"%direction:{direction_tag}%"
+    row = c.execute(
+        "SELECT summary, published_at, created_at FROM insights"
+        " WHERE llm_generated = 1 AND status = 'published' AND tags LIKE ?"
+        " ORDER BY published_at DESC, id DESC LIMIT 1", (tag,)).fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    d["week"] = d.get("published_at")
+    if d.get("week"):
+        start, end = newslib.week_range(d["week"])
+        d["week_start"], d["week_end"] = start, end
+    current = newslib.week_key(datetime.now(timezone.utc).isoformat())
+    d["current"] = d.get("week") == current
+    return d
+
+
 def news_by_product(c, limit_per_product: int = 8) -> dict[int, list[dict]]:
     """产品页「相关新闻」索引：{product_id: [item...]}，全量在内存分组。"""
     rows = c.execute("SELECT * FROM news_items"

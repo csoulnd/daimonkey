@@ -1,0 +1,20 @@
+{% import "_macros.html" as m %}
+<table class="tbl">
+  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th><th>动量分</th><th>覆盖率</th>
+  {% for mk in blk.top_metrics %}<th>{{ metric_names.get(mk, mk) }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for it in blk.rows %}
+  <tr>
+    <td class="rank{% if it.rank <= 3 %} top{% endif %}">{{ it.rank }}</td>
+    <td class="pname"><a href="/product/{{ it.slug }}">{{ it.name }}</a><span class="vendor">{{ it.vendor }}</span></td>
+    <td>{{ m.score(it.heat_score, 'heat', bar=True) }}</td>
+    <td>{{ m.delta(it.delta_7d) }}</td>
+    <td>{{ m.score(it.momentum_score, 'mom') }}</td>
+    <td>{{ m.cov(it.coverage) }}</td>
+    {% for mk in blk.top_metrics %}{% set mm = it.metrics.get(mk) %}
+    <td>{% if mm %}{{ m.mval(mm) }}{% else %}<span class="dim">—</span>{% endif %}</td>
+    {% endfor %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>

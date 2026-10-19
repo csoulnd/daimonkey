@@ -62,6 +62,12 @@ def password_valid(supplied: str) -> bool:
     actual = hashlib.sha256(supplied.encode("utf-8")).hexdigest()
     return bool(supplied) and secrets.compare_digest(actual, expected)
 
+# 旧信息架构 -> 三方向频道（301 永久跳转，保留外链与书签）
+LEGACY_REDIRECTS = {
+    "/rankings": "/dir/harness",
+    "/rankings/unified": "/dir/harness",
+}
+
 CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
     ".json": "application/json; charset=utf-8",
@@ -380,6 +386,23 @@ class Handler(BaseHTTPRequestHandler):
                     return user
         return None
 
+    def _redirect(self, location: str) -> None:
+        """旧路由 301 跳转；响应体仅作无 Location 支持时的兜底。"""
+        body = (f'<!doctype html><meta charset="utf-8">'
+                f'<meta http-equiv="refresh" content="0;url={location}">'
+                f'<a href="{location}">{location}</a>').encode("utf-8")
+        self.send_response(301)
+        self.send_header("Location", location)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "public, max-age=3600")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            try:
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
     def _file(self, path: str) -> None:
         rel = unquote(path).lstrip("/") or "index.html"
         if rel.endswith("/"):
@@ -440,6 +463,10 @@ class Handler(BaseHTTPRequestHandler):
             if not self._admit():
                 return
             path = urlparse(self.path).path
+            target = LEGACY_REDIRECTS.get(path)
+            if target:
+                self._redirect(target)
+                return
             if path == "/api/v1/knowledge/search":
                 if not self._assistant_user():
                     self._json({"error": "知识库内容登录后可见"}, 401)

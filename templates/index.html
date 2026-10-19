@@ -18,20 +18,26 @@
 {{ m.ai_summary_card(ai_home) }}
 
 <div class="portal">
-  <a class="pcard" href="/rankings/model">
-    <div class="pcard-head"><h2>模型评测</h2><span class="dim">中文基准 · 月更</span></div>
+  {% for d in direction_cards %}
+  <a class="pcard" href="{{ d.href }}">
+    <div class="pcard-head"><h2>{{ d.name }} <span class="dim">{{ d.short }}</span></h2><span class="dim">{{ d.tagline }}</span></div>
+    {% if d.placeholder %}
+    <p class="dim">{{ d.placeholder_note }}</p>
+    {% if d.planned_sources %}
+    <ul class="plist links">
+      {% for s in d.planned_sources %}<li>{{ s.name }} <span class="dim">· {{ s.status }}</span></li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% elif d.top %}
     <ol class="plist">
-      {% for it in model_top %}<li><span class="pname">{{ it.name }}</span><span class="score heat">{{ '%.1f' | format(it.heat_score) }}</span></li>{% endfor %}
+      {% for it in d.top %}<li><span class="pname">{{ it.name }}</span><span class="score heat">{{ '%.1f' | format(it.final_score or it.heat_score) }}</span></li>{% endfor %}
     </ol>
-    <span class="pcard-more">查看完整榜单 →</span>
+    {% else %}
+    <p class="dim">榜单数据接入中。</p>
+    {% endif %}
+    <span class="pcard-more">进入{{ d.name }}频道{% if d.news_count %} · 方向资讯 {{ d.news_count }} 条{% endif %} →</span>
   </a>
-  <a class="pcard" href="/rankings/unified">
-    <div class="pcard-head"><h2>智能体热度</h2><span class="dim">多源数据 · 手动更新</span></div>
-    <ol class="plist">
-      {% for it in unified[:5] %}<li><span class="pname">{{ it.name }}</span><span class="score heat">{{ '%.1f' | format(it.final_score or it.heat_score) }}</span></li>{% endfor %}
-    </ol>
-    <span class="pcard-more">查看完整榜单 →</span>
-  </a>
+  {% endfor %}
   <a class="pcard" href="/news">
     <div class="pcard-head"><h2>AI 资讯</h2><span class="dim">持续聚合</span></div>
     <ul class="plist news">
@@ -53,6 +59,7 @@
 <details id="methodology" class="method-fold">
   <summary>评分说明</summary>
   <div class="method-body dim">
+    <p><strong>三方向频道</strong>:智能体、模型、硬件三个方向各自提供新闻流、榜单与每周总结;方向顺序、关联榜单与新闻范围全部由配置定义,可按讨论演进调整。</p>
     <p><strong>智能体热度</strong>:汇总 GitHub、npm、PyPI、应用商店等公开数据,按占比算出热度与动量两项;再由 AI 复评各打一次分,两部分按比例合成最终排名。长期未更新的产品不展示。</p>
     <p><strong>模型评测</strong>:采用 SuperCLUE 中文大模型月度报告(数学/科学/代码/智能体/指令/幻觉六大任务),原始报告存档可查,同样叠加 AI 复评。</p>
     <p>覆盖率不足的产品放入观察区,不参与排名,避免数据少被误判为热度低。</p>

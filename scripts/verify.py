@@ -15,6 +15,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -23,8 +24,9 @@ sys.path.insert(0, str(ROOT))
 
 CHECKS: list[tuple[str, bool]] = []
 
-# 部署防回归：允许保留这条历史问题记录（其中出现旧路径示例）
-HARDCODE_ALLOW = {"docs/PLAN-deploy.md"}
+# 部署防回归例外：这两份文档分别记录历史问题示例与当前服务器交接信息，
+# 属于说明性文本，不参与运行路径解析。
+HARDCODE_ALLOW = {"docs/PLAN-deploy.md", "docs/HANDOVER.md"}
 # 拆开拼接，避免本文件自身命中检查
 HARDCODE_NEEDLE = "/home/" + "daimonkey"
 TEXT_SUFFIXES = {".py", ".sh", ".md", ".html", ".js", ".cjs", ".css",
@@ -122,7 +124,8 @@ def main() -> int:
     base = args.base.rstrip("/")
 
     print("== 1. 页面与 API 可访问性 ==")
-    paths = ["/", "/rankings/unified", "/rankings/coding", "/product/claude-code",
+    paths = ["/", "/dir/harness", "/dir/fm", "/dir/nv",
+             "/rankings/unified", "/rankings/coding", "/product/claude-code",
              "/sources", "/api.html", "/news",
              "/api/v1/boards.json", "/api/v1/rankings/unified.json",
              "/api/v1/meta.json", "/api/v1/news.json"]
@@ -161,19 +164,54 @@ def main() -> int:
 
     print("== 2. 页面关键结构 ==")
     home = page(base + "/")
-    uni = page(base + "/rankings/unified")
-    for name, pat in [
-        ("更新按钮", r'id="btn-update"'), ("数据截至时间", r'id="asof"'),
-        ("来源标签", r'class="src-tag s-'), ("覆盖率条", r'class="cov"'),
-        ("榜单徽章", r'class="badge b-'), ("热度/动量切换", r'data-view="mom"'),
+    uni = page(base + "/dir/harness")
+    model_page = page(base + "/rankings/model")
+    for name, pat, html in [
+        ("更新按钮", r'id="btn-update"', home),
+        ("数据截至时间", r'id="asof"', home),
+        ("来源标签", r'class="src-tag s-', uni),
+        ("覆盖率条", r'class="cov"', uni),
+        ("榜单徽章", r'class="badge b-', uni),
+        ("热度/动量切换", r'data-view="mom"', model_page),
     ]:
-        check(name, bool(re.search(pat, uni if name != "更新按钮" and name != "数据截至时间" else home)))
+        check(name, bool(re.search(pat, html)))
     meta = json.load(get(base + "/api/v1/meta.json"))
     check(f"数据新鲜度存在（截至 {meta.get('last_collected_at')}）",
           bool(meta.get("last_collected_at")))
 
+    print("== 2b. 三方向频道结构 ==")
+    for key in ("harness", "fm", "nv"):
+        html = page(base + f"/dir/{key}")
+        for label, pat in [
+            ("方向新闻区", r'id="dir-news"'),
+            ("方向榜单区", r'id="dir-boards"'),
+            ("每周总结区", r'id="dir-digest"'),
+        ]:
+            check(f"/dir/{key} {label}", bool(re.search(pat, html)))
+    nv = page(base + "/dir/nv")
+    check("NV 建设中说明", "建设中" in nv)
+    check("NV 规划数据源清单", "规划中的数据源" in nv and "MLPerf" in nv)
+    check("导航三方向入口", all(f'href="/dir/{k}"' in home
+                                for k in ("harness", "fm", "nv")))
+
+    print("== 2c. 旧路由 301 ==")
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+    opener = urllib.request.build_opener(_NoRedirect)
+    try:
+        opener.open(base + "/rankings/unified", timeout=10)
+        code, location = 200, None
+    except urllib.error.HTTPError as e:
+        code, location = e.code, e.headers.get("Location")
+    check("/rankings/unified -> 301 /dir/harness",
+          code == 301 and location == "/dir/harness")
+
     print(f"== 3. 两跳溯源抽查（{args.n} 个随机数字） ==")
-    ids = sorted(set(int(m) for m in re.findall(r'href="/raw/(\d+)"', uni)))
+    # 只抽榜单指标单元格的溯源链接(mval 宏),新闻条目的 raw 不带提取指标,
+    # 不属于“数字两跳溯源”的检查对象。
+    ids = sorted(set(int(m) for m in re.findall(
+        r'class="sv-v" href="/raw/(\d+)"', uni)))
     sample = random.sample(ids, min(args.n, len(ids))) if ids else []
     check(f"榜单页含溯源链接（{len(ids)} 个）", len(ids) > 0)
     full = 0

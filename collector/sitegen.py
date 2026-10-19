@@ -128,10 +128,22 @@ def build() -> None:
                   for b in order if b in snaps}
         bobs = {b: queries.observation_items(c, b, snaps[b], latest, products)
                 for b in order if b in snaps}
+        # 产品当前名次（主榜口径），新闻条目与频道页共用
+        rank_of: dict[str, dict] = {}
+        for b in order:
+            for it in bitems.get(b, []):
+                rank_of.setdefault(it["slug"], {
+                    "board": it["board"], "rank": it["rank"], "name": it["name"]})
+        directions = [{"key": k, **v} for k, v in reg.get("directions", {}).items()]
 
         common = {
             "site": reg["site"],
             "meta": meta,
+            "directions": directions,
+            "nav_directions": [
+                {"key": d["key"], "name": d["name"],
+                 "icon": d.get("icon", "i-index"), "href": f"/dir/{d['key']}"}
+                for d in directions],
             "board_names": {k: v["name"] for k, v in reg["boards"].items()},
             "metric_names": METRIC_NAMES,
             "nav_boards": [{"key": b, "name": reg["boards"][b]["name"]}
@@ -168,9 +180,47 @@ def build() -> None:
         ai_weight = float(ai_mod.cfg()["scoring"].get("ai_weight", 0.0))
         unified_display = _unified_display(bitems.get("unified", []), ai_weight)
         model_items = bitems.get("model", [])
+
+        # ---- 三方向频道页（三区固定：新闻流 / 榜单 / 每周总结）----
+        def direction_block(bkey: str) -> dict:
+            rows = bitems.get(bkey, [])
+            if bkey == "unified":
+                rows = _unified_display(rows, ai_weight)
+            return {
+                "key": bkey,
+                "name": reg["boards"].get(bkey, {}).get("name", bkey),
+                "rows": rows[:10],
+                "obs": len(bobs.get(bkey, [])),
+                "snapshot_date": snaps.get(bkey),
+                "folded": bool(reg["boards"].get(bkey, {}).get("folded")),
+                "top_metrics": _top_metrics(bkey, reg),
+            }
+
+        direction_cards = []
+        for d in directions:
+            blocks = [direction_block(b) for b in (d.get("boards") or [])]
+            cats = d.get("news_categories") or []
+            render("direction.html", f"dir/{d['key']}.html",
+                   direction=d, direction_page=True,
+                   board_blocks=blocks,
+                   direction_news=queries.news_for_categories(c, cats, 12),
+                   direction_digest=queries.latest_direction_digest(c, d["news_tag"]),
+                   news_rank=rank_of)
+            direction_cards.append({
+                "key": d["key"], "name": d["name"], "short": d.get("short", ""),
+                "icon": d.get("icon", "i-index"), "tagline": d.get("tagline", ""),
+                "href": f"/dir/{d['key']}",
+                "top": blocks[0]["rows"][:5] if blocks else [],
+                "news_count": queries.news_count_for_categories(c, cats),
+                "placeholder": bool(d.get("placeholder")),
+                "placeholder_note": d.get("placeholder_note", ""),
+                "planned_sources": d.get("planned_sources") or [],
+            })
+
         render("index.html", "index.html",
                unified=unified_display,
                model_top=model_items[:5],
+               direction_cards=direction_cards,
                latest_news=queries.news_recent(c, 6),
                ai_board=ai_mod.summary_of(c, "board"),
                ai_weight_pct=round(ai_weight * 100),
@@ -256,12 +306,6 @@ def build() -> None:
         # ---- AI Agent 新闻（第三入口 /news + 每周 digest）----
         nmeta = queries.news_meta(c)
         ncfg = reg.get("news", {})
-        # 产品当前名次（主榜口径），用于新闻条目上的产品徽章
-        rank_of: dict[str, dict] = {}
-        for b in order:
-            for it in bitems.get(b, []):
-                rank_of.setdefault(it["slug"], {
-                    "board": it["board"], "rank": it["rank"], "name": it["name"]})
         render("news.html", "news.html", news_page=True, news_meta=nmeta,
                news_items=queries.news_recent(c, 60), news_rank=rank_of,
                news_stale=_is_stale(nmeta.get("last_fetched_at")),

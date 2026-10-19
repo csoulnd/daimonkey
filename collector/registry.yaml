@@ -13,6 +13,49 @@ methodology:
   version: v1.6                # v1.6: 新增模型评测榜(SuperCLUE 月报口径,overlay 不并入联合榜);v1.5: 联合榜=算法70%+AI复评30%、前10、剔停滞
   observation_threshold: 0.5    # 加权覆盖率低于该值的产品进观察区，不参与排名
 
+# =============================================================================
+# 三方向频道（信息架构的唯一来源；顺序即门户与侧栏顺序）
+# 方向=频道，每个频道固定「新闻流 + 榜单 + 每周总结」三区。
+# 增删方向/调整板块只改这里，模板不硬编码任何方向名或板块。
+#   news_tag        每周总结的分组标识（insights.tags 写 direction:<news_tag>）
+#   news_categories 该方向新闻流包含的 news_items.category（空=暂无新闻，显示空态）
+#   placeholder     true=方向建设中：渲染说明与 planned_sources 清单，板块显示空态
+# =============================================================================
+directions:
+  harness:
+    name: 智能体
+    short: Harness
+    icon: i-index
+    tagline: 多源热度 · 手动更新
+    description: 关注能自主执行、多步编排的智能体产品；核心产品与生态项目分层展示，不混排。
+    boards: [unified]
+    news_tag: harness
+    news_categories: [coding, framework]
+  fm:
+    name: 模型
+    short: FM
+    icon: i-method
+    tagline: SuperCLUE 中文基准 · 月更
+    description: 跟踪主流大模型的能力评测与官方入口，以可溯源的公开基准为准。
+    boards: [model]
+    news_tag: fm
+    news_categories: [models, research]
+  nv:
+    name: 硬件
+    short: NV
+    icon: i-chip
+    tagline: 方向建设中
+    description: 推理硬件与算力基础设施方向，以空页起步，数据源接入后逐项填充。
+    boards: []
+    news_tag: nv
+    news_categories: []
+    placeholder: true
+    placeholder_note: 硬件方向以空页起步，新闻/榜单/每周总结三件套骨架已就位；以下数据源接入后逐项填充。
+    planned_sources:
+      - {name: MLPerf, note: 训练与推理性能基准, status: 接入中}
+      - {name: 厂商官方规格, note: GPU/加速卡与整机规格, status: 规划中}
+      - {name: 云厂商价格页, note: 按需/预留实例价格, status: 规划中}
+
 # ---- 历史数据 LRU 保留窗口（天）。0 = 永久保留。每次更新后执行清理 ----
 retention:
   raw_body_days: 30        # 原始响应体文件（体积大头）：到期删文件、保留元数据行与 sha256
