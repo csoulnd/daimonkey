@@ -301,6 +301,29 @@ def ensure_ai_tables(c) -> None:
     c.executescript(AI_DDL)
 
 
+# 云剪贴板（工作台：两设备间文本同步 + 小云盘），与 NEWS/ASSISTANT 同一附加式迁移模式。
+# owner 存用户名（同 assistant_sessions.owner）；file_path 存相对 DATA_DIR 的 posix 路径。
+CLIPBOARD_DDL = """
+CREATE TABLE IF NOT EXISTS clipboard_items (
+    id              INTEGER PRIMARY KEY,
+    owner           TEXT NOT NULL,
+    kind            TEXT NOT NULL,           -- text | file
+    content         TEXT,                    -- kind=text 时的文本内容
+    file_name       TEXT,                    -- kind=file 时的原始文件名（展示用）
+    file_path       TEXT,                    -- kind=file 时相对 DATA_DIR 的 posix 路径
+    file_bytes      INTEGER,                 -- kind=file 时的字节数（配额统计用）
+    content_type    TEXT,                    -- kind=file 时的 MIME（下载回放）
+    created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_clipboard_owner ON clipboard_items(owner, id DESC);
+"""
+
+
+def ensure_clipboard_tables(c) -> None:
+    """云剪贴板上线 / serve 启动时调用，旧库在线补表。"""
+    c.executescript(CLIPBOARD_DDL)
+
+
 def conn() -> sqlite3.Connection:
     c = sqlite3.connect(DB_PATH)
     c.row_factory = sqlite3.Row
@@ -316,6 +339,7 @@ def init_db() -> None:
         ensure_news_tables(c)
         ensure_assistant_tables(c)
         ensure_ai_tables(c)
+        ensure_clipboard_tables(c)
 
 
 def sha256_hex(data: bytes) -> str:
