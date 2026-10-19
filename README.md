@@ -6,10 +6,11 @@
 
 | 板块 | 入口 | 说明 |
 |---|---|---|
-| 门户主页 | `/` | 各板块 TOP 汇总,一屏看全站 |
-| 模型评测 | `/rankings/model` | SuperCLUE 中文基准(月更),API 与开源一起排、开源另有分榜,链接 ModelScope/官网,叠加 AI 复评 |
-| 智能体热度 | `/rankings/unified` | GitHub/npm/PyPI/应用商店等多源数据 + AI 复评的融合排名 |
-| AI 资讯 | `/news` | 公开渠道聚合,提到榜上产品自动关联,每周周报 |
+| 门户主页 | `/` | 三方向入口 + 各板块 TOP 汇总 |
+| 智能体(Harness) | `/dir/harness` | 核心产品榜+生态项目榜分层不混排;新闻与方向周总结 |
+| 模型(FM) | `/dir/fm` | Artificial Analysis(海外智能指数)+ SuperCLUE(中文)双口径;新闻与方向周总结 |
+| 硬件(NV) | `/dir/nv` | 占位页(规划中:MLPerf/规格/云定价),后续逐步填充 |
+| AI 资讯 | `/news` | 全站公开渠道聚合,提到榜上产品自动关联,每周周报 |
 | 个人工作台 | 登录后侧栏 | 报告厅(`/reports`)、个人知识库(`/knowledge`,每个账号可配自己的 GitHub 仓库)、全站悬浮智能助手 |
 
 匿名可浏览公开板块;工作台内容登录后可见。
@@ -39,7 +40,7 @@ python3 -m venv .venv
 .venv/bin/python scripts/serve.py --host 0.0.0.0   # http://<IP>:8080
 ```
 
-无任何自动调度:全站手动更新(页面「⟳ 更新」按钮或 CLI),页面显著展示数据截至时间。对外访问需在云安全组放行 TCP 8080。
+无任何自动调度:全站手动更新(页面「⟳ 更新」按钮或 CLI),页面显著展示数据截至时间。对外访问需在云安全组放行 TCP 8080。绑定域名与 HTTPS 见 **[docs/domain-and-https.md](docs/domain-and-https.md)**。
 
 ## 账号与权限
 

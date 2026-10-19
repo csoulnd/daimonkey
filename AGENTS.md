@@ -39,6 +39,7 @@ InferTech 观察站(原智能体热度指数):以推理技术为重心,采集 Ag
 | 产品展示专家 | [skills/product-showcase/SKILL.md](skills/product-showcase/SKILL.md) | showcase 报告引擎与模板 |
 | 报告撰写专家 | [skills/report-writing/SKILL.md](skills/report-writing/SKILL.md) | 报告厅内容撰写与登记 |
 | 模型评测专家 | [skills/model-eval/SKILL.md](skills/model-eval/SKILL.md) | 模型 benchmark 榜单:数据源接入/评分设计/官方链接 |
+| 三方向频道专家 | [skills/directions/SKILL.md](skills/directions/SKILL.md) | 方向频道页/registry directions/门户入口/Harness 收录分层/方向周总结 |
 | 个人工作台专家 | [skills/workspace/SKILL.md](skills/workspace/SKILL.md) | 工作台分区/用户隔离/自配知识库仓库 |
 | 部署交付专家 | [skills/deployment/SKILL.md](skills/deployment/SKILL.md) | 新机安装、换机/迁移、备份恢复、systemd 托管、依赖版本与部署自检 |
 

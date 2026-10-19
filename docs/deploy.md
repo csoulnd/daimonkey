@@ -24,6 +24,8 @@ status: active
 | AI 密钥 | 可选 | `data/assistant.env` 内的 `DEEPSEEK_API_KEY`；缺失时助手/AI 复评降级 |
 | systemd | 建议可用 | bootstrap 安装并 `enable --now`；容器内无 systemd 时用 `--no-service` 手动起 |
 
+> 绑定正式域名、ICP 备案、DNS 解析与 Nginx/HTTPS 改造见 **[domain-and-https.md](domain-and-https.md)**。大陆 BCC 需先完成 ICP 备案，再将域名解析到公网 IP。
+
 ## 2. 首次安装（全新服务器）
 
 ```bash
