@@ -5,10 +5,12 @@
 {% block content %}
 <div class="sec-head">
   <h1>{{ name }}{% if board == 'harness_core' %} <span class="pill">核心产品</span>{% elif board == 'harness_eco' %} <span class="pill">生态项目</span>{% endif %}</h1>
+  {% if board != 'model' %}
   <div class="view-toggle">
     <button class="tg active" data-view="heat" type="button">热度视图</button>
     <button class="tg" data-view="mom" type="button">动量视图</button>
   </div>
+  {% endif %}
 </div>
 <p class="dim">数据截至 {{ snapshot_date }} · <a href="/#methodology">评分说明</a></p>
 
@@ -29,7 +31,7 @@
     <span class="vendor">{{ it.vendor }}</span></td>
   <td>{{ m.score(it.heat_score, 'heat', bar=True) }}</td>
   <td>{{ m.delta(it.delta_7d) }}</td>
-  <td>{{ m.score(it.momentum_score, 'mom') }}</td>
+  {% if board != 'model' %}<td>{{ m.score(it.momentum_score, 'mom') }}</td>{% endif %}
   <td>{{ m.cov(it.coverage) }}</td>
   <td>{{ m.ai_cell(it) }}</td>
   {% for mk in top_metrics %}{% set mm = it.metrics.get(mk) %}
@@ -40,54 +42,19 @@
 {%- endmacro %}
 
 <table class="tbl" id="tbl-heat">
-  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th><th>动量分</th><th>覆盖率</th><th>AI</th>
+  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th>{% if board != 'model' %}<th>动量分</th>{% endif %}<th>覆盖率</th><th>AI</th>
   {% for mk in top_metrics %}<th>{{ metric_names.get(mk, mk) }}</th>{% endfor %}</tr></thead>
   <tbody>{{ rows(items) }}</tbody>
 </table>
 <table class="tbl hidden" id="tbl-mom">
-  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th><th>动量分</th><th>覆盖率</th><th>AI</th>
+  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th>{% if board != 'model' %}<th>动量分</th>{% endif %}<th>覆盖率</th><th>AI</th>
   {% for mk in top_metrics %}<th>{{ metric_names.get(mk, mk) }}</th>{% endfor %}</tr></thead>
   <tbody>{{ rows(momentum_items) }}</tbody>
 </table>
-<p class="dim">可切换按"热度"或"近期增长"排序;AI 列为 AI 复评(悬停查看理由)。</p>
+{% if board != 'model' %}<p class="dim">可切换按"热度"或"近期增长"排序;AI 列为 AI 复评(悬停查看理由)。</p>{% endif %}
 
 {% if board == 'model' %}
-<section class="duo" style="margin-top:26px">
-  <div class="blk">
-    <div class="sec-head"><h2>开源权重分榜</h2><span class="dim">同一评测,只看开放权重模型</span></div>
-    <table class="tbl">
-      <thead><tr><th>#</th><th>模型</th><th>总分</th><th>AI</th></tr></thead>
-      <tbody>
-      {% for it in open_items %}
-      <tr>
-        <td class="rank">{{ loop.index }}</td>
-        <td class="pname"><a href="/product/{{ it.slug }}">{{ it.name }}</a><span class="vendor">{{ it.vendor }}</span></td>
-        <td>{{ m.score(it.heat_score, 'heat') }}</td>
-        <td>{{ m.ai_cell(it) }}</td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="blk">
-    <div class="sec-head"><h2>官方入口</h2><span class="dim">ModelScope / 官网</span></div>
-    <table class="tbl">
-      <thead><tr><th>模型</th><th>链接</th></tr></thead>
-      <tbody>
-      {% for slug, links in model_links.items() %}
-      <tr>
-        <td class="pname"><a href="/product/{{ slug }}">{{ items | selectattr('slug', 'equalto', slug) | map(attribute='name') | join(', ') or slug }}</a></td>
-        <td>
-          {% if links.modelscope %}<a class="chip" href="{{ links.modelscope }}">ModelScope</a> {% endif %}
-          {% if links.official %}<a class="chip" href="{{ links.official }}">官网</a>{% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
-<p class="dim">数据来自两套并列口径：SuperCLUE 中文大模型月度报告(六项任务综合，月更)与 Artificial Analysis 免费 API 指数(智能/编码/智能体，周缓存)。两套口径各自标注来源，不合成单一分；每格数值可点入原始响应。</p>
+<p class="dim">按 Artificial Analysis Intelligence Index 总评分排序（同系列取最高分版本，前 40 自动入池）；编码/智能体指数仅作参考列，不参与排序。旧中文月报口径已停用，历史数据仅存档；每格数值可点入原始响应。</p>
 {% endif %}
 
 {% if observation %}

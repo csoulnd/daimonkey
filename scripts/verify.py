@@ -178,13 +178,14 @@ def main() -> int:
     home = page(base + "/")
     uni = page(base + "/dir/harness")
     model_page = page(base + "/rankings/model")
+    harness_page = page(base + "/rankings/harness_core")
     for name, pat, html in [
         ("更新按钮", r'id="btn-update"', home),
         ("数据截至时间", r'id="asof"', home),
         ("来源标签", r'class="src-tag s-', uni),
         ("覆盖率条", r'class="cov"', uni),
         ("榜单徽章", r'class="badge b-', uni),
-        ("热度/动量切换", r'data-view="mom"', model_page),
+        ("热度/动量切换", r'data-view="mom"', harness_page),
     ]:
         check(name, bool(re.search(pat, html)))
     meta = json.load(get(base + "/api/v1/meta.json"))
@@ -229,12 +230,17 @@ def main() -> int:
     except Exception as e:
         check(f"Harness 分层 API 解析 ({e})", False)
 
-    print("== 2e. FM 双口径(SuperCLUE + AA) ==")
+    print("== 2e. FM 总评分(AA) ==")
     try:
         model = json.load(get(base + "/api/v1/rankings/model.json"))
         aa_items = [it for it in model["items"]
                     if it["metrics"].get("aa_intelligence")]
-        check(f"模型榜含 AA 指数列（{len(aa_items)} 个）", len(aa_items) > 0)
+        check(f"模型榜按 AA 总评分入池（{len(aa_items)} 个）", len(aa_items) >= 20)
+        check("模型榜成员均为 AA 自动入池",
+              aa_items and all(it.get("origin") == "aa" and it.get("status") == "active"
+                               for it in model["items"]))
+        check("模型榜 heat 口径为 AA 总评分",
+              model["meta"].get("weights", {}).get("heat") == {"aa_intelligence": 1.0})
         check("AA 数值带来源与溯源",
               aa_items and all(it["metrics"]["aa_intelligence"].get("raw_payload_id")
                                and it["metrics"]["aa_intelligence"]["source"]["key"] == "aa"
@@ -242,6 +248,9 @@ def main() -> int:
         check("模型榜页 AA 列与来源标注",
               "AA 智能指数" in model_page and "src-tag s-aa" in model_page
               and "Artificial Analysis" in model_page)
+        check("模型榜不再展示 SuperCLUE 列",
+              "SuperCLUE 总分" not in model_page
+              and "src-tag s-superclue" not in model_page)
         if aa_items:
             rid = aa_items[0]["metrics"]["aa_intelligence"]["raw_payload_id"]
             raw = json.load(get(f"{base}/api/v1/raw/{rid}.json"))
@@ -251,8 +260,9 @@ def main() -> int:
         meta_src = {s["key"]: s for s in json.load(
             get(base + "/api/v1/meta.json"))["sources"]}
         check("AA 源健康可达", meta_src.get("aa", {}).get("reachable") == 1)
+        check("SuperCLUE 源已停用", meta_src.get("superclue", {}).get("enabled") == 0)
     except Exception as e:
-        check(f"AA 双口径检查 ({e})", False)
+        check(f"AA 总评分检查 ({e})", False)
 
     print("== 2f. 方向周总结与方向周报 ==")
     for key in ("harness", "fm"):

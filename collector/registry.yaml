@@ -10,7 +10,7 @@ site:
   lang: zh-CN
 
 methodology:
-  version: v1.7                # v1.7: Harness 核心/生态分层,联合榜并入核心榜;v1.6: 新增模型评测榜(SuperCLUE);v1.5: 算法70%+AI复评30%
+  version: v1.8                # v1.8: FM 榜改为 AA Intelligence Index 总评分口径(SuperCLUE 停用);v1.7: Harness 核心/生态分层;v1.6: 模型榜
   observation_threshold: 0.5    # 加权覆盖率低于该值的产品进观察区，不参与排名
 
 # =============================================================================
@@ -43,8 +43,8 @@ directions:
     name: 模型
     short: FM
     icon: i-method
-    tagline: SuperCLUE 中文 + AA 海外指数
-    description: 跟踪主流大模型的能力评测与官方入口；SuperCLUE 中文口径与 Artificial Analysis 海外指数并列展示，不合成单一分。
+    tagline: AA 总评分 · 周更
+    description: 以 Artificial Analysis Intelligence Index 总评分为准，自动收录当前主流模型（同系列取最高分版本）；SuperCLUE 已停用，历史数据仅作存档。
     boards: [model]
     news_tag: fm
     news_categories: [models, research]
@@ -160,12 +160,14 @@ boards:
   model:
     name: 模型评测
     overlay: true               # 独立评测榜,不并入 Harness 核心榜
-    # 展示列:SuperCLUE 中文口径 + Artificial Analysis 海外指数并列,不合成单一分
-    display_metrics: [sc_total, aa_intelligence, aa_coding, aa_agentic]
+    # 2026-10-19 需求方决定：以 Artificial Analysis 总评分为准，SuperCLUE 停用。
+    # 成员由 AA 源自动同步（origin=aa、status=active，同系列去重取最高分版本，前 40）。
+    select: {origin: aa, status: active}
+    display_metrics: [aa_intelligence, aa_coding, aa_agentic]
     heat:
-      sc_total: 1.0
+      aa_intelligence: 1.0
     momentum:
-      sc_total: 1.0
+      aa_intelligence: 1.0
   # 分类源榜：仅用于派生核心榜、观察区与产品页溯源，不单独进导航/门户
   coding:
     name: 编码智能体（源榜）
@@ -242,20 +244,22 @@ board_aliases:
 sources:
   - key: superclue
     type: superclue
-    name: SuperCLUE 中文大模型月报
+    name: SuperCLUE 中文大模型月报（已停用）
     base_url: "https://www.cluebenchmarks.com/superclue_2509"
-    enabled: true
+    enabled: false
+    notes: 2026-10-19 需求方决定 FM 榜以 AA 总评分为准；本源停止采集，历史 raw 与 sc_* 指标保留可回查。
   - key: aa
     type: aa
     name: Artificial Analysis 模型指数
     base_url: "https://artificialanalysis.ai/api/v2/language/models/free"
     auth: required
-    rate_limit: 免费层 1000 次；源内七天上限缓存，首次/过期才拉 4 页（周更）
+    rate_limit: 免费层 1000 次；源内七天缓存，首次/过期才拉 4 页（周更）
     cache_days: 7
+    top_n: 40                     # 同系列去重后按 Intelligence Index 取前 N 自动入池
     enabled: true
     notes: >-
       AA_API_KEY 存 data/model_eval.env（600，严禁入库）；必须用 httpx（curl 在此线路会截断）。
-      指数 v4.3：intelligence/coding/agentic + 九域指数；与 SuperCLUE 中文口径并列展示，不合成单一分。
+      FM 榜唯一排名口径：Intelligence Index 总评分；模型池自动同步，SuperCLUE 已停用。
   - key: github
     name: GitHub REST API
     type: api

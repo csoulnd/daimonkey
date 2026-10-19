@@ -23,5 +23,6 @@
 |---|---|---|---|---|
 | 8 | M1 频道化骨架(registry directions + /dir/* 三区 + NV 空页 + 旧路由 301) | directions | ✅ `80c524f` | 137 tests;verify 58/58 |
 | 9 | M2 Harness 甄别重构(tier core/eco、核心/生态不混排、联合榜并入) | directions | ✅ `557d79c` | 144 tests;verify 69/69 |
-| 10 | M3 AA 接入(httpx、周缓存、raw 溯源、模型榜双口径) | model-eval | ✅ `d031ed4` | 153 tests;verify 74/74 |
+| 10 | M3 AA 接入(httpx、周缓存、raw 溯源) | model-eval | ✅ `d031ed4` | 153 tests;verify 74/74 |
 | 11 | M4 方向周总结(按 news_tag 参数化、AI 生成+人工可改) | directions+news-digest | ✅ 本次提交 | 167 tests;verify 83/83 |
+| 12 | M5 FM 切换 AA 总评分口径(需求方决定放弃 SuperCLUE) | model-eval | ✅ 本次提交 | 模型榜 40 个 AA 当前模型;168 tests;verify 83/83 |

@@ -252,6 +252,7 @@ def build() -> None:
                ai_weight_pct=round(ai_weight * 100),
                unified_total=len(bitems.get("harness_core", [])),
                eco_total=len(bitems.get("harness_eco", [])),
+               model_total=len(bitems.get("model", [])),
                kpi_sources=src_ok, kpi_sources_enabled=src_enabled,
                kpi_news_count=(nday["n"] if nday else 0),
                kpi_news_date=(nday["d"] if nday else "—"),
@@ -264,7 +265,7 @@ def build() -> None:
             if b == "harness_core":
                 items = _core_display(bitems[b], ai_weight)
             elif b == "model":
-                items = bitems[b][:20]
+                items = bitems[b]   # AA Top 40 全量展示
             else:
                 items = bitems[b][:15]   # 各赛道页统一前 15,页面长短一致
             mom = sorted((i for i in items if i["momentum_score"] is not None),
@@ -275,20 +276,8 @@ def build() -> None:
                        for h in hist}
             series = {it["name"]: [by_slug.get(d, {}).get(it["slug"]) for d in dates]
                       for it in items[:5]}
-            extra = {}
-            if b == "model":
-                reg_models = {p["slug"]: p for p in reg["products"]
-                              if p.get("category") == "model"}
-                extra = {
-                    "open_items": [it for it in items
-                                   if reg_models.get(it["slug"], {})
-                                   .get("open_weight")],
-                    "model_links": {p["slug"]: p.get("model_links", {})
-                                    for p in reg["products"]
-                                    if p.get("category") == "model"},
-                }
             render("rankings.html", f"rankings/{b}.html",
-                   board=b, name=reg["boards"][b]["name"], **extra,
+                   board=b, name=reg["boards"][b]["name"],
                    snapshot_date=snaps[b], items=items, momentum_items=mom,
                    observation=bobs[b], top_metrics=_top_metrics(b, reg),
                    history_chart=svgchart.multi_line_chart(dates, series))

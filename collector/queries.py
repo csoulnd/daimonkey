@@ -44,7 +44,8 @@ def board_items(c, board: str, snap_date: str, latest: dict) -> list[dict]:
     rows = c.execute(
         "SELECT r.product_id, r.rank, r.heat_score, r.momentum_score, r.delta_7d,"
         " r.delta_30d, r.coverage, p.slug, p.name, p.vendor, p.category,"
-        " p.tier, p.status, a.ai_score, a.rationale AS ai_rationale"
+        " p.tier, p.origin, p.aa_slug, p.status,"
+        " a.ai_score, a.rationale AS ai_rationale"
         " FROM rankings r JOIN products p ON p.id = r.product_id"
         " LEFT JOIN ai_scores a ON a.board = r.board"
         "  AND a.snapshot_date = r.snapshot_date AND a.product_id = r.product_id"
@@ -56,7 +57,8 @@ def board_items(c, board: str, snap_date: str, latest: dict) -> list[dict]:
         items.append({
             "rank": r["rank"], "slug": r["slug"], "name": r["name"],
             "vendor": r["vendor"], "category": r["category"],
-            "tier": r["tier"], "status": r["status"],
+            "tier": r["tier"], "origin": r["origin"],
+            "aa_slug": r["aa_slug"], "status": r["status"],
             "board": origin,
             "heat_score": r["heat_score"], "momentum_score": r["momentum_score"],
             "delta_7d": r["delta_7d"], "delta_30d": r["delta_30d"],

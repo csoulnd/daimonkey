@@ -17,6 +17,9 @@
 {% if p.vscode_ext_id %}VS Code <code>{{ p.vscode_ext_id }}</code>{% endif %}
 </p>
 {% if p.notes %}<p class="dim">{{ p.notes }}</p>{% endif %}
+{% if p.category == 'model' and p.status == 'archived' and p.origin != 'aa' %}
+<div class="note-box">该模型来自已停用的 SuperCLUE 中文月报历史数据，不再参与当前 AA 模型总榜；保留页面与原始指标仅供存档回查。</div>
+{% endif %}
 
 {% if p.latest_ranks %}
 <h2>最新排名</h2>

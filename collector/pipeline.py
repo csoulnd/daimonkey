@@ -8,7 +8,7 @@ import json
 import resource
 import traceback
 
-from . import ai, db, export, retention, scoring, sitegen
+from . import ai, db, export, queries, retention, scoring, sitegen
 from .config import DATA_DIR, LOG_DIR, ensure_dirs, now_iso, registry, today_utc
 from .http import Http
 from .sources import SOURCE_REGISTRY
@@ -62,7 +62,6 @@ def _collect_inner(only: set[str] | None, reg: dict, started: str) -> dict:
     ctx = Ctx(conn=None, http=http, source_ids=source_ids,
               products=products, now=started)
     enabled_keys = {s["key"] for s in reg["sources"] if s.get("enabled", True)}
-    board_of = {p["id"]: p["boards"][0] for p in products}
     total_metrics = 0
     ok = failed = 0
     notes: list[str] = []
@@ -76,6 +75,9 @@ def _collect_inner(only: set[str] | None, reg: dict, started: str) -> dict:
             ctx.conn = c
             try:
                 metrics, src_notes = cls().collect(ctx)
+                # AA 等源会在采集期新增产品，指标写库前重建 board 映射。
+                board_of = {p["id"]: (p.get("boards") or [p.get("category", "general")])[0]
+                            for p in ctx.products}
                 total_metrics += db.save_metrics(c, source_ids[cls.key],
                                                  board_of, metrics)
                 db.mark_source(c, cls.key, True)
@@ -89,8 +91,15 @@ def _collect_inner(only: set[str] | None, reg: dict, started: str) -> dict:
                 notes.extend(f"[{cls.key}] {n}" for n in src_notes)
 
     with db.conn() as c:
-        summary = (scoring.compute_all(c, products, today_utc())
-                   if only is None else {"skipped": "news-only run"})
+        if only is None:
+            # 评分对象 = registry 产品 + AA 自动入池产品；排除历史遗留的未登记产品。
+            registry_slugs = {p["slug"] for p in products}
+            scoring_products = [
+                p for p in queries.all_products(c)
+                if p["slug"] in registry_slugs or p.get("origin") == "aa"]
+            summary = scoring.compute_all(c, scoring_products, today_utc())
+        else:
+            summary = {"skipped": "news-only run"}
         ret_counts = retention.apply(c)
         peak_mb = round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1)
         status = "success" if failed == 0 else "partial"

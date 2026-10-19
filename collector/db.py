@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS products (
     category        TEXT NOT NULL,
     subcategory     TEXT,
     tier            TEXT,                 -- Harness 收录分层 core|eco（协议/框架=eco）
+    origin          TEXT DEFAULT 'registry',  -- registry=人工清单；aa=AA 自动入池
+    aa_slug         TEXT,                 -- Artificial Analysis 模型 slug（自动同步/匹配）
     board_tags      TEXT,
     homepage        TEXT,
     repo            TEXT,
@@ -336,10 +338,14 @@ def conn() -> sqlite3.Connection:
 
 
 def ensure_product_columns(c) -> None:
-    """旧库附加式迁移：products 增加 tier（不影响既有列与数据）。"""
+    """旧库附加式迁移：products 增加 tier/origin/aa_slug（不影响既有列与数据）。"""
     cols = {row[1] for row in c.execute("PRAGMA table_info(products)")}
     if "tier" not in cols:
         c.execute("ALTER TABLE products ADD COLUMN tier TEXT")
+    if "origin" not in cols:
+        c.execute("ALTER TABLE products ADD COLUMN origin TEXT DEFAULT 'registry'")
+    if "aa_slug" not in cols:
+        c.execute("ALTER TABLE products ADD COLUMN aa_slug TEXT")
 
 
 def init_db() -> None:
@@ -410,21 +416,23 @@ def upsert_products(c, products: list[dict]) -> list[dict]:
         if row:
             pid = row["id"]
             c.execute(
-                "UPDATE products SET name=?, vendor=?, category=?, tier=?, board_tags=?,"
+                "UPDATE products SET name=?, vendor=?, category=?, tier=?,"
+                " aa_slug=COALESCE(?, aa_slug), board_tags=?,"
                 " repo=?, repo_aliases=?, license=?, npm_package=?, pypi_package=?,"
                 " appstore_id=?, vscode_ext_id=?, notes=?, updated_at=? WHERE id=?",
                 (p["name"], p.get("vendor"), p["category"], p.get("tier"),
-                 json.dumps(boards, ensure_ascii=False),
+                 p.get("aa_slug"), json.dumps(boards, ensure_ascii=False),
                  p.get("repo"), json.dumps(p.get("repo_aliases") or []),
                  p.get("license"), p.get("npm_package"), p.get("pypi_package"),
                  p.get("appstore_id"), p.get("vscode_ext_id"), p.get("notes"), ts, pid))
         else:
             cur = c.execute(
-                "INSERT INTO products(slug, name, vendor, category, tier, board_tags,"
-                " repo, repo_aliases, license, npm_package, pypi_package, appstore_id,"
-                " vscode_ext_id, notes, status, created_at, updated_at)"
-                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'active', ?, ?)",
+                "INSERT INTO products(slug, name, vendor, category, tier, origin, aa_slug,"
+                " board_tags, repo, repo_aliases, license, npm_package, pypi_package,"
+                " appstore_id, vscode_ext_id, notes, status, created_at, updated_at)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'active', ?, ?)",
                 (p["slug"], p["name"], p.get("vendor"), p["category"], p.get("tier"),
+                 p.get("origin") or "registry", p.get("aa_slug"),
                  json.dumps(boards, ensure_ascii=False),
                  p.get("repo"), json.dumps(p.get("repo_aliases") or []),
                  p.get("license"), p.get("npm_package"), p.get("pypi_package"),
