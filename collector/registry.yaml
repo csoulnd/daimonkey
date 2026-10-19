@@ -43,8 +43,8 @@ directions:
     name: 模型
     short: FM
     icon: i-method
-    tagline: SuperCLUE 中文基准 · 月更
-    description: 跟踪主流大模型的能力评测与官方入口，以可溯源的公开基准为准。
+    tagline: SuperCLUE 中文 + AA 海外指数
+    description: 跟踪主流大模型的能力评测与官方入口；SuperCLUE 中文口径与 Artificial Analysis 海外指数并列展示，不合成单一分。
     boards: [model]
     news_tag: fm
     news_categories: [models, research]
@@ -82,8 +82,10 @@ http:
   min_interval: 1.05               # 对同一主机的最小请求间隔（礼貌频率）
   host_intervals:                  # 个别限流严格的源给更长间隔（实测 pypistats 3s 基本不触发 429）
     pypistats.org: 3.0
+    artificialanalysis.ai: 2.0
   host_backoffs:                   # 个别源的专属退避序列（pypistats 全线 429 时不再拖满 65s/包）
     pypistats.org: [5, 15]
+    artificialanalysis.ai: [3, 8]  # 免费 API 慢分页：少重试、源内用长超时
   backoff: [5, 15, 45]             # 429/5xx 与网络错误的默认退避（递增重试）
 
 # ---- 指标定义：unit 参与展示，direction 参与分位数归一化 ----
@@ -110,6 +112,16 @@ metric_definitions:
   sc_agent:                 {unit: score, direction: higher}
   sc_instruction:           {unit: score, direction: higher}
   sc_hallucination:         {unit: score, direction: higher}
+  # Artificial Analysis 免费 API（指数 v4.3）：九类指数，进模型榜展示列，不参与规则排名合成
+  aa_intelligence:          {unit: score, direction: higher}
+  aa_coding:                {unit: score, direction: higher}
+  aa_agentic:               {unit: score, direction: higher}
+  aa_finance:               {unit: score, direction: higher}
+  aa_strategy:              {unit: score, direction: higher}
+  aa_legal:                 {unit: score, direction: higher}
+  aa_healthcare:            {unit: score, direction: higher}
+  aa_engineering:           {unit: score, direction: higher}
+  aa_economics:             {unit: score, direction: higher}
 
 # 由历史指标推导的增长率（评分期计算，不单独存储）
 derived_growth:
@@ -148,6 +160,8 @@ boards:
   model:
     name: 模型评测
     overlay: true               # 独立评测榜,不并入 Harness 核心榜
+    # 展示列:SuperCLUE 中文口径 + Artificial Analysis 海外指数并列,不合成单一分
+    display_metrics: [sc_total, aa_intelligence, aa_coding, aa_agentic]
     heat:
       sc_total: 1.0
     momentum:
@@ -231,6 +245,17 @@ sources:
     name: SuperCLUE 中文大模型月报
     base_url: "https://www.cluebenchmarks.com/superclue_2509"
     enabled: true
+  - key: aa
+    type: aa
+    name: Artificial Analysis 模型指数
+    base_url: "https://artificialanalysis.ai/api/v2/language/models/free"
+    auth: required
+    rate_limit: 免费层 1000 次；源内七天上限缓存，首次/过期才拉 4 页（周更）
+    cache_days: 7
+    enabled: true
+    notes: >-
+      AA_API_KEY 存 data/model_eval.env（600，严禁入库）；必须用 httpx（curl 在此线路会截断）。
+      指数 v4.3：intelligence/coding/agentic + 九域指数；与 SuperCLUE 中文口径并列展示，不合成单一分。
   - key: github
     name: GitHub REST API
     type: api
@@ -853,25 +878,25 @@ products:
 # API Key 放 data/assistant.env（600 权限，KEY=VALUE），不进 git。
 
   # ---------- model(模型评测榜,SuperCLUE 月报口径) ----------
-  - {slug: gpt-5, name: "GPT-5(high)", vendor: OpenAI, category: model, open_weight: false, model_links: {official: "https://openai.com"}}
-  - {slug: o4-mini-high, name: "o4-mini(high)", vendor: OpenAI, category: model, open_weight: false, model_links: {official: "https://openai.com"}}
+  - {slug: gpt-5, name: "GPT-5(high)", vendor: OpenAI, category: model, aa_slug: gpt-5, open_weight: false, model_links: {official: "https://openai.com"}}
+  - {slug: o4-mini-high, name: "o4-mini(high)", vendor: OpenAI, category: model, aa_slug: o4-mini, open_weight: false, model_links: {official: "https://openai.com"}}
   - {slug: claude-sonnet-4-5-reasoning, name: Claude-Sonnet-4.5-Reasoning, vendor: Anthropic, category: model, open_weight: false, model_links: {official: "https://www.anthropic.com"}}
   - {slug: claude-opus-4-1-reasoning, name: Claude-Opus-4.1-Reasoning, vendor: Anthropic, category: model, open_weight: false, model_links: {official: "https://www.anthropic.com"}}
-  - {slug: gemini-2-5-pro, name: Gemini-2.5-Pro, vendor: Google, category: model, open_weight: false, model_links: {official: "https://deepmind.google/models/gemini"}}
-  - {slug: o3-high, name: "o3(high)", vendor: OpenAI, category: model, open_weight: false, model_links: {official: "https://openai.com"}}
-  - {slug: deepseek-v3-2-exp-thinking, name: DeepSeek-V3.2-Exp-Thinking, vendor: DeepSeek, category: model, open_weight: true, model_links: {official: "https://chat.deepseek.com", modelscope: "https://modelscope.cn/models/deepseek-ai/DeepSeek-V3.2-Exp"}}
-  - {slug: deepseek-v3-1-terminus-thinking, name: DeepSeek-V3.1-Terminus-Thinking, vendor: DeepSeek, category: model, open_weight: true, model_links: {official: "https://chat.deepseek.com", modelscope: "https://modelscope.cn/models/deepseek-ai/DeepSeek-V3.1-Terminus"}}
+  - {slug: gemini-2-5-pro, name: Gemini-2.5-Pro, vendor: Google, category: model, aa_slug: gemini-2-5-pro, open_weight: false, model_links: {official: "https://deepmind.google/models/gemini"}}
+  - {slug: o3-high, name: "o3(high)", vendor: OpenAI, category: model, aa_slug: o3, open_weight: false, model_links: {official: "https://openai.com"}}
+  - {slug: deepseek-v3-2-exp-thinking, name: DeepSeek-V3.2-Exp-Thinking, vendor: DeepSeek, category: model, aa_slug: deepseek-v3-2-reasoning-0925, open_weight: true, model_links: {official: "https://chat.deepseek.com", modelscope: "https://modelscope.cn/models/deepseek-ai/DeepSeek-V3.2-Exp"}}
+  - {slug: deepseek-v3-1-terminus-thinking, name: DeepSeek-V3.1-Terminus-Thinking, vendor: DeepSeek, category: model, aa_slug: deepseek-v3-1-terminus-reasoning, open_weight: true, model_links: {official: "https://chat.deepseek.com", modelscope: "https://modelscope.cn/models/deepseek-ai/DeepSeek-V3.1-Terminus"}}
   - {slug: doubao-seed-1-6-thinking, name: Doubao-Seed-1.6-thinking-250715, vendor: 字节跳动, category: model, open_weight: false, model_links: {official: "https://www.volcengine.com/product/doubao"}}
   - {slug: ernie-x1-1, name: ERNIE-X1.1, vendor: 百度, category: model, open_weight: false, model_links: {official: "https://yiyan.baidu.com"}}
-  - {slug: qwen3-max, name: Qwen3-Max, vendor: 阿里巴巴, category: model, open_weight: false, model_links: {official: "https://tongyi.aliyun.com", modelscope: "https://modelscope.cn/models/Qwen/Qwen3-Max"}}
-  - {slug: gemini-2-5-flash, name: Gemini-2.5-Flash, vendor: Google, category: model, open_weight: false, model_links: {official: "https://deepmind.google/models/gemini"}}
+  - {slug: qwen3-max, name: Qwen3-Max, vendor: 阿里巴巴, category: model, aa_slug: qwen3-max, open_weight: false, model_links: {official: "https://tongyi.aliyun.com", modelscope: "https://modelscope.cn/models/Qwen/Qwen3-Max"}}
+  - {slug: gemini-2-5-flash, name: Gemini-2.5-Flash, vendor: Google, category: model, aa_slug: gemini-2-5-flash, open_weight: false, model_links: {official: "https://deepmind.google/models/gemini"}}
   - {slug: openpangu-ultra-moe-718b, name: openPangu-Ultra-MoE-718B, vendor: 华为, category: model, open_weight: true, model_links: {official: "https://www.huawei.com", modelscope: "https://modelscope.cn/models/openPangu/OpenPangu-Ultra-MoE-718B"}}
-  - {slug: qwen3-235b-thinking, name: Qwen3-235B-A22B-Thinking-2507, vendor: 阿里巴巴, category: model, open_weight: true, model_links: {official: "https://tongyi.aliyun.com", modelscope: "https://modelscope.cn/models/Qwen/Qwen3-235B-A22B-Thinking-2507"}}
-  - {slug: gpt-oss-120b, name: gpt-oss-120b, vendor: OpenAI, category: model, open_weight: true, model_links: {official: "https://openai.com", modelscope: "https://modelscope.cn/models/OpenAI/gpt-oss-120b"}}
-  - {slug: glm-4-6, name: GLM-4.6, vendor: 智谱AI, category: model, open_weight: true, model_links: {official: "https://chatglm.cn", modelscope: "https://modelscope.cn/models/ZhipuAI/GLM-4.6"}}
-  - {slug: kimi-k2-0905, name: kimi-k2-0905-preview, vendor: 月之暗面, category: model, open_weight: true, model_links: {official: "https://www.moonshot.cn", modelscope: "https://modelscope.cn/models/moonshotai/Kimi-K2-Instruct"}}
-  - {slug: qwen3-next-80b-thinking, name: Qwen3-Next-80B-A3B-Thinking, vendor: 阿里巴巴, category: model, open_weight: true, model_links: {official: "https://tongyi.aliyun.com", modelscope: "https://modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Thinking"}}
-  - {slug: minimax-m1, name: MiniMax-M1, vendor: MiniMax, category: model, open_weight: true, model_links: {official: "https://www.minimax.io", modelscope: "https://modelscope.cn/models/MiniMaxAI/MiniMax-M1"}}
+  - {slug: qwen3-235b-thinking, name: Qwen3-235B-A22B-Thinking-2507, vendor: 阿里巴巴, category: model, aa_slug: qwen3-235b-a22b-instruct-2507-reasoning, open_weight: true, model_links: {official: "https://tongyi.aliyun.com", modelscope: "https://modelscope.cn/models/Qwen/Qwen3-235B-A22B-Thinking-2507"}}
+  - {slug: gpt-oss-120b, name: gpt-oss-120b, vendor: OpenAI, category: model, aa_slug: gpt-oss-120b, open_weight: true, model_links: {official: "https://openai.com", modelscope: "https://modelscope.cn/models/OpenAI/gpt-oss-120b"}}
+  - {slug: glm-4-6, name: GLM-4.6, vendor: 智谱AI, category: model, aa_slug: glm-4-6-reasoning, open_weight: true, model_links: {official: "https://chatglm.cn", modelscope: "https://modelscope.cn/models/ZhipuAI/GLM-4.6"}}
+  - {slug: kimi-k2-0905, name: kimi-k2-0905-preview, vendor: 月之暗面, category: model, aa_slug: kimi-k2-0905, open_weight: true, model_links: {official: "https://www.moonshot.cn", modelscope: "https://modelscope.cn/models/moonshotai/Kimi-K2-Instruct"}}
+  - {slug: qwen3-next-80b-thinking, name: Qwen3-Next-80B-A3B-Thinking, vendor: 阿里巴巴, category: model, aa_slug: qwen3-next-80b-a3b-reasoning, open_weight: true, model_links: {official: "https://tongyi.aliyun.com", modelscope: "https://modelscope.cn/models/Qwen/Qwen3-Next-80B-A3B-Thinking"}}
+  - {slug: minimax-m1, name: MiniMax-M1, vendor: MiniMax, category: model, aa_slug: minimax-m1-80k, open_weight: true, model_links: {official: "https://www.minimax.io", modelscope: "https://modelscope.cn/models/MiniMaxAI/MiniMax-M1"}}
   - {slug: hunyuan-t1, name: Hunyuan-T1-20250822, vendor: 腾讯, category: model, open_weight: false, model_links: {official: "https://yun.tencent.com/products/hunyuan"}}
 
 assistant:

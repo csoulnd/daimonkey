@@ -42,15 +42,19 @@ class Http:
         self.request_count += 1
 
     def fetch(self, url: str, method: str = "GET", *, json_body: dict | None = None,
-              headers: dict | None = None) -> httpx.Response:
-        """带重试的请求。4xx（除 429）不重试直接返回，由调用方决定处置。"""
+              headers: dict | None = None, timeout: float | None = None) -> httpx.Response:
+        """带重试的请求。4xx（除 429）不重试直接返回，由调用方决定处置。
+
+        timeout 为单请求覆盖（秒）；AA 免费接口部分分页较慢，源级可传更长超时。
+        """
         host = urlparse(url).netloc
         backoff = self.host_backoffs.get(host, self.backoff)
         last_err: Exception | None = None
         for attempt in range(len(backoff) + 1):
             self._throttle(url)
             try:
-                r = self._client.request(method, url, json=json_body, headers=headers)
+                r = self._client.request(method, url, json=json_body, headers=headers,
+                                         timeout=timeout)
             except httpx.HTTPError as e:
                 last_err = e
                 if attempt < len(backoff):

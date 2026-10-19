@@ -18,7 +18,7 @@ description: 模型评分榜单专家。适用场景:模型 benchmark 榜单的�
 
 | 源 | 可达性 | 结论/动作 |
 |---|---|---|
-| Artificial Analysis(Podium/AA Index/大部分 benchmark) | 站点通但 SPA+慢(~12s);**官方 API 需免费 key** | **主数据源**;需求方注册 key → 存 `data/model_eval.env`(`AA_API_KEY=`),源模块按 API 实测响应微调字段映射 |
+| Artificial Analysis(Podium/AA Index/大部分 benchmark) | ✅ 已接入(2026-10-19) | **主数据源**;免费 API 分页 200/页×4=704 模型;**必须 httpx**(curl 截断),单页偶发 30~60s,源内超时 75s;key 在 `data/model_eval.env` |
 | SuperCLUE | 通(0.4s)但深度 SPA,接口藏于 chunk(`/api/chores/` 404) | 备选:①有浏览器环境时用开发者工具网络面板找真实接口;②人工录入月报分数+报告链接溯源 |
 | LMArena Elo | 直连/HF/raw.githubusercontent **全断** | 需代理或镜像通道;列先预留显示 — |
 | Code Arena(参考站第 4 源) | 断连 | 暂不接 |
@@ -33,6 +33,15 @@ description: 模型评分榜单专家。适用场景:模型 benchmark 榜单的�
 - 月更操作:改 `sources.superclue.base_url` → `scripts/fetch_superclue.py`。
 - 遗留:AA Index/Podium(等 AA key)、LMArena(等网络通道)。
 
+## AA 接入落地(2026-10-19,M3)
+
+- 源模块 `collector/sources/aa.py`;`GET https://artificialanalysis.ai/api/v2/language/models/free` + `x-api-key`。
+- 实测:`tier=free`、`intelligence_index_version=4.3`、分页 `total_pages=4`(200/页,共 704);返回九类指数 + pricing/performance,**不含 MMLU-Pro/GPQA/MATH/LiveCodeBench**——一期按实际可得字段展示 AA Intelligence/Coding/Agentic,不虚构基准列。
+- 取数策略:每页原始 JSON 逐页 `save_raw` 归档(指标 raw_id 指向所属页);`data/cache/aa_models.json` 7 天有效,有效期内零请求(4 次/周),避免 1000 次免费额度被重复更新耗尽。**强制刷新=删除该缓存文件**。
+- 模型匹配:`registry.products[category=model].aa_slug` 精确优先,其次规范化名称唯一匹配;当前 14/20 命中(Claude 4.5/4.1、豆包、ERNIE、Pangu、Hunyuan 在 AA 无对应条目,页面显示 —)。
+- 指标:`aa_intelligence/aa_coding/aa_agentic` + 六类域指数,unit=score;只做展示列(`boards.model.display_metrics`),**不参与 sc_total 规则排名、不与 SuperCLUE 合成**。页面每格带 `aa` 来源标签与 raw 溯源。
+- 验证:`tests/test_aa.py`(解析/匹配/缓存/密钥缺失);verify `2e` 检查 AA 列、来源、raw 回放与源健康。
+
 ## 原蓝图(AA 主源,待 key)
 
 1. `registry.yaml → models`:模型清单(name/org/官方链接/modelscope 链接/开源标记/所属厂牌),不占 agent products。
@@ -45,6 +54,12 @@ description: 模型评分榜单专家。适用场景:模型 benchmark 榜单的�
 
 | 症状 | 处置 |
 |---|---|
-| AA API 401/字段对不上 | key 与端点以 artificialanalysis.ai API 文档为准,先 curl 单模型验证再入库 |
+| AA API 401/字段对不上 | 先确认 `data/model_eval.env` 的 AA_API_KEY;调试**必须用 httpx**(curl 会截断),打印响应键而非 key |
+| AA 页面 AA 列全为 — | 查 raw 归档与 `data/cache/aa_models.json`;确认 registry 模型有 `aa_slug` 或名称唯一匹配;未匹配模型按设计显示 — |
+| AA 7 天内不更新 | 预期行为(周更缓存);确需刷新时删除 `data/cache/aa_models.json` 再跑更新 |
 | SuperCLUE 接口找不到 | 浏览器环境抓网络面板;或走人工月报录入(manual 模式) |
 | 模型榜数据过期 | 指标带 collected_at,榜单页展示数据截至时间,同 agent 榜更新链路 |
+
+## 决策记录
+
+- 2026-10-19(M3):AA 一期只接免费 API 实际可得的九类指数,不虚构 MMLU/GPQA 等列;免费额度用 7 天缓存保护,周更 4 次请求。与 SuperCLUE 并列展示、各自标注来源,不合成单一分。

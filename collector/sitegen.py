@@ -38,6 +38,22 @@ METRIC_NAMES = {
     "appstore_rating_count": "App Store 评分数",
     "appstore_rating_growth_30d": "App Store 评分增长",
     "vscode_installs": "VS Code 安装",
+    "sc_total": "SuperCLUE 总分",
+    "sc_math": "SuperCLUE 数学",
+    "sc_science": "SuperCLUE 科学",
+    "sc_code": "SuperCLUE 代码",
+    "sc_agent": "SuperCLUE 智能体",
+    "sc_instruction": "SuperCLUE 指令",
+    "sc_hallucination": "SuperCLUE 幻觉",
+    "aa_intelligence": "AA 智能指数",
+    "aa_coding": "AA 编码指数",
+    "aa_agentic": "AA 智能体指数",
+    "aa_finance": "AA 金融指数",
+    "aa_strategy": "AA 策略运营指数",
+    "aa_legal": "AA 法律指数",
+    "aa_healthcare": "AA 医疗指数",
+    "aa_engineering": "AA 工程指数",
+    "aa_economics": "AA 经济指数",
 }
 
 
@@ -69,6 +85,9 @@ def _env() -> Environment:
 
 
 def _top_metrics(board_key: str, reg: dict) -> list[str]:
+    configured = reg["boards"].get(board_key, {}).get("display_metrics")
+    if configured:
+        return list(configured)
     if board_key == "harness_core":
         return ["github_stars", "npm_monthly_downloads", "vscode_installs"]
     heat = reg["boards"].get(board_key, {}).get("heat", {})

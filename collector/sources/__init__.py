@@ -1,4 +1,5 @@
 """数据源注册表：新增源 = 写一个模块 + 在此注册 + registry.yaml 登记。"""
+from .aa import AASource
 from .appstore_lookup import AppstoreLookupSource
 from .appstore_rss import AppstoreRssSource
 from .github import GithubSource
@@ -19,6 +20,7 @@ SOURCE_REGISTRY = [
     NewsRssSource,
     NewsHnSource,
     SuperClueSource,
+    AASource,
 ]
 
 __all__ = ["SOURCE_REGISTRY"]
