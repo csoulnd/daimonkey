@@ -28,7 +28,7 @@ for page in [dist / "index.html", dist / "knowledge.html", *notes]:
     parser = Links()
     text = page.read_text(encoding="utf-8")
     parser.feed(text)
-    assert "个人知识库" in text and ("InferTech 观察站" in t or "智能体热度指数" in t)ext, page
+    assert "个人知识库" in text and ("InferTech 观察站" in text or "智能体热度指数" in text), page
     for link in parser.links:
         parsed = urlsplit(link)
         path = parsed.path
