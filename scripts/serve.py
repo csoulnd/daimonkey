@@ -64,6 +64,8 @@ def password_valid(supplied: str) -> bool:
 
 # 旧信息架构 -> 三方向频道（301 永久跳转，保留外链与书签）
 LEGACY_REDIRECTS = {
+    # 全站新闻页已下线(2026-10-19):新闻按方向聚合到 /dir/*
+    "/news": "/",
     "/rankings": "/dir/harness",
     "/rankings/unified": "/dir/harness",   # 联合榜并入核心产品榜
     "/rankings/coding": "/dir/harness",    # 分类源榜不再单独展示
@@ -468,6 +470,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             path = urlparse(self.path).path
             target = LEGACY_REDIRECTS.get(path)
+            if target is None and path.startswith("/news/"):
+                target = "/"
             if target:
                 self._redirect(target)
                 return

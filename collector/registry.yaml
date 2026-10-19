@@ -928,7 +928,7 @@ assistant:
   ai:
     summaries:
       enabled: true
-      pages: [home, news, knowledge, board]   # 四板块顶部 AI 摘要(board=核心产品榜总结)
+      pages: [home, knowledge, board]   # 全站新闻页已下线(2026-10-19),新闻总结改由各方向周总结承担
       max_tokens: 3000             # 推理+输出总预算（过小会出现 max-tokens 空回复）
     scoring:
       enabled: true

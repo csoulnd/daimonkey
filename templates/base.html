@@ -60,7 +60,6 @@
       {% for d in nav_directions %}
       <a href="{{ d.href }}" data-path="{{ d.href }}"><svg class="ti" aria-hidden="true"><use href="#{{ d.icon }}"/></svg>{{ d.name }}</a>
       {% endfor %}
-      <a href="/news" data-path="/news"><svg class="ti" aria-hidden="true"><use href="#i-news"/></svg>AI 新闻</a>
       <div class="tree-group auth-only">个人工作台</div>
       <a href="/reports" data-path="/reports" class="auth-only"><svg class="ti" aria-hidden="true"><use href="#i-report"/></svg>报告厅</a>
       <a href="/knowledge" data-path="/knowledge" class="auth-only"><svg class="ti" aria-hidden="true"><use href="#i-book"/></svg>个人知识库</a>
@@ -86,7 +85,7 @@
           <span class="asof">共 {{ reports_total }} 份报告</span>
           {% elif clipboard_page %}
           <span class="asof">两台设备间同步 · 文本与文件</span>
-          {% elif news_page %}
+          {% elif news_page or direction_page %}
           <span class="asof" title="新闻与热度数据的最后采集时间">新闻截至 {{ news_meta.last_fetched_at | dt if news_meta.last_fetched_at else '暂无' }} · 热度截至 {{ meta.last_collected_at | dt if meta.last_collected_at else '暂无数据' }}</span>
           <button id="btn-news-update" type="button" title="仅采集新闻（约 1 分钟），不重采热度数据">⟳ 仅更新新闻</button>
           <button id="btn-update" type="button">⟳ 全量更新</button>

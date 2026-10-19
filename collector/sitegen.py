@@ -15,7 +15,6 @@ from jinja2 import Environment, FileSystemLoader
 
 from . import ai as ai_mod
 from . import db, queries, svgchart, knowledge, news as newslib
-from . import ai as ai_mod
 from . import reports as reportslib
 from .config import (DIST_DIR, STATIC_DIR, TEMPLATES_DIR, ensure_dirs, now_iso,
                      registry, today_utc)
@@ -213,6 +212,7 @@ def build() -> None:
             }
 
         direction_cards = []
+        nmeta = queries.news_meta(c)   # 方向页顶栏需展示新闻截至时间
         for d in directions:
             blocks = [direction_block(b) for b in (d.get("boards") or [])]
             cats = d.get("news_categories") or []
@@ -227,6 +227,7 @@ def build() -> None:
             render("direction.html", f"dir/{d['key']}.html",
                    direction=d, direction_page=True,
                    board_blocks=blocks,
+                   news_meta=nmeta, news_page=False,
                    direction_news=queries.news_for_categories(c, cats, 12),
                    direction_digest=digest,
                    direction_digest_link=digest_link,
@@ -247,7 +248,6 @@ def build() -> None:
                unified=core_display,
                model_top=model_items[:5],
                direction_cards=direction_cards,
-               latest_news=queries.news_recent(c, 6),
                ai_board=ai_mod.summary_of(c, "board"),
                ai_weight_pct=round(ai_weight * 100),
                unified_total=len(bitems.get("harness_core", [])),
@@ -328,18 +328,11 @@ def build() -> None:
                             "quota_mb": clipboard_mod.cfg()["quota_mb"]})
         knowledge.build(env, common, kb_notes)
 
-        # ---- AI Agent 新闻（第三入口 /news + 每周 digest）----
-        nmeta = queries.news_meta(c)
+        # ---- AI 新闻:不再有全站页面,仅按方向聚合(频道页 + 方向周报) ----
         ncfg = reg.get("news", {})
-        render("news.html", "news.html", news_page=True, news_meta=nmeta,
-               news_items=queries.news_recent(c, 60), news_rank=rank_of,
-               news_stale=_is_stale(nmeta.get("last_fetched_at")),
-               news_retention_days=reg.get("retention", {}).get("news_days", 0),
-               news_lookback_days=ncfg.get("lookback_days", 7),
-               digests=[{"week": d["week"], "count": len(d["items"]),
-                         "start": newslib.week_range(d["week"])[0],
-                         "end": newslib.week_range(d["week"])[1]}
-                        for d in queries.news_digests(c, ncfg.get("digest_weeks", 8))])
+        # 清理已下线的全站新闻页与周报(2026-10-19 产品决策;dist 可重建)
+        (DIST_DIR / "news.html").unlink(missing_ok=True)
+        shutil.rmtree(DIST_DIR / "news", ignore_errors=True)
         def digest_counts(items: list[dict]) -> tuple[dict, list]:
             cat_counts: dict[str, int] = {}
             mentions: dict[int, int] = {}
@@ -356,42 +349,27 @@ def build() -> None:
                 key=lambda x: -x["mentions"])[:10]
             return cat_counts, top_list
 
-        def render_digest_page(direction: dict | None, week_items: dict) -> None:
+        def render_digest_page(direction: dict, week_items: dict) -> None:
             week = week_items["week"]
             start, end = newslib.week_range(week)
             cat_counts, top_list = digest_counts(week_items["items"])
-            if direction:
-                out = f"dir/{direction['key']}/digest/{week}.html"
-                extra = {
-                    "direction": direction,
-                    "digest_home": f"/dir/{direction['key']}",
-                    "digest_home_label": f"{direction['name']}频道",
-                    "ai_digest_label": "AI 生成 · 人工可复核修改",
-                }
-            else:
-                out = f"news/digest/{week}.html"
-                extra = {}
+            out = f"dir/{direction['key']}/digest/{week}.html"
+            extra = {
+                "direction": direction,
+                "digest_home": f"/dir/{direction['key']}",
+                "digest_home_label": f"{direction['name']}频道",
+                "ai_digest_label": "AI 生成 · 人工可复核修改",
+            }
             render("news_digest.html", out,
                    news_page=True, news_meta=nmeta, week=week,
                    week_start=start, week_end=end,
                    digest_items=queries._attach_products(c, week_items["items"]),
                    cat_counts=cat_counts, top_products=top_list,
                    ai_digest=queries.published_digest_summary(
-                       c, week,
-                       direction=direction["news_tag"] if direction else None),
+                       c, week, direction=direction["news_tag"]),
                    news_rank=rank_of, **extra)
 
-        digest_root = DIST_DIR / "news" / "digest"
-        digest_outputs = set()
-        for d in queries.news_digests(c, ncfg.get("digest_weeks", 8)):
-            render_digest_page(None, d)
-            digest_outputs.add(d["week"])
-        # 周报随保留窗口滚动，过期文件清理（不触碰 dist 其他内容）
-        if digest_root.is_dir():
-            for old in digest_root.glob("*.html"):
-                if old.stem not in digest_outputs:
-                    old.unlink()
-        # 方向周报：同一管线按 directions.news_categories 过滤
+        # 方向周报:同一管线按 directions.news_categories 过滤
         for direction in directions:
             cats = direction.get("news_categories") or []
             if not cats:

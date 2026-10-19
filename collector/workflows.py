@@ -86,7 +86,7 @@ def _digest_store(payload: dict, reply: str) -> None:
             "INSERT INTO insights (title, summary, source_url, source_name,"
             " published_at, tags, llm_generated, status, created_at)"
             " VALUES (?, ?, ?, ?, ?, ?, 1, ?, datetime('now', 'localtime'))",
-            (title, reply, "", "DSH assistant", week, tags, status))
+            (title, reply, "", "daimonkey 助手", week, tags, status))
 
 
 def _current_week() -> str:

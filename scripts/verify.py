@@ -39,6 +39,19 @@ def check(name: str, ok: bool) -> None:
     print(f"  {'✅' if ok else '❌'} {name}")
 
 
+def news_redirect_ok(base: str) -> bool:
+    """/news 应 301 到门户(全站新闻页已下线)。"""
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+    opener = urllib.request.build_opener(_NoRedirect)
+    try:
+        opener.open(base + "/news", timeout=10)
+        return False
+    except urllib.error.HTTPError as e:
+        return e.code == 301 and e.headers.get("Location") == "/"
+
+
 def get(url: str, timeout: int = 10):
     return urllib.request.urlopen(url, timeout=timeout)
 
@@ -128,7 +141,7 @@ def main() -> int:
     paths = ["/", "/dir/harness", "/dir/fm", "/dir/nv",
              "/rankings/unified", "/rankings/coding", "/rankings/harness_core",
              "/rankings/harness_eco", "/product/claude-code",
-             "/sources", "/api.html", "/news",
+             "/sources", "/api.html",
              "/api/v1/boards.json", "/api/v1/rankings/unified.json",
              "/api/v1/rankings/harness_core.json",
              "/api/v1/rankings/harness_eco.json",
@@ -140,27 +153,22 @@ def main() -> int:
         except Exception as e:
             check(f"{p} ({e})", False)
 
-    print("== 1b. 新闻功能结构 ==")
-    news_html = page(base + "/news")
+    print("== 1b. 新闻功能结构(按方向聚合) ==")
+    harness_html = page(base + "/dir/harness")
     for name, pat in [
-        ("新闻页标题", r"AI 新闻汇总"),
-        ("导航第三入口", r'href="/news" data-path="/news"'),
-        ("分类筛选 chips", r'id="news-filter"'),
+        ("方向新闻区", r'id="dir-news"'),
         ("新闻条目", r'class="news-item"'),
         ("轻量更新按钮", r'id="btn-news-update"'),
     ]:
-        check(name, bool(re.search(pat, news_html)))
+        check(name, bool(re.search(pat, harness_html)))
+    check("导航无全站新闻入口", 'href="/news"' not in harness_html)
+    check("全站新闻页已下线(301)", news_redirect_ok(base))
     try:
         news_api = json.load(get(base + "/api/v1/news.json"))
         check(f"新闻条目数 {news_api['meta']['total']}", news_api["meta"]["total"] > 0)
         with_raw = sum(1 for it in news_api["items"] if it.get("raw_payload_id"))
         check(f"新闻溯源链 {with_raw}/{len(news_api['items'])}",
               news_api["items"] and with_raw == len(news_api["items"]))
-        digests = re.findall(r'href="(/news/digest/[0-9W-]+\.html)"', news_html)
-        check(f"周报入口（{len(digests)} 个）", len(digests) > 0)
-        if digests:
-            r = get(base + digests[0])
-            check(f"周报页 {digests[0]} -> {r.status}", r.status == 200)
     except Exception as e:
         check(f"news.json 解析 ({e})", False)
     prod_html = page(base + "/product/claude-code")
@@ -258,8 +266,6 @@ def main() -> int:
         if links:
             r = get(base + links[0])
             check(f"方向周报页 {links[0]} -> {r.status}", r.status == 200)
-    check("全站周报入口保留",
-          bool(re.findall(r'href="/news/digest/[0-9W-]+\.html"', news_html)))
 
     print("== 2c. 旧路由 301 ==")
     class _NoRedirect(urllib.request.HTTPRedirectHandler):

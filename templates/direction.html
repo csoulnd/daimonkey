@@ -31,10 +31,33 @@
 </details>
 {% endif %}
 
+<section class="dir-section" id="dir-digest">
+  <div class="sec-head">
+    <h2>每周总结</h2>
+    <span class="dim">{{ direction.news_tag }} · 按方向聚合</span>
+  </div>
+  {% if direction_digest %}
+  <section class="ai-summary" aria-label="方向每周总结">
+    <div class="ai-summary-head">
+      <span class="ai-badge"><svg class="mk" aria-hidden="true"><use href="#i-monkey"/></svg>马猴说</span>
+      <span class="ai-tag">AI 生成 · 人工可复核修改</span>
+    </div>
+    <p class="ai-summary-body">{{ direction_digest.summary }}</p>
+    <div class="ai-summary-foot dim">{{ direction_digest.week }}（{{ direction_digest.week_start[5:] }}~{{ direction_digest.week_end[5:] }}）· 生成于 {{ direction_digest.created_at | dt }}{% if not direction_digest.current %} · 本周总结待更新{% endif %}{% if direction_digest_link %} · <a href="{{ direction_digest_link }}">查看该期方向周报 →</a>{% endif %}</div>
+  </section>
+  {% else %}
+  <div class="empty-state">该方向当周总结尚未生成，将在下一次全量更新时按新闻范围自动汇总。</div>
+  {% endif %}
+  {% if direction_digest_weeks %}
+  <div class="digest-list">
+    {% for w in direction_digest_weeks %}<a class="chip" href="/dir/{{ direction.key }}/digest/{{ w.week }}.html">{{ w.week }}（{{ w.count }} 条）</a>{% endfor %}
+  </div>
+  {% endif %}
+</section>
+
 <section class="dir-section" id="dir-news">
   <div class="sec-head">
     <h2>方向新闻</h2>
-    <a class="pcard-more" href="/news">全部资讯 →</a>
   </div>
   {% if direction_news %}
   <div class="news-list">
@@ -62,7 +85,7 @@
   </div>
   {% else %}
   <div class="empty-state">
-    {% if direction.placeholder %}该方向新闻源尚未接入。{% else %}当前新闻窗口内没有匹配条目，去 <a href="/news">全站资讯</a> 看看。{% endif %}
+    {% if direction.placeholder %}该方向新闻源尚未接入。{% else %}当前新闻窗口内没有匹配条目，稍后再来看看。{% endif %}
   </div>
   {% endif %}
 </section>
@@ -109,27 +132,4 @@
   {% endif %}
 </section>
 
-<section class="dir-section" id="dir-digest">
-  <div class="sec-head">
-    <h2>每周总结</h2>
-    <span class="dim">{{ direction.news_tag }} · 按方向聚合</span>
-  </div>
-  {% if direction_digest %}
-  <section class="ai-summary" aria-label="方向每周总结">
-    <div class="ai-summary-head">
-      <span class="ai-badge"><svg class="mk" aria-hidden="true"><use href="#i-monkey"/></svg>马猴说</span>
-      <span class="ai-tag">AI 生成 · 人工可复核修改</span>
-    </div>
-    <p class="ai-summary-body">{{ direction_digest.summary }}</p>
-    <div class="ai-summary-foot dim">{{ direction_digest.week }}（{{ direction_digest.week_start[5:] }}~{{ direction_digest.week_end[5:] }}）· 生成于 {{ direction_digest.created_at | dt }}{% if not direction_digest.current %} · 本周总结待更新{% endif %}{% if direction_digest_link %} · <a href="{{ direction_digest_link }}">查看该期方向周报 →</a>{% endif %}</div>
-  </section>
-  {% else %}
-  <div class="empty-state">该方向当周总结尚未生成，将在下一次全量更新时按新闻范围自动汇总。</div>
-  {% endif %}
-  {% if direction_digest_weeks %}
-  <div class="digest-list">
-    {% for w in direction_digest_weeks %}<a class="chip" href="/dir/{{ direction.key }}/digest/{{ w.week }}.html">{{ w.week }}（{{ w.count }} 条）</a>{% endfor %}
-  </div>
-  {% endif %}
-</section>
 {% endblock %}

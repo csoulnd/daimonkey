@@ -5,7 +5,7 @@
 <section class="hero">
   <div>
     <h1 class="hero-h">看清 AI 世界的<span class="grad">真实热度</span></h1>
-    <p class="hero-sub">模型评测、智能体热度、AI 资讯,一处看全</p>
+    <p class="hero-sub">智能体、模型、硬件,三个方向一处看全</p>
   </div>
   <span class="meta-chip"><i></i>数据截至 {{ meta.last_collected_at | dt }}</span>
 </section>
@@ -38,13 +38,6 @@
     <span class="pcard-more">进入{{ d.name }}频道{% if d.news_count %} · 方向资讯 {{ d.news_count }} 条{% endif %} →</span>
   </a>
   {% endfor %}
-  <a class="pcard" href="/news">
-    <div class="pcard-head"><h2>AI 资讯</h2><span class="dim">持续聚合</span></div>
-    <ul class="plist news">
-      {% for n in latest_news %}<li>{{ n.title[:40] }}{% if n.title | length > 40 %}…{% endif %}</li>{% endfor %}
-    </ul>
-    <span class="pcard-more">进入资讯流 →</span>
-  </a>
   <div class="pcard workbench">
     <div class="pcard-head"><h2>个人工作台</h2><span class="dim">登录后使用</span></div>
     <ul class="plist links">
