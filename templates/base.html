@@ -48,7 +48,7 @@
   <symbol id="i-monkey-dizzy" viewBox="0 0 640 520"><path fill="currentColor" fill-rule="evenodd" d="M142 206 C159 145 207 103 267 86 C298 67 334 39 363 43 C389 47 387 69 367 87 C441 91 486 133 502 206 C548 194 591 224 591 269 C591 314 556 343 512 338 C500 409 449 454 377 454 H267 C194 454 141 409 128 338 C85 344 49 314 49 269 C49 226 91 195 142 206 Z M320 237 C291 198 247 187 207 207 C168 226 158 264 158 311 C158 366 178 397 227 402 C247 404 266 404 282 402 C291 401 294 393 294 384 V339 C294 316 304 303 320 303 C336 303 346 316 346 339 V384 C346 393 349 401 358 402 C374 404 393 404 413 402 C462 397 482 366 482 311 C482 264 472 226 433 207 C393 187 349 198 320 237 Z"/><path d="M220 296 q10 -12 20 0 q10 12 20 0" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round"/><path d="M380 296 q10 -12 20 0 q10 12 20 0" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round"/><path d="M300 16 l3.2 4.8 4.8 3.2 -4.8 3.2 -3.2 4.8 -3.2 -4.8 -4.8 -3.2 4.8 -3.2 z" fill="currentColor"/><path d="M346 10 l2.4000000000000004 3.5999999999999996 3.5999999999999996 2.4000000000000004 -3.5999999999999996 2.4000000000000004 -2.4000000000000004 3.5999999999999996 -2.4000000000000004 -3.5999999999999996 -3.5999999999999996 -2.4000000000000004 3.5999999999999996 -2.4000000000000004 z" fill="currentColor"/><path d="M298 350 q11 9 22 0 q11 -9 22 0" class="mouth ms" stroke-width="10" stroke-linecap="round"/></symbol>
   <symbol id="i-monkey-party" viewBox="0 0 640 520"><path fill="currentColor" fill-rule="evenodd" d="M142 206 C159 145 207 103 267 86 C298 67 334 39 363 43 C389 47 387 69 367 87 C441 91 486 133 502 206 C548 194 591 224 591 269 C591 314 556 343 512 338 C500 409 449 454 377 454 H267 C194 454 141 409 128 338 C85 344 49 314 49 269 C49 226 91 195 142 206 Z M320 237 C291 198 247 187 207 207 C168 226 158 264 158 311 C158 366 178 397 227 402 C247 404 266 404 282 402 C291 401 294 393 294 384 V339 C294 316 304 303 320 303 C336 303 346 316 346 339 V384 C346 393 349 401 358 402 C374 404 393 404 413 402 C462 397 482 366 482 311 C482 264 472 226 433 207 C393 187 349 198 320 237 Z"/><path d="M282 92 L320 10 L358 92 Z" fill="currentColor"/><circle cx="312" cy="44" r="5" fill="#0a0a10"/><circle cx="330" cy="64" r="4" fill="#0a0a10"/><circle cx="304" cy="70" r="3.5" fill="#0a0a10"/><circle cx="320" cy="10" r="6" fill="currentColor"/><circle cx="180" cy="60" r="5" fill="#7c8cff"/><circle cx="250" cy="28" r="4" fill="#4fd6c4"/><circle cx="390" cy="22" r="5" fill="#f0b429"/><circle cx="455" cy="55" r="4" fill="#ff6b9d"/><rect x="200" y="86" width="7" height="7" fill="#4fd6c4"/><path d="M222 298 Q240 280 258 298" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round"/><path d="M382 298 Q400 280 418 298" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round"/><ellipse cx="320" cy="346" rx="17" ry="13" class="mouth mf"/></symbol>
 </svg>
-{% if stale and not knowledge_page and not news_page and not reports_page %}<div class="stale-banner"><svg class="stale-mk" aria-hidden="true"><use href="#i-monkey-wow"/></svg>数据超过 48 小时未更新（{{ meta.last_collected_at | dt }}），点击右上「更新」刷新</div>{% endif %}
+{% if stale and not knowledge_page and not news_page and not reports_page and not clipboard_page %}<div class="stale-banner"><svg class="stale-mk" aria-hidden="true"><use href="#i-monkey-wow"/></svg>数据超过 48 小时未更新（{{ meta.last_collected_at | dt }}），点击右上「更新」刷新</div>{% endif %}
 <div class="layout">
   <aside class="side" id="sidebar">
     <div class="side-brand">
@@ -82,6 +82,8 @@
           <button id="btn-kb-update" type="button" title="从 GitHub 同步知识库代码仓（约 10~60 秒），不重采热度数据">⟳ 同步知识库</button>
           {% elif reports_page %}
           <span class="asof">共 {{ reports_total }} 份报告</span>
+          {% elif clipboard_page %}
+          <span class="asof">两台设备间同步 · 文本与文件</span>
           {% elif news_page %}
           <span class="asof" title="新闻与热度数据的最后采集时间">新闻截至 {{ news_meta.last_fetched_at | dt if news_meta.last_fetched_at else '暂无' }} · 热度截至 {{ meta.last_collected_at | dt if meta.last_collected_at else '暂无数据' }}</span>
           <button id="btn-news-update" type="button" title="仅采集新闻（约 1 分钟），不重采热度数据">⟳ 仅更新新闻</button>
@@ -103,6 +105,8 @@
         <p class="dim">内容来自 <a href="{{ kb.url }}">csoulnd / InferTechNote</a>，以 GitHub 仓库为准；本站提供只读快照。外部子模块通过原仓库链接访问。</p>
         {% elif reports_page %}
         <p class="dim">报告内容与代码同仓版本化（<code>reports/</code>）；素材来自知识库、站内数据与外部资料。HTML 报告为作者自备内容。</p>
+        {% elif clipboard_page %}
+        <p class="dim">剪贴板内容按登录账号隔离，仅自己可见；文件长期保留直到手动删除，文本自动保留最近若干条。退出登录请点右上头像。</p>
         {% else %}
         <p class="dim">数据为公开信息汇总；原始响应体保留期为 {{ meta.retention.raw_body_days }} 天，过期后仅保留元数据和校验值。不构成投资或采购建议。</p>
         <p class="dim foot-end"><svg class="foot-mk" aria-hidden="true"><use href="#i-monkey"/></svg>大马猴 · <a href="/methodology">方法论</a> · <a href="/sources">数据源</a></p>
@@ -160,6 +164,7 @@
 
 <script src="/assets/app.js?v={{ assets_v }}"></script>
 {% if knowledge_page %}<script src="/assets/knowledge.js?v={{ assets_v }}" defer></script>{% endif %}
+{% if clipboard_page %}<script src="/assets/clipboard.js?v={{ assets_v }}" defer></script>{% endif %}
 {% if news_page %}<script src="/assets/news.js?v={{ assets_v }}" defer></script>{% endif %}
 <script src="/assets/assistant.js?v={{ assets_v }}" defer></script>
 </body>

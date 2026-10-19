@@ -18,7 +18,7 @@
     var on = false;
     if (dp === "/rankings/unified") {
       // 热度榜单为兜底归属:产品页/溯源页/数据源等不在其他分区的页面
-      var sections = ["/news", "/knowledge", "/reports", "/rankings/model", "/assistant"];
+      var sections = ["/news", "/knowledge", "/reports", "/rankings/model", "/assistant", "/clipboard"];
       on = sections.every(function (s) { return here !== s && !here.startsWith(s + "/"); });
     } else {
       on = dp === here || here.startsWith(dp + "/");

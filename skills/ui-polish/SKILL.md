@@ -74,6 +74,8 @@ description: 本站 UI 美化专家。适用场景:页面视觉与布局优化�
 
 ## 决策记录
 
+- 2026-10-19(云剪贴板页,主责 workspace 专家,此处仅备注):新增 `/clipboard` 页(文本+文件两区、配额条、拖拽上传)按本专家清单落地——`i-clip` 内联图标、style.css 追加令牌化云剪贴板段(仅 `:root` 令牌,无裸值)、`clipboard.js` IIFE+defer、app.js 导航高亮排除表加 `/clipboard`、base.html 顶栏/页脚/防闪烁均加 clipboard_page 分支。
+
 - 2026-10-17(P6/P1 收尾):榜单页条数统一(联合10/模型20/其余前15),观察区改 `<details>` 折叠;侧栏收起改 220ms 宽度过渡(桌面,min-width:881,移动端布局不受影响);工作台入口防闪烁=localStorage+head 预载 html.authed 类(与主题防 FOUC 同模式),探针负结果自动清除标记。
 
 - 2026-10-16:frontend-polish 升级为 ui-polish 专家,新增多模态截图循环与图标系统规范。

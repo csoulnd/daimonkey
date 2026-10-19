@@ -246,6 +246,11 @@ def build() -> None:
         render("sources.html", "sources.html", sources=queries.sources_health(c))
         render("login.html", "login.html")
         render("api.html", "api.html")
+        # 云剪贴板(工作台):页面壳静态构建,数据走 serve.py 动态 API(/api/v1/clipboard/*)
+        from . import clipboard as clipboard_mod
+        render("clipboard.html", "clipboard.html", clipboard_page=True,
+               clip_limits={"max_file_mb": clipboard_mod.cfg()["max_file_bytes"] // 1048576,
+                            "quota_mb": clipboard_mod.cfg()["quota_mb"]})
         knowledge.build(env, common, kb_notes)
 
         # ---- AI Agent 新闻（第三入口 /news + 每周 digest）----

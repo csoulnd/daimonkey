@@ -1033,3 +1033,47 @@ html.authed .tree a.auth-only { display: flex !important; }
 
 /* ---- 账号区防闪烁兜底:已登录态绝不显示登录按钮 ---- */
 html.authed #nav-login { display: none; }
+
+/* ---- 云剪贴板（工作台：文本同步 + 小云盘） ---- */
+.clip-intro { padding: 20px 0 22px; }
+.clip-intro h1 { font-size: 2em; margin: 8px 0; }
+.clip-intro p { color: var(--dim); font-size: 1.05em; }
+.clip-quota { height: 4px; border-radius: var(--r-full); background: var(--panel2);
+  margin: 10px 0 4px; overflow: hidden; }
+.clip-quota-bar { height: 100%; width: 0; border-radius: var(--r-full);
+  background: var(--acc); transition: width .4s; }
+.clip-quota-bar.full { background: var(--heat); }
+.clip-section { margin: 26px 0; }
+.clip-section h2 { font-size: 1.15em; margin: 0 0 12px; }
+.clip-input-row textarea { width: 100%; box-sizing: border-box; resize: vertical;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line-strong);
+  border-radius: var(--r-m); padding: 10px 12px; font: inherit; font-size: .95em;
+  line-height: 1.6; min-height: 76px; }
+.clip-input-row textarea:focus { outline: none; border-color: var(--acc); }
+.clip-btn-row { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); flex-wrap: wrap; }
+.clip-btn-row button, .clip-item-acts button { background: var(--panel2); color: var(--ink);
+  border: 1px solid var(--line-strong); border-radius: var(--r-s);
+  padding: 7px 14px; font-size: .82em; cursor: pointer; font-family: inherit; }
+.clip-btn-row button:hover, .clip-item-acts button:hover { border-color: var(--acc); color: var(--acc); }
+.clip-btn-row button:disabled, .clip-item-acts button:disabled { opacity: .55; cursor: default; }
+.clip-item-acts button.danger:hover { border-color: var(--down); color: var(--down); }
+.clip-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: var(--sp-2); }
+.clip-item { display: flex; gap: var(--sp-3); align-items: flex-start;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--r-m); padding: 10px 14px; }
+.clip-item-body { flex: 1; min-width: 0; }
+.clip-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere;
+  font: inherit; font-size: .9em; line-height: 1.6; max-height: 180px; overflow: auto; }
+.clip-item-meta { font-size: .78em; margin-top: 6px; }
+.clip-item-acts { display: flex; gap: var(--sp-1); flex: none; }
+.clip-empty { border: 1px dashed var(--line-strong); border-radius: var(--r-m);
+  padding: 18px; text-align: center; font-size: .88em; }
+.clip-drop { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  border: 1px dashed var(--line-strong); border-radius: var(--r-m);
+  padding: 14px 16px; font-size: .85em; transition: border-color .15s; }
+.clip-drop.over { border-color: var(--acc); background: var(--panel); }
+.clip-progress { display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-2);
+  font-size: .82em; }
+.clip-progress-track { flex: 1; height: 6px; border-radius: var(--r-full);
+  background: var(--panel2); overflow: hidden; }
+.clip-progress-bar { height: 100%; width: 0; background: var(--acc); transition: width .2s; }

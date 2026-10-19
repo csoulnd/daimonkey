@@ -68,7 +68,7 @@ copy() {
   fi
 }
 for item in assistant.env assistant_secret update_password.sha256 \
-            update_status.json snapshots raw knowledge_search.json; do
+            update_status.json snapshots raw knowledge_search.json clipboard; do
   copy "$item"
 done
 shopt -s nullglob

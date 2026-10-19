@@ -51,7 +51,7 @@ def cfg() -> dict:
 
 
 def quota_bytes() -> int:
-    return int(cfg()["quota_mb"]) * 1024 * 1024
+    return int(float(cfg()["quota_mb"]) * 1024 * 1024)
 
 
 def _now() -> str:
@@ -239,7 +239,7 @@ def usage(owner: str) -> dict:
         "text_count": text_n,
         "file_count": file_n,
         "file_bytes": file_bytes(owner),
-        "quota_bytes": int(conf["quota_mb"]) * 1024 * 1024,
+        "quota_bytes": quota_bytes(),
         "max_file_bytes": int(conf["max_file_bytes"]),
         "max_text_bytes": int(conf["max_text_bytes"]),
         "keep_text_items": int(conf["keep_text_items"]),
