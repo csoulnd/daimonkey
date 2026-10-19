@@ -51,6 +51,7 @@ def _collect_inner(only: set[str] | None, reg: dict, started: str) -> dict:
        (其内部自开连接写 usage/runs,放进主事务会自锁——历史卡顿主因)
     """
     with db.conn() as c:
+        db.ensure_product_columns(c)
         db.ensure_news_tables(c)
         products = db.upsert_products(c, reg["products"])
         source_ids = db.upsert_sources(c, reg["sources"])

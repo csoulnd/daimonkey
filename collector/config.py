@@ -34,6 +34,17 @@ def ensure_dirs() -> None:
         p.mkdir(parents=True, exist_ok=True)
 
 
+def normalize_board_tags(tags: list[str] | None) -> list[str]:
+    """board_tags → 当前榜单 key：旧库可保留 framework 等历史值，读时归一。"""
+    aliases = registry().get("board_aliases", {})
+    out: list[str] = []
+    for tag in tags or []:
+        tag = aliases.get(tag, tag)
+        if tag not in out:
+            out.append(tag)
+    return out
+
+
 def resolve_data_path(value: str | Path, data_dir: Path | None = None) -> Path:
     """把库内存储的路径解析为实际文件路径。
 

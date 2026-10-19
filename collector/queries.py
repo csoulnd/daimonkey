@@ -4,16 +4,15 @@ from __future__ import annotations
 import json
 
 from . import db
-from .config import registry
-from .scoring import load_latest_metrics, weighted_coverage
+from .config import normalize_board_tags, registry
+from .scoring import board_members, load_latest_metrics, weighted_coverage
 
 
-def boards_order() -> list[str]:
-    reg = registry()
-    order = ["unified"]
-    order += [k for k, v in reg["boards"].items()
-              if not v.get("derived") and v.get("enabled", True)]
-    return order
+def boards_order(include_hidden: bool = False) -> list[str]:
+    """页面/门户可见榜单（registry 顺序）；hidden 源榜默认不列出。"""
+    return [k for k, v in registry()["boards"].items()
+            if v.get("enabled", True)
+            and (include_hidden or not v.get("hidden"))]
 
 
 def snapshot_dates(c) -> dict[str, str]:
@@ -25,7 +24,7 @@ def all_products(c) -> list[dict]:
     out = []
     for r in c.execute("SELECT * FROM products"):
         p = dict(r)
-        p["boards"] = json.loads(p["board_tags"] or "[]")
+        p["boards"] = normalize_board_tags(json.loads(p["board_tags"] or "[]"))
         p["repo_aliases_list"] = json.loads(p["repo_aliases"] or "[]")
         out.append(p)
     return out
@@ -44,8 +43,8 @@ def metric_details(pm: dict) -> dict:
 def board_items(c, board: str, snap_date: str, latest: dict) -> list[dict]:
     rows = c.execute(
         "SELECT r.product_id, r.rank, r.heat_score, r.momentum_score, r.delta_7d,"
-        " r.delta_30d, r.coverage, p.slug, p.name, p.vendor, p.category, p.status,"
-        " a.ai_score, a.rationale AS ai_rationale"
+        " r.delta_30d, r.coverage, p.slug, p.name, p.vendor, p.category,"
+        " p.tier, p.status, a.ai_score, a.rationale AS ai_rationale"
         " FROM rankings r JOIN products p ON p.id = r.product_id"
         " LEFT JOIN ai_scores a ON a.board = r.board"
         "  AND a.snapshot_date = r.snapshot_date AND a.product_id = r.product_id"
@@ -56,7 +55,8 @@ def board_items(c, board: str, snap_date: str, latest: dict) -> list[dict]:
         origin = r["category"]
         items.append({
             "rank": r["rank"], "slug": r["slug"], "name": r["name"],
-            "vendor": r["vendor"], "category": r["category"], "status": r["status"],
+            "vendor": r["vendor"], "category": r["category"],
+            "tier": r["tier"], "status": r["status"],
             "board": origin,
             "heat_score": r["heat_score"], "momentum_score": r["momentum_score"],
             "delta_7d": r["delta_7d"], "delta_30d": r["delta_30d"],
@@ -70,22 +70,21 @@ def board_items(c, board: str, snap_date: str, latest: dict) -> list[dict]:
 
 def observation_items(c, board: str, snap_date: str, latest: dict,
                       products: list[dict]) -> list[dict]:
-    if board == "unified":
-        # 联合榜观察区 = 各分类榜观察区的并集（覆盖率取其主榜口径）
-        ranked_ids = {r["product_id"] for r in c.execute(
-            "SELECT product_id FROM rankings WHERE board='unified' AND snapshot_date=?",
-            (snap_date,))}
-        enabled_boards = [b for b in boards_order() if b != "unified"]
+    cfg = registry()["boards"].get(board, {})
+    if cfg.get("derived"):
+        # 派生榜观察区 = 各源榜观察区并集（只保留该派生榜要求的 tier）
+        tier = cfg.get("tier")
         obs, seen = [], set()
-        for b in enabled_boards:
-            for o in observation_items(c, b, snap_date, latest, products):
-                if o["slug"] in seen:
+        for bkey in cfg.get("derived_from") or []:
+            for o in observation_items(c, bkey, snap_date, latest, products):
+                if o["slug"] in seen or (tier and o.get("tier") != tier):
                     continue
                 seen.add(o["slug"])
                 obs.append(o)
         return sorted(obs, key=lambda x: -(x["coverage"] or 0))
-    heat_cfg = registry()["boards"].get(board, {}).get("heat", {})
-    members = [p for p in products if board in p["boards"]]
+    heat_cfg = cfg.get("heat", {})
+    members = board_members(products, board)
+    member_ids = {p["id"] for p in members}
     active = {k: w for k, w in heat_cfg.items()
               if any(latest.get(p["id"], {}).get(k, {}).get("value") is not None
                      for p in members)}
@@ -94,11 +93,13 @@ def observation_items(c, board: str, snap_date: str, latest: dict,
         (board, snap_date))}
     obs = []
     for p in products:
-        if board not in p["boards"] or p["id"] in ranked_ids:
+        if p["id"] not in member_ids or p["id"] in ranked_ids:
             continue
         pm = latest.get(p["id"], {})
         obs.append({
+            "product_id": p["id"],
             "slug": p["slug"], "name": p["name"], "vendor": p["vendor"],
+            "tier": p.get("tier"),
             "coverage": weighted_coverage(heat_cfg, pm, active) if heat_cfg else None,
             "available": [k for k in heat_cfg if pm.get(k, {}).get("value") is not None],
         })
@@ -123,7 +124,7 @@ def product_detail(c, slug: str) -> dict | None:
     if not row:
         return None
     p = dict(row)
-    p["boards"] = json.loads(p["board_tags"] or "[]")
+    p["boards"] = normalize_board_tags(json.loads(p["board_tags"] or "[]"))
     p["repo_aliases_list"] = json.loads(p["repo_aliases"] or "[]")
     # 采集期发现的仓库迁移别名（product_aliases 表）合并展示
     for a in c.execute("SELECT alias_value FROM product_aliases WHERE product_id=?"

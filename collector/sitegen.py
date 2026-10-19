@@ -69,7 +69,7 @@ def _env() -> Environment:
 
 
 def _top_metrics(board_key: str, reg: dict) -> list[str]:
-    if board_key == "unified":
+    if board_key == "harness_core":
         return ["github_stars", "npm_monthly_downloads", "vscode_installs"]
     heat = reg["boards"].get(board_key, {}).get("heat", {})
     return [k for k, _ in sorted(heat.items(), key=lambda kv: -kv[1])[:3]]
@@ -95,8 +95,8 @@ def _assets_version() -> str:
     return h.hexdigest()[:8]
 
 
-def _unified_display(items: list[dict], ai_weight: float) -> list[dict]:
-    """联合榜展示层变换(v1.5):剔除停滞产品 → 算法/AI 加权融合 → 重排名 → 前 10。
+def _core_display(items: list[dict], ai_weight: float) -> list[dict]:
+    """核心榜展示层变换(原联合榜 v1.5):剔除停滞 → 算法/AI 加权 → 重排名 → 前 10。
 
     只影响页面呈现;export 的 /api/v1/rankings/*.json 契约冻结,仍为算法分全量。
     """
@@ -165,10 +165,7 @@ def build() -> None:
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(html, encoding="utf-8")
 
-        # ---- 首页（单页：联合榜单 + 各赛道并排块）----
-        def board_block(bkey: str) -> dict:
-            return {"key": bkey, "name": reg["boards"].get(bkey, {}).get("name", bkey),
-                    "rows": bitems.get(bkey, []), "obs": len(bobs.get(bkey, []))}
+        # ---- 首页（门户：三方向入口 + 资讯 + 工作台）----
         # KPI 数据:数据源健康 + 最新入库日新闻量
         src_rows = queries.sources_health(c)
         src_ok = sum(1 for r in src_rows if r["enabled"] and r["reachable"])
@@ -178,14 +175,14 @@ def build() -> None:
             " WHERE published_at IS NOT NULL GROUP BY d ORDER BY d DESC LIMIT 1"
         ).fetchone()
         ai_weight = float(ai_mod.cfg()["scoring"].get("ai_weight", 0.0))
-        unified_display = _unified_display(bitems.get("unified", []), ai_weight)
+        core_display = _core_display(bitems.get("harness_core", []), ai_weight)
         model_items = bitems.get("model", [])
 
         # ---- 三方向频道页（三区固定：新闻流 / 榜单 / 每周总结）----
         def direction_block(bkey: str) -> dict:
             rows = bitems.get(bkey, [])
-            if bkey == "unified":
-                rows = _unified_display(rows, ai_weight)
+            if bkey == "harness_core":
+                rows = _core_display(rows, ai_weight)
             return {
                 "key": bkey,
                 "name": reg["boards"].get(bkey, {}).get("name", bkey),
@@ -218,26 +215,25 @@ def build() -> None:
             })
 
         render("index.html", "index.html",
-               unified=unified_display,
+               unified=core_display,
                model_top=model_items[:5],
                direction_cards=direction_cards,
                latest_news=queries.news_recent(c, 6),
                ai_board=ai_mod.summary_of(c, "board"),
                ai_weight_pct=round(ai_weight * 100),
-               unified_total=len(bitems.get("unified", [])),
-               blocks=[board_block(b) for b in order
-                       if b not in ("unified", "model") and bitems.get(b)],
+               unified_total=len(bitems.get("harness_core", [])),
+               eco_total=len(bitems.get("harness_eco", [])),
                kpi_sources=src_ok, kpi_sources_enabled=src_enabled,
                kpi_news_count=(nday["n"] if nday else 0),
                kpi_news_date=(nday["d"] if nday else "—"),
-               obs_total=sum(len(v) for k, v in bobs.items() if k != "unified"))
+               obs_total=sum(len(v) for k, v in bobs.items()))
 
         # ---- 榜单页 ----
         for b in order:
             if b not in snaps:
                 continue
-            if b == "unified":
-                items = _unified_display(bitems[b], ai_weight)
+            if b == "harness_core":
+                items = _core_display(bitems[b], ai_weight)
             elif b == "model":
                 items = bitems[b][:20]
             else:

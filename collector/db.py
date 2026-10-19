@@ -12,7 +12,8 @@ import hashlib
 import json
 import sqlite3
 
-from .config import DATA_DIR, RAW_DIR, DB_PATH, now_iso, resolve_data_path
+from .config import (DATA_DIR, RAW_DIR, DB_PATH, normalize_board_tags, now_iso,
+                     resolve_data_path)
 
 DDL = """
 PRAGMA journal_mode = WAL;
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS products (
     vendor          TEXT,
     category        TEXT NOT NULL,
     subcategory     TEXT,
+    tier            TEXT,                 -- Harness 收录分层 core|eco（协议/框架=eco）
     board_tags      TEXT,
     homepage        TEXT,
     repo            TEXT,
@@ -333,9 +335,17 @@ def conn() -> sqlite3.Connection:
     return c
 
 
+def ensure_product_columns(c) -> None:
+    """旧库附加式迁移：products 增加 tier（不影响既有列与数据）。"""
+    cols = {row[1] for row in c.execute("PRAGMA table_info(products)")}
+    if "tier" not in cols:
+        c.execute("ALTER TABLE products ADD COLUMN tier TEXT")
+
+
 def init_db() -> None:
     with conn() as c:
         c.executescript(DDL)
+        ensure_product_columns(c)
         ensure_news_tables(c)
         ensure_assistant_tables(c)
         ensure_ai_tables(c)
@@ -395,33 +405,34 @@ def upsert_products(c, products: list[dict]) -> list[dict]:
     ts = now_iso()
     out = []
     for p in products:
+        boards = normalize_board_tags(p.get("board_tags") or [p["category"]])
         row = c.execute("SELECT id FROM products WHERE slug=?", (p["slug"],)).fetchone()
         if row:
             pid = row["id"]
             c.execute(
-                "UPDATE products SET name=?, vendor=?, category=?, board_tags=?, repo=?,"
-                " repo_aliases=?, license=?, npm_package=?, pypi_package=?,"
+                "UPDATE products SET name=?, vendor=?, category=?, tier=?, board_tags=?,"
+                " repo=?, repo_aliases=?, license=?, npm_package=?, pypi_package=?,"
                 " appstore_id=?, vscode_ext_id=?, notes=?, updated_at=? WHERE id=?",
-                (p["name"], p.get("vendor"), p["category"],
-                 json.dumps(p.get("board_tags") or [p["category"]], ensure_ascii=False),
+                (p["name"], p.get("vendor"), p["category"], p.get("tier"),
+                 json.dumps(boards, ensure_ascii=False),
                  p.get("repo"), json.dumps(p.get("repo_aliases") or []),
                  p.get("license"), p.get("npm_package"), p.get("pypi_package"),
                  p.get("appstore_id"), p.get("vscode_ext_id"), p.get("notes"), ts, pid))
         else:
             cur = c.execute(
-                "INSERT INTO products(slug, name, vendor, category, board_tags, repo,"
-                " repo_aliases, license, npm_package, pypi_package, appstore_id,"
+                "INSERT INTO products(slug, name, vendor, category, tier, board_tags,"
+                " repo, repo_aliases, license, npm_package, pypi_package, appstore_id,"
                 " vscode_ext_id, notes, status, created_at, updated_at)"
-                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?, 'active', ?, ?)",
-                (p["slug"], p["name"], p.get("vendor"), p["category"],
-                 json.dumps(p.get("board_tags") or [p["category"]], ensure_ascii=False),
+                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'active', ?, ?)",
+                (p["slug"], p["name"], p.get("vendor"), p["category"], p.get("tier"),
+                 json.dumps(boards, ensure_ascii=False),
                  p.get("repo"), json.dumps(p.get("repo_aliases") or []),
                  p.get("license"), p.get("npm_package"), p.get("pypi_package"),
                  p.get("appstore_id"), p.get("vscode_ext_id"), p.get("notes"), ts, ts))
             pid = cur.lastrowid
         p = dict(p)
         p["id"] = pid
-        p["boards"] = p.get("board_tags") or [p["category"]]
+        p["boards"] = boards
         out.append(p)
         # 接入属性（可选，人工初始录入）
         integ = p.get("integration")

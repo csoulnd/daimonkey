@@ -1,11 +1,12 @@
-"""热度评分与联合榜单（v1.2）。
+"""热度评分与 Harness 分层榜（v1.7）。
 
 核心规则：
 - 分位数归一化（组内，0-1），方向感知（appstore_rank 越小越好）；
 - 缺失指标赋中性分位 0.5；coverage < 阈值 -> 观察区不入榜；
 - 某指标"全榜缺失"时剔除并重归一化；单产品缺失赋 0.5，不重归一化；
 - 双分：heat（存量）与 momentum（动量）；momentum 无可用增长数据时为 None；
-- 联合榜单只取主分类，再对各主分类的综合分做第二层分位数。
+- 核心榜（harness_core）由隐藏分类源榜派生，只取 tier=core 的主分类条目，
+  再对各分类的综合分做第二层分位数；生态榜（harness_eco）按 tier=eco 独立评分。
 """
 from __future__ import annotations
 
@@ -21,6 +22,16 @@ def weighted_coverage(heat_cfg: dict, pm: dict, active: dict | None = None) -> f
     total = sum(cfg.values()) or 1.0
     got = sum(w for k, w in cfg.items() if pm.get(k, {}).get("value") is not None)
     return round(got / total, 4)
+
+
+def board_members(products: list[dict], board_key: str) -> list[dict]:
+    """榜单成员：board_tags 命中，或 registry 的 select 条件命中（如 tier=eco）。"""
+    cfg = registry()["boards"].get(board_key, {})
+    select = cfg.get("select") or {}
+    if select:
+        return [p for p in products
+                if all(p.get(k) == v for k, v in select.items())]
+    return [p for p in products if board_key in p.get("boards", [])]
 
 
 def percentile_ranks(values: list[float | None], higher_better: bool = True) -> list[float | None]:
@@ -238,7 +249,7 @@ def compute_all(c, products: list[dict], snapshot_date: str) -> dict:
     c.execute("DELETE FROM rankings WHERE snapshot_date=?", (snapshot_date,))
 
     for bkey, bcfg in enabled.items():
-        members = [p for p in products if bkey in p["boards"]]
+        members = board_members(products, bkey)
         if not members:
             continue
         res = compute_board(bkey, bcfg, members, latest, hist_base,
@@ -266,41 +277,55 @@ def compute_all(c, products: list[dict], snapshot_date: str) -> dict:
                          "observation": len(res["observation"]),
                          "dropped": res["dropped"]}
 
-    # ---- 联合榜：仅主分类；综合分再按主分类排名，避免赛道分布和多榜取最高偏差。----
-    best: dict[int, dict] = {}
-    for bkey, res in board_results.items():
-        if boards[bkey].get("overlay"):
+    # ---- 派生榜（harness_core）：源分类榜按 tier 过滤后做第二层分位数 ----
+    # 只取产品主分类对应的源榜，避免 board_tags 多标签导致重复入选。
+    for dkey, dcfg in boards.items():
+        if not dcfg.get("derived") or not dcfg.get("enabled", True):
             continue
-        for it in res["ranked"]:
-            pid = it["product"]["id"]
-            if it["product"]["category"] == bkey:
+        tier = dcfg.get("tier")
+        best: dict[int, dict] = {}
+        for bkey in dcfg.get("derived_from") or []:
+            res = board_results.get(bkey)
+            if not res:
+                continue
+            for it in res["ranked"]:
+                prod = it["product"]
+                if prod.get("category") != bkey:
+                    continue
+                if tier and prod.get("tier") != tier:
+                    continue
                 u = dict(it)
                 u["board"] = bkey
-                best[pid] = u
-    for bkey in {it["board"] for it in best.values()}:
-        members = [it for it in best.values() if it["board"] == bkey]
-        heat_q = percentile_ranks([it["heat_score"] for it in members])
-        mom_q = percentile_ranks([it["momentum_score"] for it in members])
-        for it, hq, mq in zip(members, heat_q, mom_q):
-            it["category_heat_score"] = it["heat_score"]
-            it["heat_score"] = 100 * hq
-            it["momentum_score"] = 100 * mq if mq is not None else None
-    unified_items = sorted(best.values(), key=lambda x: (-x["heat_score"],
-                           -x["category_heat_score"], x["product"]["slug"]))
-    current = {it["product"]["id"]: i for i, it in enumerate(unified_items, 1)}
-    d7 = _rank_delta(c, "unified", snapshot_date, current, 7)
-    d30 = _rank_delta(c, "unified", snapshot_date, current, 30)
-    for rank, it in enumerate(unified_items, 1):
-        pid = it["product"]["id"]
-        c.execute(
-            "INSERT INTO rankings(board, snapshot_date, rank, product_id, heat_score,"
-            " momentum_score, delta_7d, delta_30d, coverage, methodology_version)"
-            " VALUES('unified', ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            " ON CONFLICT(board, snapshot_date, product_id) DO UPDATE SET"
-            " rank=excluded.rank, heat_score=excluded.heat_score,"
-            " momentum_score=excluded.momentum_score, delta_7d=excluded.delta_7d,"
-            " delta_30d=excluded.delta_30d, coverage=excluded.coverage",
-            (snapshot_date, rank, pid, it["heat_score"], it["momentum_score"],
-             d7.get(pid), d30.get(pid), it["coverage"], version))
-    summary["unified"] = {"ranked": len(unified_items)}
+                best[prod["id"]] = u
+        for bkey in {it["board"] for it in best.values()}:
+            members = [it for it in best.values() if it["board"] == bkey]
+            heat_q = percentile_ranks([it["heat_score"] for it in members])
+            mom_q = percentile_ranks([it["momentum_score"] for it in members])
+            for it, hq, mq in zip(members, heat_q, mom_q):
+                it["category_heat_score"] = it["heat_score"]
+                it["heat_score"] = 100 * hq
+                it["momentum_score"] = 100 * mq if mq is not None else None
+        derived_items = sorted(
+            best.values(), key=lambda x: (-x["heat_score"],
+                                          -x["category_heat_score"],
+                                          x["product"]["slug"]))
+        current = {it["product"]["id"]: i
+                   for i, it in enumerate(derived_items, 1)}
+        d7 = _rank_delta(c, dkey, snapshot_date, current, 7)
+        d30 = _rank_delta(c, dkey, snapshot_date, current, 30)
+        for rank, it in enumerate(derived_items, 1):
+            pid = it["product"]["id"]
+            c.execute(
+                "INSERT INTO rankings(board, snapshot_date, rank, product_id,"
+                " heat_score, momentum_score, delta_7d, delta_30d, coverage,"
+                " methodology_version) VALUES(?,?,?,?,?,?,?,?,?,?)"
+                " ON CONFLICT(board, snapshot_date, product_id) DO UPDATE SET"
+                " rank=excluded.rank, heat_score=excluded.heat_score,"
+                " momentum_score=excluded.momentum_score, delta_7d=excluded.delta_7d,"
+                " delta_30d=excluded.delta_30d, coverage=excluded.coverage",
+                (dkey, snapshot_date, rank, pid, it["heat_score"],
+                 it["momentum_score"], d7.get(pid), d30.get(pid),
+                 it["coverage"], version))
+        summary[dkey] = {"ranked": len(derived_items),
+                         "derived_from": list(dcfg.get("derived_from") or [])}
     return summary

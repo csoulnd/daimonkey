@@ -10,7 +10,7 @@ site:
   lang: zh-CN
 
 methodology:
-  version: v1.6                # v1.6: 新增模型评测榜(SuperCLUE 月报口径,overlay 不并入联合榜);v1.5: 联合榜=算法70%+AI复评30%、前10、剔停滞
+  version: v1.7                # v1.7: Harness 核心/生态分层,联合榜并入核心榜;v1.6: 新增模型评测榜(SuperCLUE);v1.5: 算法70%+AI复评30%
   observation_threshold: 0.5    # 加权覆盖率低于该值的产品进观察区，不参与排名
 
 # =============================================================================
@@ -26,11 +26,19 @@ directions:
     name: 智能体
     short: Harness
     icon: i-index
-    tagline: 多源热度 · 手动更新
-    description: 关注能自主执行、多步编排的智能体产品；核心产品与生态项目分层展示，不混排。
-    boards: [unified]
+    tagline: 核心产品 + 生态项目分层
+    description: 关注能自主执行、多步编排的智能体产品；核心产品与生态项目平行展示，永不混排。
+    boards: [harness_core, harness_eco]
     news_tag: harness
     news_categories: [coding, framework]
+    inclusion:
+      title: 收录说明（核心榜三问）
+      questions:
+        - 面向用户可用？（有可交付的产品形态，而不只是代码库）
+        - 具备自主执行或多步编排能力？（能自己完成任务，而不只是提供协议/SDK）
+        - 有可采集的公开使用数据？（GitHub/npm/App Store 等至少一条可用链路）
+      note: 三问全部通过才进入核心产品榜；协议（MCP）、库/框架（LangChain）、编排工具（n8n）等进入生态项目榜平行展示。原联合榜已并入核心产品榜，历史条目按产品维度逐个复核 tier。
+    migration_note: 2026-10-19 迁移：coding 全部 → core；framework 全部 → eco；general/claw 逐个判定（Browser Use 为框架 → eco，其余面向用户的产品 → core）。
   fm:
     name: 模型
     short: FM
@@ -114,28 +122,18 @@ derived_growth:
 # 榜单与权重（权重改动必须递增 methodology.version）
 # =============================================================================
 boards:
-  model:
-    name: 模型评测
-    overlay: true               # 独立评测榜,不并入 Agent 联合榜
-    heat:
-      sc_total: 1.0
-    momentum:
-      sc_total: 1.0
-  coding:
-    name: Agent Harness
-    heat:
-      github_stars: 0.25
-      npm_monthly_downloads: 0.35
-      vscode_installs: 0.20
-      github_contributors: 0.10
-      github_forks: 0.10
-    momentum:
-      github_commits_30d: 0.30
-      github_releases_30d: 0.20
-      github_stars_growth_30d: 0.30
-      npm_downloads_growth_30d: 0.20
-  framework:
-    name: 开源框架
+  # Harness 两榜：核心产品与生态项目平行展示，永不混排（DESIGN 1.4 默认 B）。
+  # 核心榜由隐藏的分类源榜（coding/general/claw）派生，只收 tier=core；
+  # 生态榜按 tier=eco 选品，协议/库/编排工具只进这里。
+  harness_core:
+    name: 核心产品榜
+    derived: true
+    derived_from: [coding, general, claw]
+    tier: core
+  harness_eco:
+    name: 生态项目榜
+    folded: true                # 频道页折叠区，不占主表
+    select: {tier: eco}
     heat:
       github_stars: 0.30
       pypi_monthly_downloads: 0.25
@@ -147,8 +145,31 @@ boards:
       github_stars_growth_30d: 0.30
       pypi_downloads_growth_30d: 0.15
       npm_downloads_growth_30d: 0.15
+  model:
+    name: 模型评测
+    overlay: true               # 独立评测榜,不并入 Harness 核心榜
+    heat:
+      sc_total: 1.0
+    momentum:
+      sc_total: 1.0
+  # 分类源榜：仅用于派生核心榜、观察区与产品页溯源，不单独进导航/门户
+  coding:
+    name: 编码智能体（源榜）
+    hidden: true
+    heat:
+      github_stars: 0.25
+      npm_monthly_downloads: 0.35
+      vscode_installs: 0.20
+      github_contributors: 0.10
+      github_forks: 0.10
+    momentum:
+      github_commits_30d: 0.30
+      github_releases_30d: 0.20
+      github_stars_growth_30d: 0.30
+      npm_downloads_growth_30d: 0.20
   general:
-    name: 通用智能体
+    name: 通用智能体（源榜）
+    hidden: true
     # v1.1: 开源/闭源双轨道——GitHub 轨 0.5 / App Store 轨 0.5，
     # 任一轨道完整即可达 50% 覆盖率入榜（开源产品无 App Store 数据，反之亦然）
     heat:
@@ -159,7 +180,8 @@ boards:
       github_commits_30d: 0.50
       github_stars_growth_30d: 0.50
   claw:
-    name: Claw 生态
+    name: Claw 生态（源榜）
+    hidden: true
     heat:
       github_stars: 0.40
       npm_monthly_downloads: 0.40
@@ -170,7 +192,7 @@ boards:
       npm_downloads_growth_30d: 0.20
   domestic:
     name: 国产开源榜
-    overlay: true               # 地域专题榜；联合榜仅取产品主分类，避免重复入榜
+    overlay: true               # 地域专题榜；不参与 Harness 核心榜派生，避免重复入榜
     heat:
       github_stars: 0.65
       github_forks: 0.35
@@ -185,9 +207,6 @@ boards:
       appstore_rank: 0.45
     momentum:
       appstore_rating_growth_30d: 1.00
-  unified:
-    name: 联合榜单
-    derived: true              # 主分类综合分再做分类内分位数，不直接配置指标
   office:
     name: 办公智能体
     enabled: false             # 暂无可用数据源（多为闭源），Phase 2 接入
@@ -197,6 +216,11 @@ boards:
   data:
     name: 数据智能体
     enabled: false
+
+# 旧 board_key → 新 board_key。framework 已并入 Harness 生态榜；
+# 读取旧库 board_tags 时也会按此归一，避免产品页出现不存在的榜单。
+board_aliases:
+  framework: harness_eco
 
 # =============================================================================
 # 数据源登记表（sources 表 + /sources 页面的数据基础）
@@ -376,6 +400,7 @@ products:
     name: Codex CLI
     vendor: OpenAI
     category: coding
+    tier: core
     repo: openai/codex
     npm_package: "@openai/codex"
     license: Apache-2.0
@@ -384,6 +409,7 @@ products:
     name: DSH (DeepSeek Harness)
     vendor: DeepSeek
     category: coding
+    tier: core
     board_tags: [coding, domestic]
     repo: deepseek-ai/deepseek-harness
     npm_package: "@deepseek-ai/dsh"
@@ -392,6 +418,7 @@ products:
     name: Claude Code
     vendor: Anthropic
     category: coding
+    tier: core
     repo: anthropics/claude-code
     npm_package: "@anthropic-ai/claude-code"
     vscode_ext_id: anthropic.claude-code
@@ -401,6 +428,7 @@ products:
     name: Gemini CLI
     vendor: Google
     category: coding
+    tier: core
     repo: google-gemini/gemini-cli
     npm_package: "@google/gemini-cli"
     license: Apache-2.0
@@ -409,6 +437,7 @@ products:
     name: OpenCode
     vendor: Anomaly
     category: coding
+    tier: core
     repo: anomalyco/opencode
     repo_aliases: [sst/opencode]
     npm_package: opencode-ai
@@ -418,6 +447,7 @@ products:
     name: Cline
     vendor: Cline
     category: coding
+    tier: core
     repo: cline/cline
     npm_package: cline
     vscode_ext_id: saoudrizwan.claude-dev
@@ -427,6 +457,7 @@ products:
     name: Kilo Code
     vendor: Kilo Org
     category: coding
+    tier: core
     repo: Kilo-Org/kilocode
     vscode_ext_id: kilocode.Kilo-Code
     integration: {has_api: 1, protocol: [mcp, openai-compat], install_difficulty: easy}
@@ -434,6 +465,7 @@ products:
     name: Goose
     vendor: Block
     category: coding
+    tier: core
     repo: block/goose
     license: Apache-2.0
     integration: {has_cli: 1, has_tui: 1, has_api: 1, protocol: [mcp], install_difficulty: medium}
@@ -441,6 +473,7 @@ products:
     name: OpenHands
     vendor: All Hands AI
     category: coding
+    tier: core
     repo: All-Hands-AI/OpenHands
     license: MIT
     integration: {has_cli: 1, has_webui: 1, has_api: 1, protocol: [mcp], install_difficulty: medium}
@@ -448,6 +481,7 @@ products:
     name: Aider
     vendor: Aider AI
     category: coding
+    tier: core
     repo: Aider-AI/aider
     pypi_package: aider
     license: Apache-2.0
@@ -456,6 +490,7 @@ products:
     name: GitHub Copilot
     vendor: GitHub
     category: coding
+    tier: core
     vscode_ext_id: GitHub.copilot
     repo: null
     integration: {has_api: 1, protocol: [openai-compat], install_difficulty: easy}
@@ -463,6 +498,7 @@ products:
     name: Cursor
     vendor: Anysphere
     category: coding
+    tier: core
     repo: null
     notes: 闭源，暂无公开数据口径，进观察区
 
@@ -471,6 +507,7 @@ products:
     name: OpenClaw
     vendor: OpenClaw
     category: general
+    tier: core
     board_tags: [general, claw]
     repo: openclaw/openclaw
     npm_package: openclaw
@@ -480,17 +517,20 @@ products:
     name: Hermes Agent
     vendor: NousResearch
     category: general
+    tier: core
     repo: NousResearch/hermes-agent
   - slug: autogpt
     name: AutoGPT
     vendor: Significant Gravitas
     category: general
+    tier: core
     repo: Significant-Gravitas/AutoGPT
     license: MIT
   - slug: browser-use
     name: Browser Use
     vendor: Browser Use
     category: general
+    tier: eco
     repo: browser-use/browser-use
     pypi_package: browser-use
     license: MIT
@@ -499,6 +539,7 @@ products:
     name: ChatGPT
     vendor: OpenAI
     category: general
+    tier: core
     repo: null
     appstore_id: com.openai.chat
     appstore_country: us
@@ -509,6 +550,7 @@ products:
     name: QClaw
     vendor: 腾讯
     category: claw
+    tier: core
     board_tags: [claw, domestic_app]
     appstore_id: "6760533871"
     appstore_country: cn
@@ -518,6 +560,7 @@ products:
     name: AutoClaw
     vendor: 智谱
     category: claw
+    tier: core
     board_tags: [claw, domestic_app]
     appstore_id: "6761991573"
     appstore_country: cn
@@ -527,12 +570,14 @@ products:
     name: easyclaw
     vendor: 猎豹
     category: claw
+    tier: core
     repo: null
     notes: 暂无公开仓库/包名，观察区
   - slug: joyclaw
     name: JoyClaw
     vendor: 京东
     category: claw
+    tier: core
     board_tags: [claw, office]
     repo: null
     notes: 暂无公开仓库/包名，观察区
@@ -540,6 +585,7 @@ products:
     name: LobsterAI
     vendor: 网易有道
     category: claw
+    tier: core
     repo: null
     notes: 暂无公开仓库/包名，观察区
 
@@ -548,6 +594,7 @@ products:
     name: n8n
     vendor: n8n
     category: framework
+    tier: eco
     repo: n8n-io/n8n
     npm_package: n8n
     integration: {has_webui: 1, has_api: 1, has_docker: 1, docker_image_ref: "docker.n8n.io/n8nio/n8n", container_friendly: 5, install_difficulty: easy}
@@ -555,6 +602,7 @@ products:
     name: Dify
     vendor: LangGenius
     category: framework
+    tier: eco
     repo: langgenius/dify
     board_tags: [framework, domestic]
     integration: {has_webui: 1, has_api: 1, has_docker: 1, container_friendly: 5, install_difficulty: medium}
@@ -562,6 +610,7 @@ products:
     name: LangChain
     vendor: LangChain
     category: framework
+    tier: eco
     repo: langchain-ai/langchain
     pypi_package: langchain
     license: MIT
@@ -570,6 +619,7 @@ products:
     name: Langflow
     vendor: Langflow
     category: framework
+    tier: eco
     repo: langflow-ai/langflow
     pypi_package: langflow
     license: MIT
@@ -578,6 +628,7 @@ products:
     name: crewAI
     vendor: crewAIInc
     category: framework
+    tier: eco
     repo: crewAIInc/crewAI
     pypi_package: crewai
     license: MIT
@@ -586,6 +637,7 @@ products:
     name: AutoGen
     vendor: Microsoft
     category: framework
+    tier: eco
     repo: microsoft/autogen
     pypi_package: autogen-agentchat
     license: MIT
@@ -594,6 +646,7 @@ products:
     name: Flowise
     vendor: FlowiseAI
     category: framework
+    tier: eco
     repo: FlowiseAI/Flowise
     npm_package: flowise
     license: Apache-2.0
@@ -602,12 +655,14 @@ products:
     name: Mastra
     vendor: Mastra
     category: framework
+    tier: eco
     repo: mastra-ai/mastra
     npm_package: "@mastra/core"
   - slug: openai-agents
     name: OpenAI Agents SDK
     vendor: OpenAI
     category: framework
+    tier: eco
     repo: openai/openai-agents-python
     pypi_package: openai-agents
     license: MIT
@@ -616,6 +671,7 @@ products:
     name: Google ADK
     vendor: Google
     category: framework
+    tier: eco
     repo: google/adk-python
     pypi_package: google-adk
     license: Apache-2.0
@@ -623,6 +679,7 @@ products:
     name: MCP
     vendor: ModelContextProtocol
     category: framework
+    tier: eco
     repo: modelcontextprotocol/servers
     npm_package: "@modelcontextprotocol/sdk"
     license: MIT
@@ -631,6 +688,7 @@ products:
     name: Activepieces
     vendor: Activepieces
     category: framework
+    tier: eco
     repo: activepieces/activepieces
     license: MIT
     integration: {has_webui: 1, has_api: 1, has_docker: 1, container_friendly: 5, install_difficulty: easy}
@@ -638,6 +696,7 @@ products:
     name: Coze Studio
     vendor: Coze
     category: framework
+    tier: eco
     repo: coze-dev/coze-studio
     board_tags: [framework, domestic]
     license: Apache-2.0
@@ -646,6 +705,7 @@ products:
     name: Qwen-Agent
     vendor: QwenLM
     category: framework
+    tier: eco
     repo: QwenLM/Qwen-Agent
     board_tags: [framework, domestic]
     pypi_package: qwen-agent
@@ -654,42 +714,49 @@ products:
     name: FastGPT
     vendor: LabRing
     category: framework
+    tier: eco
     board_tags: [framework, domestic]
     repo: labring/FastGPT
   - slug: ragflow
     name: RAGFlow
     vendor: InfiniFlow
     category: framework
+    tier: eco
     board_tags: [framework, domestic]
     repo: infiniflow/ragflow
   - slug: agentscope
     name: AgentScope
     vendor: AgentScope Team
     category: framework
+    tier: eco
     board_tags: [framework, domestic]
     repo: agentscope-ai/agentscope
   - slug: metagpt
     name: MetaGPT
     vendor: DeepWisdom
     category: framework
+    tier: eco
     board_tags: [framework, domestic]
     repo: FoundationAgents/MetaGPT
   - slug: openmanus
     name: OpenManus
     vendor: FoundationAgents
     category: general
+    tier: core
     board_tags: [general, domestic]
     repo: FoundationAgents/OpenManus
   - slug: chatdev
     name: ChatDev
     vendor: OpenBMB
     category: framework
+    tier: eco
     board_tags: [framework, domestic]
     repo: OpenBMB/ChatDev
   - slug: vercel-ai
     name: Vercel AI SDK
     vendor: Vercel
     category: framework
+    tier: eco
     repo: vercel/ai
     npm_package: ai
     license: Apache-2.0
@@ -736,6 +803,7 @@ products:
     name: 千问
     vendor: 阿里巴巴
     category: general
+    tier: core
     board_tags: [general, domestic_app]
     appstore_id: "6466733523"
     appstore_country: cn
@@ -835,14 +903,14 @@ assistant:
   ai:
     summaries:
       enabled: true
-      pages: [home, news, knowledge, board]   # 四板块顶部 AI 摘要(board=联合榜单总结)
+      pages: [home, news, knowledge, board]   # 四板块顶部 AI 摘要(board=核心产品榜总结)
       max_tokens: 3000             # 推理+输出总预算（过小会出现 max-tokens 空回复）
     scoring:
       enabled: true
-      boards: []                    # 空 = 自动取当日有数据的所有榜；可填 [unified, coding]
+      boards: []                    # 空 = 自动取当日有数据的所有榜；可填 [harness_core, harness_eco]
       top_n: 15                     # 每榜取前 N 名送 AI 分析
       max_tokens: 4000
-      ai_weight: 0.3                # AI 复评在联合榜最终分中的权重(v1.5);0=仅展示
+      ai_weight: 0.3                # AI 复评在核心榜最终分中的权重(v1.5);0=仅展示
 
 # 云剪贴板（个人工作台，2026-10-19）：两台设备间文本同步 + 小云盘。
 # 用户隔离按 owner；文件落 data/clipboard/{owner}/，换机备份见 deploy/backup.sh 白名单。

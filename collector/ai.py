@@ -13,6 +13,7 @@ import json
 import re
 
 from . import assistant, db
+from .config import registry
 
 class AiParseError(assistant.AssistantError):
     """AI 输出无法解析（可安全重试一次：配额与执行均已正常）。"""
@@ -51,7 +52,7 @@ def data_signature(c, page: str) -> str | None:
     if page == "home":
         row = c.execute(
             "SELECT snapshot_date, COUNT(*) n FROM rankings"
-            " WHERE board = 'unified' GROUP BY snapshot_date"
+            " WHERE board = 'harness_core' GROUP BY snapshot_date"
             " ORDER BY snapshot_date DESC LIMIT 1").fetchone()
         return f"{row['snapshot_date']}:{row['n']}" if row else None
     if page == "news":
@@ -68,17 +69,18 @@ def data_signature(c, page: str) -> str | None:
         # 联合榜单总结的指纹:最新快照日前 15 名次 + 对应 AI 分集合
         row = c.execute(
             "SELECT snapshot_date, COUNT(*) n FROM rankings"
-            " WHERE board = 'unified' GROUP BY snapshot_date"
+            " WHERE board = 'harness_core' GROUP BY snapshot_date"
             " ORDER BY snapshot_date DESC LIMIT 1").fetchone()
         if not row:
             return None
         top = c.execute(
             "SELECT r.rank, r.heat_score, p.slug FROM rankings r"
             " JOIN products p ON p.id = r.product_id"
-            " WHERE r.board='unified' AND r.snapshot_date=? ORDER BY r.rank LIMIT 15",
+            " WHERE r.board='harness_core' AND r.snapshot_date=?"
+            " ORDER BY r.rank LIMIT 15",
             (row["snapshot_date"],)).fetchall()
         ai_n = c.execute(
-            "SELECT COUNT(*) n FROM ai_scores WHERE board='unified'"
+            "SELECT COUNT(*) n FROM ai_scores WHERE board='harness_core'"
             " AND snapshot_date=?", (row["snapshot_date"],)).fetchone()["n"]
         digest = ",".join(f"{r['rank']}{r['slug']}:{_n(r['heat_score'])}" for r in top)
         return f"{row['snapshot_date']}:{digest}:ai{ai_n}"
@@ -148,9 +150,11 @@ def score_boards(c, snapshot_date: str) -> list[str]:
         return []
     boards = conf.get("boards")
     if not boards:
+        visible = {k for k, v in registry()["boards"].items()
+                   if v.get("enabled", True) and not v.get("hidden")}
         boards = [r[0] for r in c.execute(
             "SELECT DISTINCT board FROM rankings WHERE snapshot_date = ?"
-            " ORDER BY board", (snapshot_date,))]
+            " ORDER BY board", (snapshot_date,)) if r[0] in visible]
     notes: list[str] = []
     for board in boards:
         try:

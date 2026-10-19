@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 
 def seed(db_mod):
-    """临时库中造最小数据集：2 产品 + 联合榜 + 1 条新闻。"""
+    """临时库中造最小数据集：2 产品 + 核心产品榜 + 1 条新闻。"""
     with db_mod.conn() as c:
         c.executescript(db_mod.DDL)
         db_mod.ensure_news_tables(c)
@@ -28,7 +28,7 @@ def seed(db_mod):
             c.execute(
                 "INSERT INTO rankings (board, snapshot_date, rank, product_id,"
                 " heat_score, momentum_score, delta_7d, coverage, methodology_version)"
-                " VALUES ('unified','2026-10-12',?,?,?,?,?,?, 'v1.4')",
+                " VALUES ('harness_core','2026-10-12',?,?,?,?,?,?, 'v1.7')",
                 (pid, pid, 90.0 - pid, 60.0, 1.0, 0.9))
         c.execute(
             "INSERT INTO news_items (url_hash, title, url, source_key, source_name,"
@@ -152,7 +152,7 @@ class AiWorkflowTests(unittest.TestCase):
             c.execute("UPDATE rankings SET momentum_score = NULL, delta_7d = NULL,"
                       " coverage = NULL WHERE product_id = 2")
         spec = self.workflows.get("board_ai_analysis")
-        task = spec.build_task({"board": "unified", "snapshot_date": "2026-10-12"})
+        task = spec.build_task({"board": "harness_core", "snapshot_date": "2026-10-12"})
         self.assertIn("Beta 框架", task)
         self.assertIn("—", task)  # None 值以占位符呈现
         home_task = self.workflows.get("page_summary").build_task({"page": "home"})
@@ -174,8 +174,8 @@ class AiWorkflowTests(unittest.TestCase):
                 c.execute(
                     "INSERT INTO ai_scores (board, snapshot_date, product_id,"
                     " ai_score, rationale, created_at) VALUES"
-                    " ('unified','2026-10-12',1,91,'理由1','now'),"
-                    " ('unified','2026-10-12',2,77,'理由2','now')")
+                    " ('harness_core','2026-10-12',1,91,'理由1','now'),"
+                    " ('harness_core','2026-10-12',2,77,'理由2','now')")
             return ok_result()
 
         with self.db.conn() as c, \

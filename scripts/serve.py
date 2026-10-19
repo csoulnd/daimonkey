@@ -65,7 +65,11 @@ def password_valid(supplied: str) -> bool:
 # 旧信息架构 -> 三方向频道（301 永久跳转，保留外链与书签）
 LEGACY_REDIRECTS = {
     "/rankings": "/dir/harness",
-    "/rankings/unified": "/dir/harness",
+    "/rankings/unified": "/dir/harness",   # 联合榜并入核心产品榜
+    "/rankings/coding": "/dir/harness",    # 分类源榜不再单独展示
+    "/rankings/general": "/dir/harness",
+    "/rankings/claw": "/dir/harness",
+    "/rankings/framework": "/rankings/harness_eco",
 }
 
 CONTENT_TYPES = {

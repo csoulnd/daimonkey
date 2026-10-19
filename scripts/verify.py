@@ -125,9 +125,12 @@ def main() -> int:
 
     print("== 1. 页面与 API 可访问性 ==")
     paths = ["/", "/dir/harness", "/dir/fm", "/dir/nv",
-             "/rankings/unified", "/rankings/coding", "/product/claude-code",
+             "/rankings/unified", "/rankings/coding", "/rankings/harness_core",
+             "/rankings/harness_eco", "/product/claude-code",
              "/sources", "/api.html", "/news",
              "/api/v1/boards.json", "/api/v1/rankings/unified.json",
+             "/api/v1/rankings/harness_core.json",
+             "/api/v1/rankings/harness_eco.json",
              "/api/v1/meta.json", "/api/v1/news.json"]
     for p in paths:
         try:
@@ -193,6 +196,29 @@ def main() -> int:
     check("NV 规划数据源清单", "规划中的数据源" in nv and "MLPerf" in nv)
     check("导航三方向入口", all(f'href="/dir/{k}"' in home
                                 for k in ("harness", "fm", "nv")))
+    harness_html = page(base + "/dir/harness")
+    check("Harness 收录三问", "收录说明（核心榜三问）" in harness_html
+          and harness_html.count("<li>") >= 3)
+
+    print("== 2d. Harness 分层不混排 ==")
+    try:
+        core = json.load(get(base + "/api/v1/rankings/harness_core.json"))
+        eco = json.load(get(base + "/api/v1/rankings/harness_eco.json"))
+        legacy = json.load(get(base + "/api/v1/rankings/unified.json"))
+        core_slugs = {it["slug"] for it in core["items"]}
+        eco_slugs = {it["slug"] for it in eco["items"]}
+        check("核心榜全部 tier=core",
+              core["items"] and {it.get("tier") for it in core["items"]} == {"core"})
+        check("生态榜全部 tier=eco",
+              eco["items"] and {it.get("tier") for it in eco["items"]} == {"eco"})
+        check("核心/生态无交集", not (core_slugs & eco_slugs))
+        check("MCP/n8n 不在核心榜",
+              not ({"mcp-servers", "n8n"} & core_slugs))
+        check("MCP/n8n 在生态榜", {"mcp-servers", "n8n"} <= eco_slugs)
+        check("旧 unified API 指向核心榜",
+              legacy["meta"].get("legacy_of") == "harness_core")
+    except Exception as e:
+        check(f"Harness 分层 API 解析 ({e})", False)
 
     print("== 2c. 旧路由 301 ==")
     class _NoRedirect(urllib.request.HTTPRedirectHandler):

@@ -4,7 +4,7 @@
 {% block crumb %}{{ name }}{% endblock %}
 {% block content %}
 <div class="sec-head">
-  <h1>{{ name }}{% if board == 'unified' %} <span class="pill">跨榜整合</span>{% endif %}</h1>
+  <h1>{{ name }}{% if board == 'harness_core' %} <span class="pill">核心产品</span>{% elif board == 'harness_eco' %} <span class="pill">生态项目</span>{% endif %}</h1>
   <div class="view-toggle">
     <button class="tg active" data-view="heat" type="button">热度视图</button>
     <button class="tg" data-view="mom" type="button">动量视图</button>
@@ -24,7 +24,7 @@
 <tr>
   <td class="rank{% if it.rank <= 3 %} top{% endif %}">{{ it.rank }}</td>
   <td class="pname"><a href="/product/{{ it.slug }}">{{ it.name }}</a>
-    {% if board == 'unified' %}{{ m.badge(it.board, board_names) }}{% endif %}
+    {% if board == 'harness_core' %}{{ m.badge(it.board, board_names) }}{% endif %}
     {% if it.status == 'stale' %}<span class="stale-tag" title="仓库超过 90 天无推送">停滞</span>{% endif %}
     <span class="vendor">{{ it.vendor }}</span></td>
   <td>{{ m.score(it.heat_score, 'heat', bar=True) }}</td>

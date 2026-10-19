@@ -40,6 +40,7 @@ def export_all() -> None:
             obs = queries.observation_items(c, b, snaps[b], latest, products)
             boards_list.append({
                 "key": b, "name": reg["boards"][b]["name"],
+                "hidden": bool(reg["boards"][b].get("hidden")),
                 "product_count": len(queries.board_items(c, b, snaps[b], latest)),
                 "observation_count": len(obs),
                 "snapshot_date": snaps[b],
@@ -51,15 +52,17 @@ def export_all() -> None:
         })
 
         # ---- rankings/{board}.json + history ----
+        payloads: dict[str, dict] = {}
         for b in order:
             if b not in snaps:
                 continue
             items = queries.board_items(c, b, snaps[b], latest)
             obs = queries.observation_items(c, b, snaps[b], latest, products)
-            configured = reg["boards"][b] if b != "unified" else {}
+            is_derived = bool(reg["boards"][b].get("derived"))
+            configured = {} if is_derived else reg["boards"][b]
             effective = {}
-            if b != "unified":
-                members = [p for p in products if b in p["boards"]]
+            if not is_derived:
+                members = scoring.board_members(products, b)
                 effective = scoring.compute_board(
                     b, configured, members, latest, hist_base, snaps[b],
                     reg["methodology"]["observation_threshold"])["weights"]
@@ -68,6 +71,7 @@ def export_all() -> None:
                     "board": b, "name": reg["boards"][b]["name"],
                     "snapshot_date": snaps[b], "methodology_version": version,
                     "generated_at": generated,
+                    "hidden": bool(reg["boards"][b].get("hidden")),
                     "weights": configured,
                     "effective_weights": effective,
                 },
@@ -75,12 +79,25 @@ def export_all() -> None:
                           for it in items],
                 "observation": obs,
             }
+            payloads[b] = payload
             _jwrite(api / "rankings" / f"{b}.json", payload)
             _jwrite(api / "rankings" / b / "history.json", {
                 "meta": {"board": b, "days": 90},
                 "series": queries.history_series(c, b, 90),
             })
             _jwrite(SNAPSHOT_DIR / snaps[b] / f"{b}.json", payload)
+
+        # 旧 API 契约兼容：unified 已并入 harness_core，保留只读别名。
+        if "harness_core" in payloads:
+            legacy = dict(payloads["harness_core"])
+            legacy["meta"] = dict(legacy["meta"], board="unified",
+                                  name="联合榜单（已并入核心产品榜）",
+                                  legacy_of="harness_core")
+            _jwrite(api / "rankings" / "unified.json", legacy)
+            _jwrite(api / "rankings" / "unified" / "history.json", {
+                "meta": {"board": "unified", "legacy_of": "harness_core", "days": 90},
+                "series": queries.history_series(c, "harness_core", 90),
+            })
 
         # ---- products/{slug}.json ----
         news_idx = queries.news_by_product(c, limit_per_product=5)
