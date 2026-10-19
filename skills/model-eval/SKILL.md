@@ -23,6 +23,8 @@ description: 模型评分榜单专家。适用场景:模型 benchmark 榜单的�
 | LMArena Elo | 直连/HF/raw.githubusercontent **全断** | 需代理或镜像通道;列先预留显示 — |
 | Code Arena(参考站第 4 源) | 断连 | 暂不接 |
 | ModelScope | 通(0.2s) | 开源模型官方链接优先 ModelScope |
+| **OpenRouter Rankings**(openrouter.ai/rankings) | 通(3s) | **真实使用量榜(调用量份额/应用排名)**——2026-10-18 探测新增;FM 方向口径=使用量定范围+质量定排名,数据端点待 spike |
+| LiveBench / OpenCompass | 通 | 二期备选基准源 |
 
 ## 已落地(2026-10-17,v1.6)
 
