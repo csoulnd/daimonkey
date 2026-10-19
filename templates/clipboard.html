@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}剪贴板 · {{ site.name }}{% endblock %}
+{% block content %}
+<section class="clip-intro">
+  <div class="dim">CLOUD CLIPBOARD</div>
+  <h1>剪贴板</h1>
+  <p>两台设备间同步文本与文件：一端存入，另一端约 5 秒内自动出现（页面需保持打开）。</p>
+  <div class="dim" id="clip-usage-line" aria-live="polite">加载中…</div>
+  <div class="clip-quota" aria-hidden="true"><div class="clip-quota-bar" id="clip-quota-bar"></div></div>
+</section>
+
+<section class="clip-section" aria-labelledby="clip-text-h">
+  <h2 id="clip-text-h">文本</h2>
+  <div class="clip-input-row">
+    <textarea id="clip-input" rows="3" placeholder="粘贴或输入要同步到另一台设备的文本，Ctrl+Enter 存入"></textarea>
+    <div class="clip-btn-row">
+      <button id="clip-save" type="button">存入</button>
+      <button id="clip-paste" type="button" title="读取本机剪贴板内容到输入框（浏览器会请求授权）">从本机剪贴板读取</button>
+    </div>
+  </div>
+  <div id="clip-msg" class="dim" aria-live="polite"></div>
+  <ul class="clip-list" id="clip-text-list"></ul>
+</section>
+
+<section class="clip-section" aria-labelledby="clip-file-h">
+  <h2 id="clip-file-h">文件</h2>
+  <div class="clip-drop" id="clip-drop">
+    <button id="clip-upload" type="button">选择文件上传</button>
+    <span class="dim">或把文件拖到这里 · 单文件 ≤ {{ clip_limits.max_file_mb }}MB，总量 {{ clip_limits.quota_mb }}MB</span>
+    <input type="file" id="clip-file-input" hidden>
+  </div>
+  <div class="clip-progress" id="clip-progress" hidden>
+    <div class="clip-progress-track"><div class="clip-progress-bar" id="clip-progress-bar"></div></div>
+    <span class="dim" id="clip-progress-text"></span>
+  </div>
+  <ul class="clip-list clip-files" id="clip-file-list"></ul>
+</section>
+{% endblock %}

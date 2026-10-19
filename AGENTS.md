@@ -20,6 +20,10 @@ InferTech 观察站(原智能体热度指数):以推理技术为重心,采集 Ag
 3. **结束后**:把本次任务产生的新知识沉淀回对应专家——决策及理由、踩过的坑、新的验证命令。**没有更新专家的任务视为未完成。**
 4. 跨领域任务:选定一个主责专家,其余专家只在被触及时追加备注,不重复记录。
 
+## 开发交接
+
+新成员从 [docs/HANDOVER.md](docs/HANDOVER.md) 入口进入。
+
 ## 当前迭代计划
 
 见 [PLAN.md](PLAN.md);**三方向需求分析与设计**见 [docs/DESIGN-三方向.md](docs/DESIGN-三方向.md)(澄清记录:[docs/ROADMAP-三方向.md](docs/ROADMAP-三方向.md));**部署交付件与可搬迁性计划**见 [docs/PLAN-deploy.md](docs/PLAN-deploy.md)——D1-D6 已完成(2026-10-17),状态与验收证据在该文件末尾。

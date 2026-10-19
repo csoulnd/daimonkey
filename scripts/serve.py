@@ -14,6 +14,10 @@
     智能助手（账号登录，签名 Cookie 携带用户名）：
     GET/POST /api/v1/assistant/session|login|logout、GET sessions|sessions/{id}/messages|
     status|usage|workflows、POST chat|workflows/{name}、DELETE sessions/{id}
+    云剪贴板（工作台：两设备间文本同步 + 小云盘，全部需登录）：
+    GET /api/v1/clipboard/items|usage、GET /api/v1/clipboard/files/{id}（下载）、
+    POST /api/v1/clipboard/items（文本）|files（raw body 上传，文件名在 X-Filename 头）、
+    DELETE /api/v1/clipboard/items/{id}
 
 站点浏览（GET）无需鉴权。登录与更新触发统一走账号体系：
     账号由 scripts/userctl.py 在服务器上手动创建，全部账号等权（管理员）；
@@ -36,12 +40,12 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse, parse_qs
+from urllib.parse import unquote, urlparse, parse_qs, quote
 from email.utils import formatdate
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from collector import assistant, kbsearch, users
+from collector import assistant, clipboard, kbsearch, users
 DIST = ROOT / "dist"
 STATUS_FILE = ROOT / "data" / "update_status.json"
 PASSWORD_FILE = ROOT / "data" / "update_password.sha256"   # 仅过渡期使用
@@ -461,8 +465,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"error": "use POST to trigger update"}, 405)
                 return
             if any(path == p or path.startswith(p + "/")
-                   for p in ("/notes", "/reports", "/knowledge")):
-                # 讲稿/报告厅/知识库:仅登录账号可见(响应带 noindex)
+                   for p in ("/notes", "/reports", "/knowledge", "/clipboard")):
+                # 讲稿/报告厅/知识库/剪贴板:仅登录账号可见(响应带 noindex)
                 user = self._assistant_user()
                 if not user:
                     self._login_denied(path)
@@ -476,6 +480,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._file(path)
                 return
             if self._assistant_get(path):
+                return
+            if self._clipboard_get(path):
                 return
             self._file(path)
         except (BrokenPipeError, ConnectionResetError):
@@ -497,7 +503,7 @@ class Handler(BaseHTTPRequestHandler):
                 "<body style=\"font-family:system-ui,sans-serif;max-width:520px;"
                 "margin:14vh auto;padding:0 24px;line-height:1.8;color:#556\">"
                 "<h2>需要登录</h2>"
-                "<p>此内容(报告厅 / 知识库 / 讲稿)仅登录账号可见,站点其余页面匿名可浏览。</p>"
+                "<p>此内容(报告厅 / 知识库 / 讲稿 / 剪贴板)仅登录账号可见,站点其余页面匿名可浏览。</p>"
                 f"<p><a href=\"/login?next={quote(path)}\" "
                 "style=\"padding:8px 18px;background:#7c8cff;color:#fff;"
                 "border-radius:8px;text-decoration:none\">前往登录</a></p>"
@@ -559,6 +565,117 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"error": f"{type(e).__name__}: {e}"}, 500)
         return True
 
+    # ---- 云剪贴板（工作台：两设备间文本同步 + 小云盘，见 skills/workspace） ----
+
+    def _clipboard_get(self, path: str) -> bool:
+        """剪贴板 GET 路由；已处理返回 True。全部需登录。"""
+        if not path.startswith("/api/v1/clipboard/"):
+            return False
+        rest = path[len("/api/v1/clipboard/"):]
+        user = self._assistant_user()
+        if not user:
+            self._json({"error": "未登录"}, 401)
+            return True
+        try:
+            if rest == "items":
+                params = parse_qs(urlparse(self.path).query)
+                try:
+                    limit = int(params.get("limit", ["100"])[0])
+                except ValueError:
+                    self._json({"error": "invalid limit"}, 400)
+                    return True
+                self._json({"items": clipboard.list_items(
+                    user, max(1, min(limit, 200)))})
+            elif rest == "usage":
+                self._json({"usage": clipboard.usage(user), "user": user})
+            elif rest.startswith("files/"):
+                fid = rest[len("files/"):]
+                if not fid.isdigit():
+                    self._json({"error": "bad file id"}, 400)
+                    return True
+                item = clipboard.get_file(user, int(fid))
+                if item is None:
+                    self._json({"error": "文件不存在"}, 404)
+                    return True
+                self._send_clipboard_file(item)
+            else:
+                self._json({"error": "not found"}, 404)
+        except Exception as e:
+            self._json({"error": f"{type(e).__name__}: {e}"}, 500)
+        return True
+
+    def _send_clipboard_file(self, item: dict) -> None:
+        """受登录保护的文件下载；分块流出，路径穿越已在 get_file 校验。"""
+        f = item["path"]
+        size = f.stat().st_size
+        name = item.get("file_name") or "file"
+        self.send_response(200)
+        ctype = item.get("content_type") or "application/octet-stream"
+        self.send_header("Content-Type", ctype[:100])
+        self.send_header("Content-Length", str(size))
+        self.send_header("Cache-Control", "private, no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Robots-Tag", "noindex")
+        # RFC 5987：中文文件名走 filename*，ASCII 部分另给兜底
+        ascii_name = name.encode("ascii", "ignore").decode("ascii") or "file"
+        self.send_header("Content-Disposition",
+                         f"attachment; filename=\"{ascii_name}\"; "
+                         f"filename*=UTF-8''{quote(name)}")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            with open(f, "rb") as fh:
+                while True:
+                    chunk = fh.read(1 << 20)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # 客户端取消了下载
+
+    def _clipboard_post(self, path: str) -> bool:
+        """剪贴板 POST 路由；已处理返回 True。全部需登录。"""
+        if not path.startswith("/api/v1/clipboard/"):
+            return False
+        rest = path[len("/api/v1/clipboard/"):]
+        user = self._assistant_user()
+        if not user:
+            self._json({"error": "未登录"}, 401)
+            return True
+        try:
+            if rest == "items":
+                body = self._read_json() or {}
+                item = clipboard.add_text(user, str(body.get("content", "")))
+                self._json({"item": item}, 201)
+            elif rest == "files":
+                self._clipboard_upload(user)
+            else:
+                self._json({"error": "not found"}, 404)
+        except clipboard.ClipboardTooLarge as e:
+            self._json({"error": str(e)}, 413)
+        except clipboard.ClipboardQuota as e:
+            self._json({"error": str(e)}, 507)
+        except clipboard.ClipboardError as e:
+            self._json({"error": str(e)}, 400)
+        except Exception as e:
+            self._json({"error": f"{type(e).__name__}: {e}"}, 500)
+        return True
+
+    def _clipboard_upload(self, user: str) -> None:
+        """raw body 上传：Content-Length 必填；文件名在 X-Filename 头（URL 编码）。"""
+        try:
+            size = int(self.headers.get("Content-Length", ""))
+        except ValueError:
+            size = -1
+        if size <= 0:
+            self._json({"error": "文件为空或缺 Content-Length"}, 400)
+            return
+        name = unquote(self.headers.get("X-Filename", "") or "file")
+        ctype = (self.headers.get("Content-Type") or "")[:100]
+        item = clipboard.add_file(user, name, size, self.rfile.read, ctype)
+        self._json({"item": item}, 201)
+
     def do_HEAD(self) -> None:
         self.do_GET()
 
@@ -569,6 +686,8 @@ class Handler(BaseHTTPRequestHandler):
             parsed = urlparse(self.path)
             if parsed.path.startswith("/api/v1/assistant/"):
                 self._assistant_post(parsed.path)
+                return
+            if self._clipboard_post(parsed.path):
                 return
             if parsed.path not in ("/api/v1/update", "/api/v1/update/news",
                                    "/api/v1/update/knowledge"):
@@ -743,6 +862,19 @@ class Handler(BaseHTTPRequestHandler):
             if not self._admit():
                 return
             path = urlparse(self.path).path
+            cb_prefix = "/api/v1/clipboard/items/"
+            if path.startswith(cb_prefix):
+                user = self._assistant_user()
+                if not user:
+                    self._json({"error": "未登录"}, 401)
+                    return
+                cid = path[len(cb_prefix):]
+                if not cid.isdigit():
+                    self._json({"error": "bad id"}, 400)
+                    return
+                ok = clipboard.delete_item(user, int(cid))
+                self._json({"ok": bool(ok)}, 200 if ok else 404)
+                return
             prefix = "/api/v1/assistant/sessions/"
             if not path.startswith(prefix) or not self._assistant_user():
                 if path.startswith("/api/v1/assistant/"):
@@ -787,6 +919,7 @@ def main() -> None:
         from collector import db
         with db.conn() as c:
             db.ensure_assistant_tables(c)
+            db.ensure_clipboard_tables(c)
     except Exception as e:  # 助手表初始化失败不阻断静态站点服务
         print(f"警告: 助手表初始化失败（{e}），助手接口可能不可用")
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)

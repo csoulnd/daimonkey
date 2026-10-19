@@ -12,11 +12,13 @@
 from __future__ import annotations
 
 import hashlib
+import itertools
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .config import DATA_DIR, now_iso, registry
+from .config import DATA_DIR, registry
 from . import db
 
 CLIPBOARD_DIR = DATA_DIR / "clipboard"
@@ -143,7 +145,7 @@ def add_file(owner: str, name: str, size: int, read, content_type: str = "") -> 
     folder = CLIPBOARD_DIR / re.sub(r"[^a-z0-9_-]", "", owner.lower())
     folder.mkdir(parents=True, exist_ok=True)
     suffix = Path(display).suffix[:16]
-    tmp = folder / f".tmp-{os_getpid()}-{next(_counter)}"
+    tmp = folder / f".tmp-{os.getpid()}-{next(_tmp_seq)}"
     sha = hashlib.sha256()
     written = 0
     try:
@@ -245,12 +247,4 @@ def usage(owner: str) -> dict:
 
 
 # 临时文件名序号（避免同进程并发上传互踩）
-import itertools
-import os as _os
-
-
-def os_getpid() -> int:
-    return _os.getpid()
-
-
-_counter = itertools.count(1)
+_tmp_seq = itertools.count(1)
