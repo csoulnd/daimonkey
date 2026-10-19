@@ -26,7 +26,8 @@ CHECKS: list[tuple[str, bool]] = []
 
 # 部署防回归例外：这两份文档分别记录历史问题示例与当前服务器交接信息，
 # 属于说明性文本，不参与运行路径解析。
-HARDCODE_ALLOW = {"docs/PLAN-deploy.md", "docs/HANDOVER.md"}
+HARDCODE_ALLOW = {"docs/PLAN-deploy.md", "docs/HANDOVER.md",
+                  "docs/domain-and-https.md"}
 # 拆开拼接，避免本文件自身命中检查
 HARDCODE_NEEDLE = "/home/" + "daimonkey"
 TEXT_SUFFIXES = {".py", ".sh", ".md", ".html", ".js", ".cjs", ".css",
@@ -244,6 +245,21 @@ def main() -> int:
         check("AA 源健康可达", meta_src.get("aa", {}).get("reachable") == 1)
     except Exception as e:
         check(f"AA 双口径检查 ({e})", False)
+
+    print("== 2f. 方向周总结与方向周报 ==")
+    for key in ("harness", "fm"):
+        html = page(base + f"/dir/{key}")
+        check(f"{key} 每周总结区", 'id="dir-digest"' in html)
+        check(f"{key} 周总结卡片或空态",
+              "ai-summary" in html or "empty-state" in html)
+        links = re.findall(
+            rf'href="(/dir/{key}/digest/[0-9]{{4}}-W[0-9]{{2}}\.html)"', html)
+        check(f"{key} 方向周报入口（{len(links)} 个）", bool(links))
+        if links:
+            r = get(base + links[0])
+            check(f"方向周报页 {links[0]} -> {r.status}", r.status == 200)
+    check("全站周报入口保留",
+          bool(re.findall(r'href="/news/digest/[0-9W-]+\.html"', news_html)))
 
     print("== 2c. 旧路由 301 ==")
     class _NoRedirect(urllib.request.HTTPRedirectHandler):

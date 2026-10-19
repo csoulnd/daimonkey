@@ -26,6 +26,8 @@ AI_DEFAULTS: dict = {
                   "max_tokens": 3000},
     "scoring": {"enabled": True, "top_n": 15, "ai_weight": 0.0,
                 "max_tokens": 4000},
+    # 方向周总结：生成即发布（人工可改），或 publish=false 走草稿审核
+    "direction_digests": {"enabled": True, "publish": True, "max_tokens": 1200},
 }
 
 

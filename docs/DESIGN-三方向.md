@@ -1,13 +1,30 @@
 ---
 title: "三方向(Harness/FM/NV)需求分析与设计"
 type: design
-status: draft
+status: active
 ---
 
 # 三方向需求分析与设计
 
 > 需求来源:需求方 2026-10-17 三轮口述(见 ROADMAP-三方向.md 澄清记录)。
 > 未决项以【默认】标注=按此实现,需求方可随时否决翻转。
+
+## 实施状态(2026-10-19)
+
+| 里程碑 | 状态 | 提交 | 验收证据 |
+|---|---|---|---|
+| M1 频道化骨架 | ✅ 已上线 | `80c524f` | `/dir/{harness,fm,nv}` 三区页、门户三入口、NV 空页、旧路由 301；137 tests，verify 58/58 |
+| M2 Harness 甄别重构 | ✅ 已上线 | `557d79c` | 产品 `tier: core|eco`；`harness_core`/`harness_eco` 不混排；联合榜并入核心榜；收录三问上频道页；144 tests，verify 69/69 |
+| M3 AA 接入 | ✅ 已上线 | `d031ed4` | AA 免费 API 4 页 704 模型、14/20 registry 匹配、46 行指标；逐页 raw 溯源；7 天缓存；153 tests，verify 74/74 |
+| M4 方向周总结 | ✅ 已上线 | 本次提交 | W42 harness/fm 周总结已发布；方向周报页 `4` 期/方向；`digestctl` 人工编辑；167 tests，verify 83/83 |
+
+实施补充与偏差:
+
+- **AA 列**：设计 2.3 预设的 MMLU-Pro/GPQA/MATH/LiveCodeBench 在当前免费 API 中不可得；一期按实际字段展示 AA Intelligence/Coding/Agentic 三类指数（另存六类域指数），与 SuperCLUE 并列、不合成单一分。详见 `skills/model-eval`。
+- **方向新闻**：`directions.news_tag` 作为周总结分组标识；实际新闻过滤使用新增的 `news_categories` 列表（一个方向可覆盖多个分类，如 harness=coding+framework）。
+- **核心榜派生**：`harness_core` 由隐藏分类源榜 `coding/general/claw` 派生，只取 `tier=core` 的主分类条目；`harness_eco` 按 `tier=eco` 独立评分。旧 `/api/v1/rankings/unified.json` 保留只读兼容别名。
+- **周总结周次**：自动生成取“该方向最近有新闻的 ISO 周”；当新闻数据滞后、当前周无条目时，频道展示最近一期并标注“本周总结待更新”，不伪造当周内容。
+- **人工可改**：`scripts/digestctl.py list/edit/publish/generate`；方向总结默认生成即发布（`assistant.ai.direction_digests.publish`），全站周报仍保持 AI 草稿→人工发布。
 
 ## 一、需求分析
 

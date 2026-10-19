@@ -216,11 +216,21 @@ def build() -> None:
         for d in directions:
             blocks = [direction_block(b) for b in (d.get("boards") or [])]
             cats = d.get("news_categories") or []
+            digest_weeks = [
+                {"week": w["week"], "count": len(w["items"])}
+                for w in queries.news_digests(
+                    c, reg.get("news", {}).get("digest_weeks", 8), cats)]
+            digest = queries.latest_direction_digest(c, d["news_tag"])
+            digest_link = (f"/dir/{d['key']}/digest/{digest['week']}.html"
+                           if digest and any(w["week"] == digest["week"]
+                                             for w in digest_weeks) else None)
             render("direction.html", f"dir/{d['key']}.html",
                    direction=d, direction_page=True,
                    board_blocks=blocks,
                    direction_news=queries.news_for_categories(c, cats, 12),
-                   direction_digest=queries.latest_direction_digest(c, d["news_tag"]),
+                   direction_digest=digest,
+                   direction_digest_link=digest_link,
+                   direction_digest_weeks=digest_weeks,
                    news_rank=rank_of)
             direction_cards.append({
                 "key": d["key"], "name": d["name"], "short": d.get("short", ""),
@@ -330,13 +340,10 @@ def build() -> None:
                          "start": newslib.week_range(d["week"])[0],
                          "end": newslib.week_range(d["week"])[1]}
                         for d in queries.news_digests(c, ncfg.get("digest_weeks", 8))])
-        digest_root = DIST_DIR / "news" / "digest"
-        digest_outputs = set()
-        for d in queries.news_digests(c, ncfg.get("digest_weeks", 8)):
-            start, end = newslib.week_range(d["week"])
+        def digest_counts(items: list[dict]) -> tuple[dict, list]:
             cat_counts: dict[str, int] = {}
             mentions: dict[int, int] = {}
-            for item in d["items"]:
+            for item in items:
                 cat_counts[item["category"]] = cat_counts.get(item["category"], 0) + 1
                 for pid in json.loads(item["product_ids"] or "[]"):
                     mentions[pid] = mentions.get(pid, 0) + 1
@@ -347,19 +354,57 @@ def build() -> None:
                 ({"slug": r["slug"], "name": r["name"], "mentions": mentions[r["id"]]}
                  for r in name_rows),
                 key=lambda x: -x["mentions"])[:10]
-            render("news_digest.html", f"news/digest/{d['week']}.html",
-                   news_page=True, news_meta=nmeta, week=d["week"],
+            return cat_counts, top_list
+
+        def render_digest_page(direction: dict | None, week_items: dict) -> None:
+            week = week_items["week"]
+            start, end = newslib.week_range(week)
+            cat_counts, top_list = digest_counts(week_items["items"])
+            if direction:
+                out = f"dir/{direction['key']}/digest/{week}.html"
+                extra = {
+                    "direction": direction,
+                    "digest_home": f"/dir/{direction['key']}",
+                    "digest_home_label": f"{direction['name']}频道",
+                    "ai_digest_label": "AI 生成 · 人工可复核修改",
+                }
+            else:
+                out = f"news/digest/{week}.html"
+                extra = {}
+            render("news_digest.html", out,
+                   news_page=True, news_meta=nmeta, week=week,
                    week_start=start, week_end=end,
-                   digest_items=queries._attach_products(c, d["items"]),
+                   digest_items=queries._attach_products(c, week_items["items"]),
                    cat_counts=cat_counts, top_products=top_list,
-                   ai_digest=queries.published_digest_summary(c, d["week"]),
-                   news_rank=rank_of)
+                   ai_digest=queries.published_digest_summary(
+                       c, week,
+                       direction=direction["news_tag"] if direction else None),
+                   news_rank=rank_of, **extra)
+
+        digest_root = DIST_DIR / "news" / "digest"
+        digest_outputs = set()
+        for d in queries.news_digests(c, ncfg.get("digest_weeks", 8)):
+            render_digest_page(None, d)
             digest_outputs.add(d["week"])
         # 周报随保留窗口滚动，过期文件清理（不触碰 dist 其他内容）
         if digest_root.is_dir():
             for old in digest_root.glob("*.html"):
                 if old.stem not in digest_outputs:
                     old.unlink()
+        # 方向周报：同一管线按 directions.news_categories 过滤
+        for direction in directions:
+            cats = direction.get("news_categories") or []
+            if not cats:
+                continue
+            out_root = DIST_DIR / "dir" / direction["key"] / "digest"
+            outputs = set()
+            for d in queries.news_digests(c, ncfg.get("digest_weeks", 8), cats):
+                render_digest_page(direction, d)
+                outputs.add(d["week"])
+            if out_root.is_dir():
+                for old in out_root.glob("*.html"):
+                    if old.stem not in outputs:
+                        old.unlink()
         # ---- 报告厅（第四入口 /reports，内容在仓库 reports/ 目录）----
         reportslib.build(env, common)
     finally:

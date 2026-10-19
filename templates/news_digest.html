@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m %}
-{% block title %}{{ week }} 周报 · AI 新闻{% endblock %}
+{% block title %}{% if direction %}{{ direction.name }}方向 · {% endif %}{{ week }} 周报 · AI 新闻{% endblock %}
 {% block content %}
-<div class="kb-breadcrumb"><a href="/news">AI 新闻</a> / <span>{{ week }} 周报</span></div>
+<div class="kb-breadcrumb"><a href="{{ digest_home | default('/news') }}">{{ digest_home_label | default('AI 新闻') }}</a> / <span>{{ week }} 周报</span></div>
 <section class="kb-intro news-intro">
   <div class="dim">WEEKLY DIGEST</div>
-  <h1>{{ week }} 周报</h1>
+  <h1>{{ week }} 周报{% if direction %} <span class="pill">{{ direction.name }}方向</span>{% endif %}</h1>
   <p class="dim">{{ week_start }} ~ {{ week_end }} · 共 {{ digest_items | length }} 条 ·
     {% for key, n in cat_counts.items() %}<span class="chip nc-{{ key }}">{{ news_categories.get(key, key) }} {{ n }}</span> {% endfor %}
   </p>
@@ -13,7 +13,7 @@
 
 {% if ai_digest %}
 <section class="ai-summary" aria-label="AI 周报总结">
-  <div class="ai-summary-head"><span class="ai-badge"><svg class="mk" aria-hidden="true"><use href="#i-monkey"/></svg>马猴说</span><span class="ai-tag">AI 生成 · 每期自动总结</span></div>
+  <div class="ai-summary-head"><span class="ai-badge"><svg class="mk" aria-hidden="true"><use href="#i-monkey"/></svg>马猴说</span><span class="ai-tag">{{ ai_digest_label | default('AI 生成 · 每期自动总结') }}</span></div>
   <p class="ai-summary-body">{{ ai_digest.summary }}</p>
   <div class="ai-summary-foot dim">由 DSH agent 生成于 {{ ai_digest.created_at | dt }}</div>
 </section>

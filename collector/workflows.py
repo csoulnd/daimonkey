@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from . import ai as ai_mod
 from . import assistant, db, news
+from .config import registry
 
 
 @dataclass
@@ -28,43 +29,136 @@ class WorkflowSpec:
             raise ValueError(f"workflow {self.name} 缺少 build_task")
 
 
-# ---- 工作流 1：新闻周报 AI 摘要 ----
+# ---- 工作流 1：新闻周报 AI 摘要（全站 / 按方向参数化） ----
+
+def _direction_conf(key: str) -> dict:
+    directions = registry().get("directions") or {}
+    conf = directions.get(key)
+    if not conf:
+        raise assistant.AssistantError(f"未知方向: {key}")
+    return conf
+
 
 def _digest_task(payload: dict) -> str:
     week = payload.get("week") or _current_week()
     start, end = news.week_range(week)
+    direction = payload.get("direction")
+    scope = "AI Agent 领域"
+    params: list = [start, end]
+    sql = ("SELECT title, source_name, category, summary FROM news_items"
+           " WHERE substr(published_at, 1, 10) BETWEEN ? AND ?")
+    if direction:
+        conf = _direction_conf(direction)
+        cats = conf.get("news_categories") or []
+        if not cats:
+            raise assistant.AssistantError(f"{conf['name']}方向暂无新闻范围")
+        sql += " AND category IN (" + ",".join("?" * len(cats)) + ")"
+        params += cats
+        scope = f"{conf['name']}方向"
+    sql += " ORDER BY published_at DESC LIMIT 60"
     with db.conn() as c:
-        rows = c.execute(
-            "SELECT title, source_name, category, summary FROM news_items"
-            " WHERE substr(published_at, 1, 10) BETWEEN ? AND ?"
-            " ORDER BY published_at DESC LIMIT 60", (start, end)).fetchall()
+        rows = c.execute(sql, params).fetchall()
     if not rows:
-        raise assistant.AssistantError(f"{week} 没有可总结的新闻条目")
+        raise assistant.AssistantError(f"{week} 没有可总结的{scope}新闻条目")
     lines = [f"- [{r['category']}] {r['title']}（{r['source_name']}）"
              for r in rows]
     return (
-        "以下是本周 AI Agent 领域新闻条目（分类/标题/来源）：\n"
+        f"以下是本周{scope}新闻条目（分类/标题/来源）：\n"
         + "\n".join(lines)
-        + "\n\n请用中文写一份 300 字以内的本周领域摘要：概括主要趋势、"
+        + f"\n\n请用中文写一份 300 字以内的本周{scope}摘要：概括主要趋势、"
           "值得关注的发布与事件；不逐条罗列，只提炼脉络。"
           "末尾单独一行输出：`AI 生成于 " + week + "`。")
 
 
 def _digest_store(payload: dict, reply: str) -> None:
     week = payload.get("week") or _current_week()
+    direction = payload.get("direction")
+    if direction:
+        conf = _direction_conf(direction)
+        digest_conf = ai_mod.cfg().get("direction_digests", {})
+        status = "published" if digest_conf.get("publish", True) else "draft"
+        title = f"{conf['name']}方向周总结 {week}"
+        tags = f"news-digest,ai,direction:{direction}"
+    else:
+        status, title, tags = "draft", f"AI 周报摘要 {week}", "news-digest,ai"
     with db.conn() as c:
         c.execute(
             "INSERT INTO insights (title, summary, source_url, source_name,"
             " published_at, tags, llm_generated, status, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, 1, 'draft', datetime('now', 'localtime'))",
-            (f"AI 周报摘要 {week}", reply, "", "DSH assistant",
-             week, "news-digest,ai"))
+            " VALUES (?, ?, ?, ?, ?, ?, 1, ?, datetime('now', 'localtime'))",
+            (title, reply, "", "DSH assistant", week, tags, status))
 
 
 def _current_week() -> str:
     from datetime import date
     iso = date.today().isocalendar()
     return f"{iso[0]}-W{iso[1]:02d}"
+
+
+def _latest_news_week(c, categories: list[str]) -> str | None:
+    clause = ",".join("?" * len(categories))
+    row = c.execute(
+        "SELECT COALESCE(published_at, fetched_at) t FROM news_items"
+        " WHERE category IN (" + clause + ")"
+        " ORDER BY t DESC LIMIT 1", categories).fetchone()
+    return news.week_key(row["t"]) if row and row["t"] else None
+
+
+def generate_direction_digests(week: str | None = None,
+                               direction: str | None = None,
+                               force: bool = False) -> list[str]:
+    """按方向生成每周总结（AI 草稿/直接发布由配置决定）。
+
+    不指定 week 时取该方向最近有新闻的 ISO 周（数据滞后时仍能生成“最近一期”，
+    频道页会标注“本周总结待更新”）。已有该方向该周的总结则不重复调用 AI。
+    任何异常只记 notes，绝不阻断建站。
+    """
+    conf = ai_mod.cfg().get("direction_digests", {})
+    if not conf.get("enabled", True) or not assistant.cfg().get("enabled", True):
+        return []
+    all_dirs = registry().get("directions") or {}
+    keys = [direction] if direction else list(all_dirs)
+    notes: list[str] = []
+    for key in keys:
+        d = all_dirs.get(key)
+        if not d:
+            notes.append(f"[dir:{key}] 未知方向，跳过")
+            continue
+        cats = d.get("news_categories") or []
+        if not cats:
+            notes.append(f"[dir:{key}] 无新闻范围，跳过")
+            continue
+        with db.conn() as c:
+            wk = week or _latest_news_week(c, cats)
+            if not wk:
+                notes.append(f"[dir:{key}] 暂无新闻，跳过")
+                continue
+            start, end = news.week_range(wk)
+            n = c.execute(
+                "SELECT COUNT(*) n FROM news_items WHERE category IN ("
+                + ",".join("?" * len(cats)) + ")"
+                " AND substr(COALESCE(published_at, fetched_at), 1, 10)"
+                " BETWEEN ? AND ?", (*cats, start, end)).fetchone()["n"]
+            if not n:
+                notes.append(f"[dir:{key}] {wk} 无新闻，跳过")
+                continue
+            if not force:
+                exists = c.execute(
+                    "SELECT COUNT(*) n FROM insights WHERE llm_generated=1"
+                    " AND tags LIKE ? AND published_at=?",
+                    (f"%direction:{key}%", wk)).fetchone()["n"]
+                if exists:
+                    notes.append(f"[dir:{key}] {wk} 总结已存在，跳过")
+                    continue
+        try:
+            result = assistant.run_internal(
+                "news_digest_summary", {"direction": key, "week": wk},
+                channel="internal", max_tokens=int(conf.get("max_tokens", 1200)))
+            notes.append(f"[dir:{key}] {wk} 总结已生成（~{result['tokens_in']}+"
+                         f"{result['tokens_out']} tok）")
+        except Exception as e:  # AI 失败不阻断建站
+            notes.append(f"[dir:{key}] 周总结跳过: {type(e).__name__}: {e}")
+    return notes
 
 
 # ---- 工作流 2：文案润色（只出草稿，不直接上线） ----

@@ -218,15 +218,24 @@ def _attach_products(c, rows: list) -> list[dict]:
     return out
 
 
-def published_digest_summary(c, week: str) -> dict | None:
-    """某 ISO 周的已发布 AI 周报总结（insights 表 llm_generated=1 且 status=published）。
+def published_digest_summary(c, week: str, direction: str | None = None) -> dict | None:
+    """某 ISO 周的已发布 AI 周报总结（insights，llm_generated=1/status=published）。
 
-    草稿态（draft）不展示——AI 产物需人工确认发布后才上线。
+    全站周报排除带 direction 标记的行；方向周报只看对应 direction:<tag>。
+    草稿态（draft）不展示。
     """
-    row = c.execute(
-        "SELECT summary, created_at FROM insights WHERE llm_generated = 1"
-        " AND status = 'published' AND tags LIKE '%news-digest%'"
-        " AND published_at = ? ORDER BY id DESC LIMIT 1", (week,)).fetchone()
+    if direction:
+        row = c.execute(
+            "SELECT summary, created_at FROM insights WHERE llm_generated = 1"
+            " AND status = 'published' AND tags LIKE '%news-digest%'"
+            " AND tags LIKE ? AND published_at = ? ORDER BY id DESC LIMIT 1",
+            (f"%direction:{direction}%", week)).fetchone()
+    else:
+        row = c.execute(
+            "SELECT summary, created_at FROM insights WHERE llm_generated = 1"
+            " AND status = 'published' AND tags LIKE '%news-digest%'"
+            " AND tags NOT LIKE '%direction:%' AND published_at = ?"
+            " ORDER BY id DESC LIMIT 1", (week,)).fetchone()
     return dict(row) if row else None
 
 
@@ -311,10 +320,18 @@ def news_by_product(c, limit_per_product: int = 8) -> dict[int, list[dict]]:
     return {k: v[:limit_per_product] for k, v in index.items()}
 
 
-def news_digests(c, weeks: int = 8) -> list[dict]:
-    """按 ISO 周分组（published_at 缺失回退 fetched_at），最近 N 周。"""
+def news_digests(c, weeks: int = 8,
+                 categories: list[str] | None = None) -> list[dict]:
+    """按 ISO 周分组（published_at 缺失回退 fetched_at），最近 N 周。
+
+    categories 非空时只统计该方向的新闻范围（周报管线按 news_tag 参数化）。
+    """
     from . import news as newslib
-    rows = c.execute("SELECT * FROM news_items").fetchall()
+    clause, params = _category_filter(categories)
+    sql = "SELECT * FROM news_items"
+    if params:
+        sql += " WHERE category IN (" + clause + ")"
+    rows = c.execute(sql, params).fetchall()
     grouped: dict[str, list] = {}
     for r in rows:
         key = newslib.week_key(r["published_at"] or r["fetched_at"])

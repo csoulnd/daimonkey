@@ -9,3 +9,12 @@
 | 5 | 右上角头像体系✅2026-10-17 | ui-polish+workspace | 登录按钮固定顶栏最右;登录后变头像(首字母圆标+菜单:用户名/退出) | 退出入口一眼可见 |
 | 6 | 榜单子页面重整✅2026-10-17(联合10/模型20/其余15,观察区折叠) | ui-polish | 各榜单页统一结构:标题+主表(数量按内容定:联合10/模型20/其余前15)+观察区折叠;删无用 topic | 页面长短一致、无空板块 |
 | 7 | 稳定性专项✅2026-10-17(一期) | load-optimization | 复现并诊断:serve 线程/锁(chat/update)、pi 长任务阻塞、前端轮询;修复+看门狗日志 | 72h 无卡死;压测回归 |
+
+## 三方向 M1-M4(2026-10-19,详见 docs/DESIGN-三方向.md 实施状态)
+
+| # | 任务 | 主责专家 | 状态 | 验收 |
+|---|---|---|---|---|
+| 8 | M1 频道化骨架(registry directions + /dir/* 三区 + NV 空页 + 旧路由 301) | directions | ✅ `80c524f` | 137 tests;verify 58/58 |
+| 9 | M2 Harness 甄别重构(tier core/eco、核心/生态不混排、联合榜并入) | directions | ✅ `557d79c` | 144 tests;verify 69/69 |
+| 10 | M3 AA 接入(httpx、周缓存、raw 溯源、模型榜双口径) | model-eval | ✅ `d031ed4` | 153 tests;verify 74/74 |
+| 11 | M4 方向周总结(按 news_tag 参数化、AI 生成+人工可改) | directions+news-digest | ✅ 本次提交 | 167 tests;verify 83/83 |

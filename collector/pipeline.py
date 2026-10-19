@@ -137,12 +137,20 @@ def run_build() -> list[str]:
     """
     ensure_dirs()
     ai_notes: list[str] = []
+    # 方向周总结：AI 调用全部在主事务之外；失败只记 notes，不阻断建站。
+    # 同一方向同一周已有总结则跳过，避免 --build 反复烧配额。
+    try:
+        from . import workflows
+        ai_notes.extend(workflows.generate_direction_digests())
+    except Exception as e:
+        ai_notes.append(f"[ai:direction-digest] 步骤异常（已跳过）: "
+                        f"{type(e).__name__}: {e}")
     try:
         with db.conn() as c:
             db.ensure_ai_tables(c)
-            ai_notes = ai.refresh_summaries_if_stale(c)
+            ai_notes.extend(ai.refresh_summaries_if_stale(c))
     except Exception as e:  # 摘要步骤绝不该阻断建站
-        ai_notes = [f"[ai] 摘要步骤异常（已跳过）: {e}"]
+        ai_notes.append(f"[ai] 摘要步骤异常（已跳过）: {e}")
     export.export_all()
     sitegen.build()
     return ai_notes

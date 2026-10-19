@@ -936,6 +936,12 @@ assistant:
       top_n: 15                     # 每榜取前 N 名送 AI 分析
       max_tokens: 4000
       ai_weight: 0.3                # AI 复评在核心榜最终分中的权重(v1.5);0=仅展示
+    # 方向周总结（M4）：按 directions.news_categories 过滤；生成后可直接发布，
+    # 人工可用 scripts/digestctl.py edit/publish 修改。publish=false 则先落草稿。
+    direction_digests:
+      enabled: true
+      publish: true
+      max_tokens: 1200
 
 # 云剪贴板（个人工作台，2026-10-19）：两台设备间文本同步 + 小云盘。
 # 用户隔离按 owner；文件落 data/clipboard/{owner}/，换机备份见 deploy/backup.sh 白名单。
