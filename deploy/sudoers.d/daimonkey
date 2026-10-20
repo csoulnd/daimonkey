@@ -1,0 +1,14 @@
+# daimonkey 服务账号的最小 sudo 授权（仅固定 wrapper，不授予任意 systemctl）。
+#
+# 安装位置: /etc/sudoers.d/daimonkey
+# 安装要求: root:root、权限 0440、文件名不含 '.'（sudo 会忽略带点的文件）。
+# 安装前必须校验: visudo -cf deploy/sudoers.d/daimonkey
+#                 安装后再校验: visudo -cf /etc/sudoers.d/daimonkey
+#
+# 为什么要 wrapper：站内运维 agent 以 daimonkey 用户运行，直接
+# `systemctl restart daimonkey` 会杀掉 agent 自己所在的服务、中断当前轮。
+# wrapper 用 systemd-run --on-active 延时触发重启，把提权面收敛到一条固定命令。
+#
+# daimonkey-status 为可选扩展（status/journal 已由 systemd-journal 组覆盖），
+# 保留授权语句便于后续接入固定状态查询 wrapper，未安装时不影响其他规则。
+daimonkey ALL=(root) NOPASSWD: /usr/local/bin/daimonkey-restart, /usr/local/bin/daimonkey-status

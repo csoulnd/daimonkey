@@ -3,8 +3,14 @@
   "use strict";
 
   var API = "/api/v1/assistant";
-  var state = { authed: false, user: null, sessionId: null, running: false,
-                pollTimer: null, open: false, renameTarget: null, deleteTarget: null };
+  var state = { authed: false, user: null, role: null, opsEnabled: false,
+                sessionId: null, modes: {}, running: false,
+                pollTimer: null, open: false, renameTarget: null, deleteTarget: null,
+                rollback: null,
+                /* 运维 run：run_id / 增量 seq / 并发令牌 / 流式与工具 DOM 引用 */
+                runId: null, runSeq: 0, runToken: 0, opsTimer: null,
+                streamEl: null, toolsEl: null, bubbleEl: null, toolList: [],
+                pendingApproval: null, approvalBusy: false, doneReply: "" };
 
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) {
@@ -23,6 +29,71 @@
   function fmtTokens(n) {
     return n >= 1000000 ? (n / 1000000).toFixed(1) + "M"
       : n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+  }
+  function scrollMessages() {
+    var box = $("asst-messages");
+    if (box) box.scrollTop = box.scrollHeight;
+  }
+
+  /* ---- 会话模式：对话 / 运维（仅 admin 且 registry 开启 ops 时可用） ---- */
+  function opsAvailable() {
+    return state.role === "admin" && !!state.opsEnabled;
+  }
+  function currentMode() {
+    if (!opsAvailable()) return "chat";
+    var key = state.sessionId ? String(state.sessionId) : "new";
+    return state.modes[key] === "ops" ? "ops" : "chat";
+  }
+
+  /* 切换当前会话模式；尚无会话时先记在 "new" 槽，建会话时带上。 */
+  function setMode(mode) {
+    if (!opsAvailable() || state.running) return;
+    mode = mode === "ops" ? "ops" : "chat";
+    if (!state.sessionId) {
+      state.modes.new = mode;
+      updateModeUI();
+      return;
+    }
+    var sid = state.sessionId;
+    api("/sessions/" + sid + "/mode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: mode })
+    }).then(function (res) {
+      if (!res.ok) { msg(res.body.error || "切换模式失败", true); return; }
+      state.modes[String(sid)] = mode;
+      updateModeUI();
+      msg(mode === "ops" ? "已切到运维模式（工具操作会请求审批）" : "已切到对话模式");
+      refreshSessions();
+    });
+  }
+  function updateModeUI() {
+    var wrap = $("asst-mode");
+    if (!wrap) return;
+    var avail = opsAvailable();
+    var mode = currentMode();
+    wrap.hidden = !avail;
+    Array.prototype.forEach.call(
+      wrap.querySelectorAll("button[data-mode]"), function (b) {
+        var on = b.getAttribute("data-mode") === mode;
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    var input = $("asst-input");
+    if (input) {
+      input.placeholder = (avail && mode === "ops")
+        ? "输入运维指令，Ctrl+Enter 发送" : "输入消息，Ctrl+Enter 发送";
+    }
+  }
+  function loadSessionMeta() {
+    return api("/session").then(function (res) {
+      var b = (res && res.body) || {};
+      var ok = !!(res && res.ok && b.authed);
+      state.role = ok ? (b.role || "member") : null;
+      state.opsEnabled = ok ? !!b.ops_enabled : false;
+      updateModeUI();
+      return b;
+    });
   }
 
   /* ---- 大马猴表情:切换宠物/面板标题的 symbol 与 data-face 动效 ---- */
@@ -179,6 +250,7 @@
         showUser(res.body.user || credentials.username);
         var btn = $("asst-logout");
         if (btn) btn.hidden = false;
+        loadSessionMeta();  // 取 role / ops_enabled，决定是否显示模式切换
         return true;
       }
       if (res.status === 401) state.authed = false;  // 过期/伪造态自愈
@@ -208,13 +280,30 @@
     state.open = false;
     $("asst-panel").hidden = true;
     $("asst-pet").classList.remove("hide");
-    stopPolling();
+    abandonRun();  // 停止轮询并复位运行态；服务端任务继续，重开面板后可看历史
   }
 
   function refreshAll() {
     refreshSessions();
     refreshUsage();
     loadWorkflows();
+  }
+
+  /* 关闭面板：只停止前端轮询/复位 UI，服务端任务继续（重开可看历史） */
+  function abandonRun() {
+    stopPolling();
+    stopOpsPoll();
+    state.runToken += 1;          // 让晚到的轮询响应失效
+    state.running = false;
+    state.runId = null;
+    state.bubbleEl = null;
+    state.streamEl = null;
+    state.toolsEl = null;
+    state.toolList = [];
+    state.rollback = null;
+    hideApproval();
+    setStopVisible(false);
+    $("asst-send").disabled = false;
   }
 
   /* ---- 会话 ---- */
@@ -225,12 +314,19 @@
       var list = $("asst-session-list");
       list.textContent = "";
       var sessions = res.body.sessions || [];
+      var modes = {};
       sessions.forEach(function (s) {
+        modes[String(s.id)] = s.mode === "ops" ? "ops" : "chat";
         var li = el("li", s.id === state.sessionId ? "on" : "");
         li.dataset.sid = String(s.id);  // selectSession 高亮同步依赖此标记
         var title = el("span", "asst-s-title", (s.title || ("会话 " + s.id)));
         title.title = s.title || "";
         li.appendChild(title);
+        if (s.mode === "ops") {  // 运维会话标记
+          var modeTag = el("span", "asst-s-mode", "⚙");
+          modeTag.title = "运维会话";
+          li.appendChild(modeTag);
+        }
         var acts = el("span", "asst-s-acts");
         var btnRename = el("button", null, "✎");
         btnRename.type = "button";
@@ -246,6 +342,8 @@
         li.onclick = function () { selectSession(s.id); };
         list.appendChild(li);
       });
+      state.modes = modes;
+      updateModeUI();
       if (!sessions.length) {
         var empty = el("li", "asst-s-empty", "（无活跃会话）");
         list.appendChild(empty);
@@ -269,6 +367,7 @@
   function selectSession(id) {
     state.sessionId = id;
     highlightSession();
+    updateModeUI();
     var generation = ++selectGeneration;
     api("/sessions/" + id + "/messages").then(function (res) {
       if (generation !== selectGeneration) return;  // 已切走，丢弃过期响应
@@ -277,14 +376,17 @@
   }
   function newSession() {
     withAuth(function () {
+      var mode = currentMode();
       return api("/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "" })
+        body: JSON.stringify({ title: "", mode: mode })
       }).then(function (res) {
         if (res.ok) {
           state.sessionId = res.body.session_id;
+          state.modes[String(state.sessionId)] = res.body.mode === "ops" ? "ops" : "chat";
           renderMessages([]);
+          updateModeUI();
           refreshSessions();
         } else { msg(res.body.error || "创建失败", true); }
       });
@@ -394,20 +496,24 @@
           input.value = text;
         };
         state.rollback = rollback;
-        startRun("/chat", { session_id: sid, message: text });
+        if (currentMode() === "ops") startOpsRun(sid, text);
+        else startRun("/chat", { session_id: sid, message: text });
       });
     });
   }
 
   function ensureSession() {
     if (state.sessionId) return Promise.resolve(state.sessionId);
+    var mode = currentMode();
     return api("/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "" })
+      body: JSON.stringify({ title: "", mode: mode })
     }).then(function (res) {
       if (!res.ok) { msg(res.body.error || "创建会话失败", true); return null; }
       state.sessionId = res.body.session_id;
+      state.modes[String(state.sessionId)] = res.body.mode === "ops" ? "ops" : "chat";
+      updateModeUI();
       refreshSessions();
       return state.sessionId;
     });
@@ -449,6 +555,12 @@
   /* 启动即失败:收尾 + 撤回乐观气泡并还原输入(仅聊天路径设置了 rollback) */
   function failedRun(text) {
     finishRun();
+    stopOpsPoll();
+    setStopVisible(false);
+    if (state.bubbleEl && state.bubbleEl.parentNode) {
+      state.bubbleEl.parentNode.removeChild(state.bubbleEl);
+    }
+    state.bubbleEl = null;
     petFaceThen("error", 2000);
     if (state.rollback) {
       try { state.rollback(); } catch (e) { /* 忽略 */ }
@@ -505,6 +617,211 @@
     $("asst-send").disabled = false;
   }
 
+  /* ---- 运维轮（ops）：流式文本 + 工具卡片 + 审批 + 停止 ----
+   * 与 /chat 的区别：后端后台线程执行，前端按 run_id 增量轮询 events；
+   * 每轮一个 pi 子进程，工具与审批事件由服务端缓冲（见 collector/assistant.py）。 */
+  function setStopVisible(on) {
+    var btn = $("asst-stop");
+    if (btn) { btn.hidden = !on; btn.disabled = false; }
+  }
+
+  function startOpsRun(sid, text) {
+    var token = ++state.runToken;
+    state.running = true;
+    state.runId = null;
+    state.runSeq = 0;
+    state.doneReply = "";
+    state.pendingApproval = null;
+    hideApproval();
+    $("asst-send").disabled = true;
+    setStopVisible(true);
+    petFace("thinking");
+    msg("运维任务执行中…");
+
+    var box = $("asst-messages");
+    var bubble = el("div", "asst-bubble a asst-ops");
+    var tools = el("div", "asst-tools");
+    var stream = el("div", "asst-bubble-body asst-stream", "");
+    bubble.appendChild(tools);
+    bubble.appendChild(stream);
+    box.appendChild(bubble);
+    scrollMessages();
+    state.bubbleEl = bubble;
+    state.toolsEl = tools;
+    state.streamEl = stream;
+    state.toolList = [];
+
+    api("/ops/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sid, message: text })
+    }).then(function (res) {
+      if (token !== state.runToken) return;
+      if (res.status === 401) { state.authed = false; failedRun("登录已过期，请重试"); return; }
+      if (!res.ok) { failedRun(res.body.error || ("HTTP " + res.status)); return; }
+      state.runId = res.body.run_id;
+      pollOps(token);
+    }).catch(function () {
+      if (token === state.runToken) failedRun("网络错误");
+    });
+  }
+
+  function stopOpsPoll() {
+    if (state.opsTimer) { clearInterval(state.opsTimer); state.opsTimer = null; }
+  }
+
+  function pollOps(token) {
+    stopOpsPoll();
+    var failures = 0;
+    state.opsTimer = setInterval(function () {
+      if (token !== state.runToken || !state.runId) { stopOpsPoll(); return; }
+      api("/ops/runs/" + state.runId + "?after=" + state.runSeq).then(function (res) {
+        if (token !== state.runToken) return;
+        if (res.status === 0) {
+          if (++failures >= 10) {
+            stopOpsPoll();
+            finishOps({ state: "failed", error: "网络中断，任务状态未知" }, token);
+          }
+          return;
+        }
+        failures = 0;
+        if (!res.ok) { finishOps({ state: "failed", error: res.body.error || ("HTTP " + res.status) }, token); return; }
+        var body = res.body || {};
+        (body.events || []).forEach(function (ev) {
+          if (ev.seq && ev.seq > state.runSeq) state.runSeq = ev.seq;
+          handleOpsEvent(ev);
+        });
+        if (typeof body.text === "string" && state.streamEl) {
+          state.streamEl.textContent = body.text;
+          scrollMessages();
+        }
+        if (body.pending) showApproval(body.pending);
+        else hideApproval();
+        if (body.state !== "running") finishOps(body, token);
+      });
+    }, 600);
+  }
+
+  function handleOpsEvent(ev) {
+    if (ev.type === "tool_start") addToolCard(ev.tool || "?", ev.args, null);
+    else if (ev.type === "tool_end") finishToolCard(ev.tool || "?", ev.status, ev.output, ev.duration_s);
+    else if (ev.type === "approval") showApproval(ev);
+    else if (ev.type === "approval_resolved") hideApproval();
+    else if (ev.type === "done" && ev.reply && state.streamEl) {
+      state.doneReply = ev.reply;
+      state.streamEl.textContent = ev.reply;
+      scrollMessages();
+    }
+  }
+
+  function addToolCard(tool, args, output) {
+    var wrap = el("details", "asst-tool");
+    wrap.open = false;
+    var sum = el("summary");
+    sum.appendChild(el("span", "asst-tool-name", tool));
+    var brief = String(args == null ? "" : args).replace(/\s+/g, " ").slice(0, 140);
+    if (brief) sum.appendChild(el("code", "asst-tool-args", brief));
+    wrap.appendChild(sum);
+    var out = el("pre", "asst-tool-out", output || "执行中…");
+    wrap.appendChild(out);
+    if (state.toolsEl) state.toolsEl.appendChild(wrap);
+    state.toolList.push({ tool: tool, node: wrap, out: out, done: false });
+    scrollMessages();
+  }
+
+  function finishToolCard(tool, status, output, duration) {
+    var item = null;
+    for (var i = state.toolList.length - 1; i >= 0; i -= 1) {
+      if (!state.toolList[i].done && state.toolList[i].tool === tool) { item = state.toolList[i]; break; }
+    }
+    if (!item) { addToolCard(tool, "", output); item = state.toolList[state.toolList.length - 1]; }
+    item.done = true;
+    item.node.classList.add(status === "error" ? "err" : "ok");
+    var suffix = status === "error" ? "失败" : "完成";
+    if (duration != null) suffix += " · " + duration + "s";
+    var sum = item.node.querySelector("summary");
+    if (sum) sum.appendChild(el("span", "asst-tool-state", suffix));
+    item.out.textContent = output || "（无输出）";
+    scrollMessages();
+  }
+
+  function showApproval(pending) {
+    var box = $("asst-approval");
+    if (!box || !pending) return;
+    state.pendingApproval = pending;
+    $("asst-approval-title").textContent = " " + (pending.tool || "");
+    $("asst-approval-cmd").textContent = pending.command || pending.title || "";
+    box.hidden = false;
+    state.approvalBusy = false;
+    $("asst-approval-allow").disabled = false;
+    $("asst-approval-deny").disabled = false;
+    scrollMessages();
+  }
+
+  function hideApproval() {
+    var box = $("asst-approval");
+    if (box) box.hidden = true;
+    state.pendingApproval = null;
+  }
+
+  function resolveApproval(allow) {
+    if (!state.runId || !state.pendingApproval || state.approvalBusy) return;
+    var aid = state.pendingApproval.id;
+    state.approvalBusy = true;
+    $("asst-approval-allow").disabled = true;
+    $("asst-approval-deny").disabled = true;
+    api("/ops/runs/" + state.runId + "/approvals/" + aid, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allow: !!allow })
+    }).then(function (res) {
+      state.approvalBusy = false;
+      if (!res.ok) {
+        $("asst-approval-allow").disabled = false;
+        $("asst-approval-deny").disabled = false;
+        msg(res.body.error || "审批失败", true);
+        return;
+      }
+      hideApproval();
+      msg(allow ? "已允许" : "已拒绝");
+    });
+  }
+
+  function stopOpsRun() {
+    if (!state.runId || !state.running) return;
+    setStopVisible(true);
+    $("asst-stop").disabled = true;
+    msg("正在停止…");
+    api("/ops/runs/" + state.runId + "/abort", { method: "POST" }).then(function (res) {
+      if (!res.ok) msg(res.body.error || "停止失败", true);
+    });
+  }
+
+  function finishOps(body, token) {
+    if (token !== state.runToken) return;
+    stopOpsPoll();
+    state.running = false;
+    state.runId = null;
+    state.rollback = null;
+    $("asst-send").disabled = false;
+    setStopVisible(false);
+    hideApproval();
+    var err = body && body.error;
+    if (err) {
+      petFaceThen("error", 2000);
+      msg(err, true);
+    } else if (body && body.aborted) {
+      petFaceThen("calm", 1600);
+      msg("已停止");
+    } else {
+      petFaceThen("happy", 1600);
+      var count = (body && body.tool_count) || (state.toolList || []).length;
+      msg(count ? ("完成 · 工具 " + count + " 次") : "完成");
+    }
+    refreshUsage();
+    refreshSessions();
+  }
+
   /* ---- 用量（低调显示在面板底部） ---- */
   function refreshUsage() {
     api("/usage").then(function (res) {
@@ -512,12 +829,12 @@
       var box = $("asst-usage");
       box.textContent = "";
       var u = res.body.usage || {};
-      ["interactive", "internal"].forEach(function (ch) {
-        var v = u[ch];
+      [["interactive", "助手"], ["internal", "内部"], ["ops", "运维"]].forEach(function (pair) {
+        var ch = pair[0], v = u[ch];
         if (!v) return;
         var line = el("span", "asst-usage-line" +
           (v.limit && v.requests / v.limit >= 0.8 ? " warn" : ""));
-        line.textContent = "今日" + (ch === "interactive" ? "助手" : "内部")
+        line.textContent = "今日" + pair[1]
           + " " + v.requests + "/" + v.limit
           + " · " + fmtTokens(v.tokens) + "tok";
         box.appendChild(line);
@@ -585,6 +902,10 @@
       api("/logout", { method: "POST" }).then(function () {
         state.authed = false;
         state.sessionId = null;
+        state.role = null;
+        state.opsEnabled = false;
+        state.modes = {};
+        updateModeUI();
         showUser(null);
         $("asst-logout").hidden = true;
         renderMessages([]);
@@ -593,6 +914,17 @@
       });
     });
     $("asst-new").addEventListener("click", newSession);
+    // 会话模式切换（对话 / 运维；仅 admin 且 registry 开启 ops 时显示）
+    var modeWrap = $("asst-mode");
+    if (modeWrap) {
+      modeWrap.addEventListener("click", function (ev) {
+        var btn = ev.target.closest ? ev.target.closest("button[data-mode]") : null;
+        if (btn) setMode(btn.getAttribute("data-mode"));
+      });
+    }
+    $("asst-stop").addEventListener("click", stopOpsRun);
+    $("asst-approval-allow").addEventListener("click", function () { resolveApproval(true); });
+    $("asst-approval-deny").addEventListener("click", function () { resolveApproval(false); });
     // 行内重命名 / 删除确认（侧栏每项的 ✎/🗑 触发 openRename/openDelete）
     $("asst-rename-ok").addEventListener("click", submitRename);
     $("asst-rename-cancel").addEventListener("click", function () {
@@ -616,12 +948,14 @@
         sendMessage();
       }
     });
-    // 启动时静默探一次登录态（Cookie 7 天有效，多数时候直接就绪）
-    api("/session").then(function (res) {
-      state.authed = !!(res.ok && res.body.authed);
+    // 启动时静默探一次登录态（Cookie 7 天有效，多数时候直接就绪）；
+    // 走 loadSessionMeta 才能一并拿到 role/ops_enabled，决定是否显示运维模式。
+    loadSessionMeta().then(function (body) {
+      state.authed = !!(body && body.authed);
       if (state.authed) {
-        showUser(res.body.user || null);
+        showUser(body.user || null);
         $("asst-logout").hidden = false;
+        refreshAll();          // 已有 Cookie 时直接拉会话/用量，省一次展开
       } else {
         // 过期/伪造态:清除首帧标记,工作台入口收回
         showUser(null);

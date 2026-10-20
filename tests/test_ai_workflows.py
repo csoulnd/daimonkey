@@ -13,6 +13,8 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import tests  # noqa: E402,F401  单测护栏:离线 + 不调真实模型
+
 
 def seed(db_mod):
     """临时库中造最小数据集：2 产品 + 核心产品榜 + 1 条新闻。"""
@@ -212,12 +214,16 @@ class AiPipelineTests(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_build_survives_ai_failure(self):
-        from collector import ai as ai_mod, export, sitegen
-        with patch.object(ai_mod, "refresh_summaries_if_stale",
+        from collector import ai as ai_mod, export, sitegen, workflows
+        with patch.object(workflows, "generate_direction_digests",
                           side_effect=RuntimeError("boom")), \
+                patch.object(ai_mod, "refresh_summaries_if_stale",
+                             side_effect=RuntimeError("boom")), \
                 patch.object(export, "export_all"), \
                 patch.object(sitegen, "build"):
             notes = self.pipeline.run_build()
+        # 两个 AI 步骤都要降级:周总结失败只记 note,摘要失败也只记 note
+        self.assertTrue(any("direction-digest" in n and "boom" in n for n in notes))
         self.assertTrue(any("摘要步骤异常" in n for n in notes))
 
     def test_status_has_ai_field(self):
@@ -229,6 +235,16 @@ class AiPipelineTests(unittest.TestCase):
         self.assertEqual(out["state"], "success")
         status = json.loads(self.pipeline.STATUS_FILE.read_text(encoding="utf-8"))
         self.assertEqual(status["ai"], ["[ai:home] ok"])
+
+
+class LightweightGuardTests(unittest.TestCase):
+    """护栏自检:漏 mock 时快速失败,而不是起 pi 子进程或触网。"""
+
+    def test_guards_installed(self):
+        import socket
+        from collector import assistant
+        self.assertTrue(getattr(assistant.run_internal, "_daimon_guarded", False))
+        self.assertTrue(getattr(socket.socket, "_daimon_guarded", False))
 
 
 if __name__ == "__main__":

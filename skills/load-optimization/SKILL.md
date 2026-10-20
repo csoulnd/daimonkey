@@ -55,6 +55,7 @@ ps -eo pid,ppid,rss,args --sort=-rss | grep -vE "grep|zcode|sshd|journald" | hea
 | 整轮采集单个长事务锁库(可达 10 分钟) | 已解决(2026-10-17) | 逐源短事务+AI 评分移出主事务(自锁主因);另加更新子进程 25min 看门狗、慢请求(>5s)日志、前端轮询 15min 上限 | 影响:锁库期间 AI 评分/会话写入可能 busy;数据量小可接受,恶化时按源分事务 |
 | dist/raw 逐 payload 整页(约 270MB)且每次全量重压 | 待决策 | 方案:raw 页改按需 JSON 渲染或 .gz 按内容哈希判断;动 dist 结构前先过 data-update 专家 |
 | serve.py 子进程日志 fd 不显式关闭 | 低优先 | 每次更新泄漏一个 fd,量级极小 |
+| 单测漏 mock 会起 pi 子进程联网、整轮挂起 | 已解决(2026-10-20) | `tests/__init__.py` 护栏:仅放行 loopback、未 patch 的 `assistant.run_internal` 直接报错、pbkdf2 降到 1000 轮;全量 169 用例 15s(原 >10min 挂死) |
 
 ## 常见调整
 
@@ -79,3 +80,5 @@ ps -eo pid,ppid,rss,args --sort=-rss | grep -vE "grep|zcode|sshd|journald" | hea
 - 2026-10-16:弃用 deepseek-harness-sdk(常驻 187MB、守护线程越界风险),站内 agent 改用 Pi 一次性进程模式;codex 站外遗留进程清退(后发现属外层 ZCode 环境后端会重生,已从本站内存账移除)。规格定为 10 并发/20 在线。
 - 2026-10-16(规格化防护落地):serve.py 实测——静态 120/min/IP、API 60/min/IP 令牌桶(超限 429+Retry-After)、全局在途上限 30、连接超时 30s、%00 路径 400、nosniff+CSP 安全头;压测 20 线程 120 请求全部成功(p50 5ms)、35 并发迸发全部 200,压测后 serve.py RSS 27MB/线程归零。同步修复 pipeline 首源失败 UnboundLocalError 与状态卡 running 问题。
 - 2026-10-17(部署托管):serve.py 从 nohup 裸跑迁移到 systemd(`Restart=always`、开机自启、`KillMode=mixed` 连同更新子进程退出),服务仍只有 serve.py 一个常驻进程;bootstrap 幂等重跑不会重复起进程。未引入采集定时器,保持手动更新约定。依赖改为精确版本锁定,避免新机装到未验证行为。
+- 2026-10-20(运维 agent 资源模型):ops 每轮一个 pi RPC 子进程（任务期峰值 ~130MB、结束即释放），会话文件落 `data/pi-sessions/`；全局执行锁仍为 1，审批等待不占 CPU。杀进程统一 `os.killpg`——外部 `kill -9 -pid` 在本机进程树下会卡死（已修 `run()` 与 `run_turn`）。
+- 2026-10-20(单测轻量化):`test_build_survives_ai_failure` 只 mock 了 `ai.refresh_summaries_if_stale`,漏掉 `run_build` 第一站的 `workflows.generate_direction_digests`,用例真的起了 pi 子进程等 DeepSeek 回复,整轮测试挂起 >5 分钟;执行通道在超时清理进程时连累同机 `daimonkey.service` 被 SIGKILL(systemd 已自动恢复)。修复:补 mock 并断言两步都降级;`tests/__init__.py` 加护栏——外网连接只放行 loopback、未 patch 的 `assistant.run_internal` 立即抛错(不再起 pi)、pbkdf2 轮数降到 1000(只影响单测,哈希格式/校验不变),重型鉴权用例显式 `import tests` 加载护栏。结果:168→169 用例 15s 全绿。运维教训:长命令一律 `timeout` 包裹或 `setsid nohup` 后台跑,禁止让单命令顶到执行通道上限。

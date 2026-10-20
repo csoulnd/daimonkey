@@ -12,6 +12,8 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 
+import tests  # noqa: E402,F401  单测护栏:离线 + 快速 KDF
+
 
 spec = importlib.util.spec_from_file_location(
     "assistant_server", Path(__file__).resolve().parents[1] / "scripts" / "serve.py")
@@ -118,6 +120,18 @@ class AssistantAuthTests(unittest.TestCase):
         # 伪造 Cookie 401
         conn.request("GET", "/api/v1/assistant/sessions",
                      headers={"Cookie": "assistant_session=alice.999999.deadbeef"})
+        self.assertEqual(conn.getresponse().status, 401)
+        conn.close()
+
+    def test_disabled_user_cookie_rejected(self):
+        """Cookie 签名有效但账号已禁用/删除 → 立即失效（不等 7 天）。"""
+        conn = http.client.HTTPConnection(*self.httpd.server_address)
+        cookie = self._login(conn)
+        self.assertTrue(acct.set_enabled(ALICE, False))
+        status, body = get_json(conn, "/api/v1/assistant/session", cookie)
+        self.assertFalse(body["authed"])
+        conn.request("GET", "/api/v1/assistant/sessions",
+                     headers={"Cookie": cookie})
         self.assertEqual(conn.getresponse().status, 401)
         conn.close()
 

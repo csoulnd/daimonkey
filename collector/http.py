@@ -53,8 +53,12 @@ class Http:
         for attempt in range(len(backoff) + 1):
             self._throttle(url)
             try:
-                r = self._client.request(method, url, json=json_body, headers=headers,
-                                         timeout=timeout)
+                # httpx 里 timeout=None 是"禁用超时",不是"沿用 Client 默认值";
+                # 未显式指定时不能传这个 key,否则会把 20s 读超时整个覆盖掉,
+                # 遇到"连接存活但不再返回数据"的链路会永久阻塞(2026-10-20 实测)。
+                extra = {} if timeout is None else {"timeout": timeout}
+                r = self._client.request(method, url, json=json_body,
+                                         headers=headers, **extra)
             except httpx.HTTPError as e:
                 last_err = e
                 if attempt < len(backoff):

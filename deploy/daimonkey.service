@@ -8,10 +8,22 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
+# 降权：站内运维 agent（pi 工具）继承本用户权限运行，必须是普通用户而非 root。
+# Group 与用户同名，保证 dist/、data/ 的组权限一致（bootstrap 会建同名组）。
 User=__RUN_AS__
+Group=__RUN_AS__
 WorkingDirectory=__INSTALL_ROOT__
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
+# 固定 PATH：保证 agent 调用的 sudo/systemd-run 等运维命令可预测（不依赖登录 shell）。
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+# 安全选项取舍（刻意保持最小改动，勿贸然加沙箱）：
+# - 不加 NoNewPrivileges=yes：agent 需要 `sudo -n /usr/local/bin/daimonkey-restart`，
+#   NoNewPrivileges 会禁止 sudo 的 setuid 提权，延时重启链路直接不可用。
+# - 不加 ProtectSystem=strict：站点运行时要写 dist/、data/，且仓库位于 /home 下；
+#   ProtectHome=yes 还会让业务代码不可见。强隔离留给后续容器/namespace 方案。
+# - 重启只允许走 root 拥有的固定 wrapper（/usr/local/bin/daimonkey-restart），
+#   sudoers 不授予任意 systemctl 权限。详见 docs/deploy.md 与 deploy/sudoers.d/daimonkey。
 ExecStart=__INSTALL_ROOT__/.venv/bin/python scripts/serve.py --host __HOST__ --port __PORT__
 Restart=always
 RestartSec=3

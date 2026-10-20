@@ -544,6 +544,65 @@ h3 { font-size: 0.96em; margin: 0.7em 0 0.35em; font-weight: 600; }
   color: var(--dim); border-top: 1px solid var(--line); padding-top: 6px;
 }
 .asst-usage-line.warn { color: var(--heat); }
+
+/* ---- 运维 agent：流式文本 / 工具卡片 / 审批 / 模式切换 / 停止 ---- */
+.asst-ops { max-width: 100%; }
+.asst-stream { white-space: pre-wrap; }
+.asst-tools { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.asst-tool {
+  border: 1px solid var(--line); border-radius: var(--r-s);
+  background: var(--panel); font-size: var(--fs-xs);
+}
+.asst-tool summary {
+  cursor: pointer; padding: 4px 8px; display: flex; gap: 6px;
+  align-items: baseline; flex-wrap: wrap; list-style: none;
+}
+.asst-tool summary::-webkit-details-marker { display: none; }
+.asst-tool-name { color: var(--acc); font-weight: 600; }
+.asst-tool-args { color: var(--dim); font-size: 11px; overflow-wrap: anywhere; }
+.asst-tool-state { color: var(--dim); margin-left: auto; white-space: nowrap; }
+.asst-tool.ok .asst-tool-state { color: var(--up); }
+.asst-tool.err { border-color: var(--down); }
+.asst-tool.err .asst-tool-state { color: var(--down); }
+.asst-tool-out {
+  margin: 0; padding: 6px 8px; max-height: 160px; overflow: auto;
+  white-space: pre-wrap; border-top: 1px solid var(--line); color: var(--dim);
+}
+.asst-approval {
+  border: 1px solid var(--heat); border-radius: var(--r-m); padding: 8px 10px;
+  background: rgba(217, 161, 82, 0.12);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.asst-approval[hidden] { display: none; }
+.asst-approval-head { font-size: var(--fs-xs); font-weight: 600; color: var(--heat); }
+.asst-approval-cmd {
+  display: block; white-space: pre-wrap; font-size: 11px; color: var(--dim);
+  max-height: 80px; overflow: auto;
+}
+.asst-approval-acts { display: flex; gap: 8px; }
+.asst-approval-acts button {
+  border-radius: var(--r-s); padding: 5px 14px; font-size: var(--fs-xs);
+  cursor: pointer; font-family: inherit; border: 1px solid var(--line);
+  background: var(--panel2); color: var(--ink);
+}
+.asst-approval-acts .allow { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
+.asst-approval-acts .deny { color: var(--down); border-color: var(--down); }
+.asst-approval-acts button:disabled { opacity: 0.5; cursor: wait; }
+.asst-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.asst-mode { display: flex; gap: 4px; }
+.asst-mode[hidden] { display: none; }
+.asst-mode button {
+  background: none; border: 1px solid var(--line); color: var(--dim);
+  border-radius: var(--r-full); padding: 2px 10px; font-size: var(--fs-xs);
+  cursor: pointer; font-family: inherit;
+}
+.asst-mode button.on { color: var(--acc-ink); background: var(--acc); border-color: var(--acc); }
+#asst-stop {
+  flex-shrink: 0; background: none; color: var(--down); border: 1px solid var(--down);
+  border-radius: var(--r-m); padding: 9px 12px; font-size: var(--fs-xs);
+  cursor: pointer; font-family: inherit;
+}
+#asst-stop:disabled { opacity: 0.5; cursor: wait; }
 @media (max-width: 880px) {
   .asst-panel { right: 12px; bottom: 12px; width: calc(100vw - 24px); max-height: calc(100vh - 90px); }
   .asst-pet { right: 14px; bottom: 14px; }

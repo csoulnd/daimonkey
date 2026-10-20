@@ -388,7 +388,8 @@ class Handler(BaseHTTPRequestHandler):
             name, _, value = part.strip().partition("=")
             if name == ASSISTANT_COOKIE:
                 user = session_user(value)
-                if user:
+                # 签名有效还不够：账号可能已删除/禁用，必须回库确认
+                if user and users.is_active(user):
                     return user
         return None
 
@@ -561,8 +562,11 @@ class Handler(BaseHTTPRequestHandler):
             return False
         rest = path[len("/api/v1/assistant/"):]
         if rest == "session":
-            self._json({"authed": self._assistant_user() is not None,
-                        "user": self._assistant_user()})
+            user = self._assistant_user()
+            role = users.get_role(user) if user else None
+            self._json({"authed": user is not None, "user": user,
+                        "role": role,
+                        "ops_enabled": assistant.ops_enabled()})
             return True
         user = self._assistant_user()
         if not user:
@@ -578,7 +582,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"usage": assistant.usage_summary(),
                             "user": user,
                             "limits": {k: v for k, v in assistant.cfg().items()
-                                       if k in ("interactive", "internal", "execution")}})
+                                       if k in ("interactive", "internal", "ops", "execution")}})
             elif rest == "status":
                 with _chat_lock:
                     state = dict(_chat_state)
@@ -587,6 +591,24 @@ class Handler(BaseHTTPRequestHandler):
             elif rest == "workflows":
                 from collector import workflows
                 self._json({"workflows": workflows.describe()})
+            elif rest.startswith("ops/runs/"):
+                # 运维 run 轮询:?after=N 只回增量事件
+                rid = rest[len("ops/runs/"):]
+                if "/" in rid or not rid:
+                    self._json({"error": "bad run id"}, 400)
+                    return True
+                params = parse_qs(urlparse(self.path).query)
+                try:
+                    after = int(params.get("after", ["0"])[0])
+                except ValueError:
+                    after = 0
+                state = assistant.run_status(rid, owner=user)
+                if state is None:
+                    self._json({"error": "run 不存在或已过期"}, 404)
+                else:
+                    state["events"] = [e for e in state["events"]
+                                       if int(e.get("seq", 0)) > after]
+                    self._json(state)
             elif rest.endswith("/messages") and rest.startswith("sessions/"):
                 sid = rest[len("sessions/"):-len("/messages")]
                 if sid.isdigit():
@@ -845,9 +867,17 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if rest == "sessions":
                 body = self._read_json() or {}
+                mode = str(body.get("mode", "chat"))
+                if mode == "ops":
+                    if not users.is_admin(user):
+                        self._json({"error": "仅管理员可创建运维会话"}, 403)
+                        return
+                    if not assistant.ops_enabled():
+                        self._json({"error": "运维模式未启用"}, 403)
+                        return
                 sid = assistant.create_session(str(body.get("title", "")),
-                                               owner=user)
-                self._json({"session_id": sid}, 201)
+                                               owner=user, mode=mode)
+                self._json({"session_id": sid, "mode": "ops" if mode == "ops" else "chat"}, 201)
             elif rest.startswith("sessions/") and rest.endswith("/rename"):
                 sid = rest[len("sessions/"):-len("/rename")]
                 if not sid.isdigit():
@@ -858,6 +888,26 @@ class Handler(BaseHTTPRequestHandler):
                                               owner=user)
                 self._json({"ok": bool(ok)} if ok else {"error": "会话不存在或标题为空"},
                            200 if ok else 404)
+            elif rest.startswith("sessions/") and rest.endswith("/mode"):
+                sid = rest[len("sessions/"):-len("/mode")]
+                if not sid.isdigit():
+                    self._json({"error": "bad session id"}, 400)
+                    return
+                body = self._read_json() or {}
+                mode = str(body.get("mode", "chat"))
+                if mode not in ("chat", "ops"):
+                    self._json({"error": "mode 只能是 chat 或 ops"}, 400)
+                    return
+                if mode == "ops":
+                    if not users.is_admin(user):
+                        self._json({"error": "仅管理员可切换运维模式"}, 403)
+                        return
+                    if not assistant.ops_enabled():
+                        self._json({"error": "运维模式未启用"}, 403)
+                        return
+                ok = assistant.set_session_mode(int(sid), mode, owner=user)
+                self._json({"ok": True, "mode": mode} if ok
+                           else {"error": "会话不存在"}, 200 if ok else 404)
             elif rest == "chat":
                 body = self._read_json() or {}
                 sid, message = body.get("session_id"), str(body.get("message", ""))
@@ -883,8 +933,48 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"state": "running", "workflow": name}, 202)
                 else:
                     self._json({"state": "running", "note": "已有一个任务进行中"}, 409)
+            elif rest == "ops/chat":
+                if not assistant.ops_enabled():
+                    self._json({"error": "运维模式未启用"}, 403)
+                    return
+                if not users.is_admin(user):
+                    self._json({"error": "仅管理员可使用运维模式"}, 403)
+                    return
+                body = self._read_json() or {}
+                sid = body.get("session_id")
+                message = str(body.get("message", ""))
+                if not isinstance(sid, int):
+                    self._json({"error": "session_id 必填"}, 400)
+                    return
+                if not message.strip():
+                    self._json({"error": "message 不能为空"}, 400)
+                    return
+                if not assistant.session_owned(sid, user):
+                    self._json({"error": "会话不存在"}, 404)
+                    return
+                run_id = assistant.start_ops_turn(sid, message, user)
+                self._json({"run_id": run_id, "state": "running"}, 202)
+            elif rest.startswith("ops/runs/"):
+                tail = rest[len("ops/runs/"):]
+                parts = tail.split("/")
+                rid = parts[0]
+                if len(parts) == 2 and parts[1] == "abort":
+                    ok = assistant.abort_run(rid, owner=user)
+                    self._json({"ok": True} if ok else {"error": "run 不存在"}, 200 if ok else 404)
+                elif len(parts) == 3 and parts[1] == "approvals":
+                    body = self._read_json() or {}
+                    ok = assistant.resolve_approval(rid, parts[2],
+                                                    bool(body.get("allow")), owner=user)
+                    self._json({"ok": True} if ok else {"error": "审批不存在或已失效"},
+                               200 if ok else 404)
+                else:
+                    self._json({"error": "not found"}, 404)
             else:
                 self._json({"error": "not found"}, 404)
+        except assistant.AssistantPermission as e:
+            self._json({"error": str(e)}, 403)
+        except assistant.AssistantBusy as e:
+            self._json({"error": str(e)}, 409)
         except assistant.AssistantQuota as e:
             self._json({"error": str(e)}, 429)
         except assistant.AssistantError as e:

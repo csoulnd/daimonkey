@@ -1,9 +1,43 @@
 """各源解析函数测试（固化样本，不发真实请求）。"""
 import unittest
 
+import httpx
+
 from collector.sources.appstore_rss import parse_entries
 from collector.sources.npm import _chunks, _sum_days
 from collector.sources.vscode_marketplace import parse_installs
+
+
+class TestHttpTimeout(unittest.TestCase):
+    """回归(2026-10-20):未显式传 timeout 时不能透传 None。
+
+    httpx 的 timeout=None 是"禁用超时",会把 Client 的 20s 读超时覆盖掉;
+    曾导致一次数据更新卡在"连接存活但不返回数据"的链路上 9 分钟以上。
+    """
+
+    def _http(self):
+        from collector.http import Http
+        h = Http()
+        h._throttle = lambda url: None
+        self.seen = {}
+
+        def fake_request(method, url, **kw):
+            self.seen.update(kw)
+            return httpx.Response(200, request=httpx.Request(method, url))
+
+        h._client.request = fake_request
+        return h
+
+    def test_default_uses_client_timeout(self):
+        h = self._http()
+        self.assertEqual(h.fetch("https://example.com/x").status_code, 200)
+        self.assertNotIn("timeout", self.seen)
+        self.assertGreater(h._client.timeout.read, 0)
+
+    def test_explicit_timeout_passed_through(self):
+        h = self._http()
+        h.fetch("https://example.com/x", timeout=45)
+        self.assertEqual(self.seen["timeout"], 45)
 
 
 class TestNpm(unittest.TestCase):

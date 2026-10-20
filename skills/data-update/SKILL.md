@@ -30,6 +30,7 @@ description: 本站数据更新操作与排障。适用场景：热度/新闻数
 | 数据仍显示过期 | 全量更新后需等构建完成（状态变 success）才刷新；缓存策略已设 no-cache |
 | 换机/改目录后溯源页打不开 | `raw_payloads.body_path` 只存相对路径；先跑 `.venv/bin/python scripts/migrate_relpath.py`，再用 `scripts/verify.py` 第 5 节核对文件可解析 |
 | 新机更新行为与旧机不同 | 依赖已精确锁定；检查 `pip freeze` 与 `requirements.txt` 是否一致，重跑 `deploy/bootstrap.sh` |
+| 更新长时间停在 running（>10 分钟） | 先看进程是否卡在 `read()`：`cat /proc/<pid>/wchan`、`ss -tnp \| grep <pid>`；2026-10-20 曾因 `Http.fetch` 透传 `timeout=None`（httpx 语义=禁用超时）卡在一条不断流的 TCP 上，已修复并加回归用例 `tests/test_sources.py::TestHttpTimeout` |
 
 ## 原则
 

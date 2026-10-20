@@ -26,6 +26,7 @@ FORCE_RESTORE=0
 INSTALL_SERVICE=1
 INSTALL_DEPS=1
 REBUILD=0
+CREATE_USER=0
 BIN_DIR="/usr/local/bin"
 
 say()  { printf '\n== %s ==\n' "$*"; }
@@ -41,6 +42,7 @@ usage() {
   --host HOST           监听地址（默认 0.0.0.0）
   --port PORT           监听端口（默认 8080）
   --run-as USER         服务运行用户（默认 sudo 发起者/当前用户）
+  --create-user         运行用户不存在时创建（运维 agent 降权部署用）
   --restore FILE        从 deploy/backup.sh 生成的备份包恢复（新机部署用）
   --force               恢复时允许覆盖已存在的 data/（旧数据改名保留）
   --rebuild             强制重建站点（dist/ 存在也重建）
@@ -56,6 +58,7 @@ while [ $# -gt 0 ]; do
     --host) HOST="${2:?--host 需要参数}"; shift 2 ;;
     --port) PORT="${2:?--port 需要参数}"; shift 2 ;;
     --run-as) RUN_AS="${2:?--run-as 需要参数}"; shift 2 ;;
+    --create-user) CREATE_USER=1; shift ;;
     --restore) RESTORE="${2:?--restore 需要参数}"; shift 2 ;;
     --force) FORCE_RESTORE=1; shift ;;
     --rebuild) REBUILD=1; shift ;;
@@ -69,7 +72,15 @@ done
 
 [ -f "$ROOT/requirements.txt" ] || die "未找到 requirements.txt，请在仓库内执行: $ROOT"
 [ -f "$ROOT/scripts/serve.py" ] || die "未找到 scripts/serve.py，仓库不完整"
-id "$RUN_AS" >/dev/null 2>&1 || die "运行用户不存在: $RUN_AS"
+if ! id "$RUN_AS" >/dev/null 2>&1; then
+  if [ "$CREATE_USER" = 1 ] && [ "$(id -u)" -eq 0 ]; then
+    useradd --user-group --home-dir "$ROOT" --no-create-home \
+            --shell /bin/bash "$RUN_AS"
+    ok "已创建服务用户: $RUN_AS（home=$ROOT）"
+  else
+    die "运行用户不存在: $RUN_AS（降权部署请加 --run-as daimonkey --create-user）"
+  fi
+fi
 # 相对参数按调用者当前目录解析（脚本内部已 cd 到安装目录）
 case "$RESTORE" in
   "") ;;
@@ -205,11 +216,20 @@ else
   ok "未指定 --restore（全新安装）"
 fi
 
-if [ "$(id -u)" -eq 0 ]; then
-  chown -R "$RUN_AS" "$ROOT/data" 2>/dev/null || true
-  if [ -d "$ROOT/.venv" ]; then chown -R "$RUN_AS" "$ROOT/.venv"; fi
-  if [ -d "$ROOT/dist" ]; then chown -R "$RUN_AS" "$ROOT/dist"; fi
-fi
+# 降权部署：整个仓库（含 .git/.venv/dist/data）归服务用户，agent 才能读代码、
+# 写工作区、跑 git；SSH key 缺失时从 root 复制（知识库同步依赖）。
+fix_owner() {
+  [ "$(id -u)" -eq 0 ] || return 0
+  chown -R "$RUN_AS:$RUN_AS" "$ROOT" 2>/dev/null || true
+  if [ -d /root/.ssh ] && [ ! -e "$ROOT/.ssh" ]; then
+    cp -a /root/.ssh "$ROOT/.ssh"
+    chown -R "$RUN_AS:$RUN_AS" "$ROOT/.ssh"
+    chmod 700 "$ROOT/.ssh"
+    chmod 600 "$ROOT/.ssh"/* 2>/dev/null || true
+    ok "已迁移 SSH key 到 $ROOT/.ssh（知识库同步用）"
+  fi
+}
+fix_owner
 
 # ---------------------------------------------------------------- 5. 路径/建库/构建
 say "5/7 数据库与站点"
@@ -229,6 +249,7 @@ fi
 if [ ! -f "$ROOT/data/assistant.env" ]; then
   warn "缺少 data/assistant.env（DEEPSEEK_API_KEY）：站点可用，AI 助手/评分降级"
 fi
+fix_owner   # 构建产物归服务用户，避免降权后 dist/ 不可写
 
 # ---------------------------------------------------------------- 6. userctl
 say "6/7 账号管理命令 userctl"
@@ -243,7 +264,13 @@ exec "$ROOT/.venv/bin/python" "$ROOT/scripts/userctl.py" "\$@"
 EOF
 chmod 755 "$BIN_DIR/userctl.tmp"
 mv "$BIN_DIR/userctl.tmp" "$BIN_DIR/userctl"
-ok "已安装 $BIN_DIR/userctl"
+cat > "$BIN_DIR/opsctl.tmp" <<EOF
+#!/usr/bin/env bash
+exec "$ROOT/.venv/bin/python" "$ROOT/scripts/opsctl.py" "\$@"
+EOF
+chmod 755 "$BIN_DIR/opsctl.tmp"
+mv "$BIN_DIR/opsctl.tmp" "$BIN_DIR/opsctl"
+ok "已安装 $BIN_DIR/userctl 与 $BIN_DIR/opsctl"
 
 # ---------------------------------------------------------------- 7. systemd
 say "7/7 进程托管（systemd）"
@@ -254,6 +281,36 @@ elif [ "$(id -u)" -ne 0 ]; then
 elif ! systemctl show-environment >/dev/null 2>&1; then
   warn "systemd 不可用（容器环境？）：跳过托管；手动启动: $ROOT/scripts/serve.sh --host $HOST --port $PORT"
 else
+  # 运维 agent 的最小提权面：固定 wrapper + sudoers + journal 只读组
+  if [ -f "$ROOT/deploy/sudoers.d/daimonkey" ]; then
+    cat > /usr/local/bin/daimonkey-restart.tmp <<'WRAP'
+#!/usr/bin/env bash
+# 固定延时重启入口：systemd-run 异步触发，避免 agent 重启时杀掉自己所在的服务。
+set -euo pipefail
+delay="${1:-3}"
+case "$delay" in
+  ''|*[!0-9]*) echo "delay 必须是非负整数" >&2; exit 2 ;;
+esac
+exec systemd-run --on-active="$delay" \
+     --unit="daimonkey-restart-$(date +%s)" \
+     --collect systemctl restart daimonkey
+WRAP
+    install -m 755 -o root -g root /usr/local/bin/daimonkey-restart.tmp \
+            /usr/local/bin/daimonkey-restart
+    rm -f /usr/local/bin/daimonkey-restart.tmp
+    install -m 0440 -o root -g root "$ROOT/deploy/sudoers.d/daimonkey" \
+            /etc/sudoers.d/daimonkey
+    if ! visudo -cf /etc/sudoers.d/daimonkey >/dev/null; then
+      rm -f /etc/sudoers.d/daimonkey
+      die "sudoers 语法校验失败，已移除（避免 sudo 全局不可用）"
+    fi
+    usermod -aG systemd-journal "$RUN_AS" 2>/dev/null \
+      || warn "加入 systemd-journal 组失败（journal 读取受限）"
+    ok "已安装重启 wrapper 与 sudoers（$RUN_AS 仅可延时重启）"
+  else
+    warn "缺少 deploy/sudoers.d/daimonkey，跳过运维提权配置"
+  fi
+
   UNIT_SRC="$ROOT/deploy/daimonkey.service"
   UNIT_DST="/etc/systemd/system/daimonkey.service"
   [ -f "$UNIT_SRC" ] || die "缺少 $UNIT_SRC"

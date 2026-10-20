@@ -251,7 +251,8 @@ CREATE TABLE IF NOT EXISTS users (
     username     TEXT PRIMARY KEY,
     pw_hash      TEXT NOT NULL,          -- pbkdf2$<iterations>$<salt_hex>$<dk_hex>
     created_at   TEXT NOT NULL,
-    enabled      INTEGER NOT NULL DEFAULT 1
+    enabled      INTEGER NOT NULL DEFAULT 1,
+    role         TEXT NOT NULL DEFAULT 'admin'   -- admin(可开运维会话) | member
 );
 """
 
@@ -261,6 +262,60 @@ def ensure_users_tables(c) -> None:
     cols = {row[1] for row in c.execute("PRAGMA table_info(users)")}
     if "knowledge_repo" not in cols:
         c.execute("ALTER TABLE users ADD COLUMN knowledge_repo TEXT")
+    if "role" not in cols:
+        # 附加式迁移:历史账号一律沿用"全部账号等权(管理员)"的旧语义
+        c.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'")
+
+
+# 站内运维 agent(ops):会话模式/pi 会话映射/工具级审计/审批。
+# 全部 IF NOT EXISTS + 列迁移,旧库在线可用;事件流只在内存,工具与审批落库供溯源。
+OPS_DDL = """
+CREATE TABLE IF NOT EXISTS assistant_tool_calls (
+    id          INTEGER PRIMARY KEY,
+    run_id      TEXT NOT NULL,
+    session_id  INTEGER,
+    tool        TEXT NOT NULL,
+    args_json   TEXT,
+    decision    TEXT,                     -- allow | ask | approved | denied
+    status      TEXT,                     -- running | ok | error | blocked
+    output      TEXT,
+    duration_s  REAL,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tool_calls_run ON assistant_tool_calls(run_id);
+CREATE TABLE IF NOT EXISTS assistant_approvals (
+    id          TEXT PRIMARY KEY,
+    run_id      TEXT NOT NULL,
+    session_id  INTEGER,
+    owner       TEXT,
+    tool        TEXT,
+    command     TEXT,
+    status      TEXT NOT NULL,            -- pending | allowed | denied | timeout
+    created_at  TEXT NOT NULL,
+    decided_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_approvals_run ON assistant_approvals(run_id);
+"""
+
+
+def ensure_ops_tables(c) -> None:
+    """运维 agent 上线 / serve 启动时调用，旧库在线补表与列。"""
+    c.executescript(OPS_DDL)
+    cols = {row[1] for row in c.execute("PRAGMA table_info(assistant_sessions)")}
+    if "mode" not in cols:
+        c.execute("ALTER TABLE assistant_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'chat'")
+    if "pi_session" not in cols:
+        c.execute("ALTER TABLE assistant_sessions ADD COLUMN pi_session TEXT")
+    run_cols = {row[1] for row in c.execute("PRAGMA table_info(assistant_runs)")}
+    for name, ddl in (
+        ("run_id", "ALTER TABLE assistant_runs ADD COLUMN run_id TEXT"),
+        ("mode", "ALTER TABLE assistant_runs ADD COLUMN mode TEXT"),
+        ("reply", "ALTER TABLE assistant_runs ADD COLUMN reply TEXT"),
+        ("tool_count", "ALTER TABLE assistant_runs ADD COLUMN tool_count INTEGER DEFAULT 0"),
+    ):
+        if name not in run_cols:
+            c.execute(ddl)
+    c.execute("CREATE INDEX IF NOT EXISTS idx_asst_runs_run ON assistant_runs(run_id)")
 
 
 def ensure_sessions_owner_column(c) -> None:
@@ -277,6 +332,7 @@ def ensure_assistant_tables(c) -> None:
     c.executescript(ASSISTANT_DDL)
     ensure_users_tables(c)
     ensure_sessions_owner_column(c)
+    ensure_ops_tables(c)
 
 
 # AI 摘要与 AI 分析分：与确定性 rankings 平行存储，永不改写规则分。

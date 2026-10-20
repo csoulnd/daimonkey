@@ -14,7 +14,7 @@ status: active
 - **站点**:InferTech 观察站(品牌 daimonkey),门户+模型评测榜+智能体热度榜+AI 资讯+登录后个人工作台(报告厅/按用户隔离知识库/悬浮助手)。
 - **位置**:服务器目录 `/home/daimonkey`;仓库 `github.com/csoulnd/daimonkey`(main);服务 `systemd daimonkey`(端口 8080,`systemctl restart daimonkey`)。
 - **账号**:唯一账号 `dai`(需求方)。CLI `userctl add/passwd/repo/list`(任意目录)。
-- **健康基线**:110 unittest + 2 node 测试全过;`scripts/verify.py` 33/33;serve RSS ~27MB/空闲线程归零。
+- **健康基线**(2026-10-20):186 unittest + 2 node 测试全过;`scripts/verify.py` 83/83;serve RSS ~28MB/空闲线程归零;服务已降权为 `User=daimonkey`（`opsctl.py deploy-check` 15/15）。
 
 ## 2. 架构要点(动手前必读)
 
@@ -28,8 +28,9 @@ status: active
    - 逐源独立短事务,严禁整轮长事务锁库;
    - AI 调用(`ai.score_boards_safe`)在主事务之外执行;
    - 库内路径一律相对(`raw/...`),严禁绝对路径(verify 有防回归检查)。
-4. **助手运行时**:PIAgent 一次性进程(`collector/piagent.py`,pi CLI 全局安装,`--no-tools`);
-   密钥 `data/assistant.env`(DEEPSEEK)、`data/model_eval.env`(AA),均 600 不进 git。
+4. **助手运行时**:PIAgent 一次性进程(`collector/piagent.py`,pi CLI 全局安装);
+   对话通道 `--no-tools`,运维通道(仅 admin)走 pi RPC + 工具白名单 + 审批 + 审计
+   (`docs/OPS-AGENT.md`);密钥 `data/assistant.env`(DEEPSEEK)、`data/model_eval.env`(AA),均 600 不进 git。
 5. **前端无构建链**:原生 JS(IIFE)。登录态显隐走 localStorage + head 预载 `html.authed` 类
    (防 FOUC 模式,见 base.html 头部与 assistant.js showUser),新功能照抄该模式。
 
@@ -72,6 +73,8 @@ cd /home/daimonkey
 .venv/bin/python -m unittest discover -s tests # 测试
 .venv/bin/python scripts/verify.py             # 站点验收
 systemctl restart daimonkey                    # 重启服务(serve.py 改动后)
+.venv/bin/python scripts/opsctl.py status       # 服务/更新/站点探活;deploy-check 部署体检
+.venv/bin/python scripts/opsctl.py restart --in 3   # 受控延时重启(运维 agent 同款)
 userctl list                                   # 账号管理
 deploy/backup.sh                               # 备份(动 data 前先跑)
 ```

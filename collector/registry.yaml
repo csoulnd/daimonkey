@@ -906,7 +906,8 @@ products:
 assistant:
   enabled: true
   # PIAgent 一次性进程模式(pi.dev,collector/piagent.py):任务期间起 pi 子进程、
-  # 用完即退(实测峰值 ~130MB),无常驻 runtime。--no-tools 全禁工具。
+  # 用完即退(实测峰值 ~130MB),无常驻 runtime。对话通道 --no-tools 纯文本;
+  # 运维通道(ops,2026-10-20)走 pi RPC + 工具 + 持久会话,仅管理员可用。
   provider: deepseek
   model: deepseek/deepseek-flash     # pi 模型目录里的 provider/model 标识
   api_key_env: DEEPSEEK_API_KEY
@@ -923,6 +924,25 @@ assistant:
     daily_tokens: 2000000
     max_message_chars: 8000
     max_output_tokens: 4000
+  # 站内运维 agent：工具 read/write/edit/bash/find/grep/ls + pi 持久会话。
+  # 安全边界见 docs/OPS-AGENT.md 与 deploy/pi-ext/ops-guard.ts：
+  # 路径白名单/密钥黑名单、命令分级（放行/审批/拒绝）、工具调用上限、JSONL+DB 审计。
+  ops:
+    # 上线开关：2026-10-20 完成服务降权（User=daimonkey、deploy-check 15/15）
+    # 后开启。换机/重建环境时必须先降权再改回 true；root 服务 + 工具调用
+    # 等于把 root shell 暴露给模型，审批/审计只是护栏，不是沙箱。
+    enabled: true
+    model: deepseek/deepseek-v4-pro  # 运维用更强模型（复杂排查/改码）
+    thinking: high
+    tools: read,write,edit,bash,find,grep,ls
+    timeout_s: 900                  # 单轮上限（含工具执行）
+    approval_timeout_s: 180         # 前端无人应答即拒绝
+    max_tool_calls: 60
+    session_dir: data/pi-sessions   # pi 会话文件（随会话删除）
+    audit_dir: data/ops-audit       # 工具调用 JSONL 审计
+    extension: deploy/pi-ext/ops-guard.ts
+    daily_limit: 60
+    daily_tokens: 4000000
   login:
     max_failures: 5
     lockout_minutes: 10

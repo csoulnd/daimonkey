@@ -154,11 +154,26 @@
         <input type="password" id="asst-password" placeholder="密码，回车登录" maxlength="128" autocomplete="current-password">
       </div>
       <div id="asst-messages" class="asst-messages" aria-live="polite"></div>
+      <div class="asst-approval" id="asst-approval" hidden role="alert">
+        <div class="asst-approval-head">⚠ 助手请求执行<span id="asst-approval-title"></span></div>
+        <code class="asst-approval-cmd" id="asst-approval-cmd"></code>
+        <div class="asst-approval-acts">
+          <button id="asst-approval-allow" type="button" class="allow">允许</button>
+          <button id="asst-approval-deny" type="button" class="deny">拒绝</button>
+        </div>
+      </div>
       <form id="asst-form" class="asst-form">
         <textarea id="asst-input" rows="2" maxlength="8000" placeholder="输入消息，Ctrl+Enter 发送"></textarea>
+        <button id="asst-stop" type="button" title="停止当前运维任务" hidden>■ 停止</button>
         <button id="asst-send" type="submit">发送</button>
       </form>
-      <div class="asst-msg" id="asst-msg"></div>
+      <div class="asst-foot">
+        <div class="asst-mode" id="asst-mode" role="group" aria-label="会话模式" hidden>
+          <button type="button" data-mode="chat" aria-pressed="false">对话</button>
+          <button type="button" data-mode="ops" aria-pressed="false">⚙ 运维</button>
+        </div>
+        <div class="asst-msg" id="asst-msg"></div>
+      </div>
     </div>
   </div>
 </section>

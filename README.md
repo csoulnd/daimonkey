@@ -86,6 +86,7 @@ data/         SQLite/密钥/快照(不入库)   dist/  构建产物(不手改)
 - **当前迭代计划**:[PLAN.md](PLAN.md)
 - **评分口径**:站内各榜页面「评分说明」折叠块;AI 参与的环节在页面均有标注
 - **助手运行时**:PIAgent 一次性进程(pi.dev),无常驻内存;配额与护栏见 `registry.yaml → assistant`
+- **站内运维 agent(管理员)**:对话/运维双模式,pi RPC + 工具白名单 + 前端审批 + 工具级审计;必须先降权再开启,见 [docs/OPS-AGENT.md](docs/OPS-AGENT.md) 与 [docs/deploy.md §11](docs/deploy.md)
 - **数据保留**:原始响应/时序/快照按 LRU 窗口滚动(`registry.yaml → retention`),溯源链永久不断
 
 ## 安全要点

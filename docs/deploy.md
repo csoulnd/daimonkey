@@ -188,6 +188,64 @@ deploy/smoke.sh --all                     # + 搬迁演练 + systemd 重启演�
 | `deploy/backup.sh` | 热备 + 数据打包（排除 dist/cache） |
 | `deploy/smoke.sh` | 在线检查 + 搬迁/重启演练 |
 | `deploy/daimonkey.service` | systemd 单元模板（bootstrap 渲染） |
+| `deploy/pi-ext/ops-guard.ts` | 运维 agent 的 pi 工具策略扩展（拦截/审批/审计） |
+| `deploy/pi-ext/ops-policy.json` | 路径/命令/审计策略单一事实源 |
+| `deploy/sudoers.d/daimonkey` | 服务用户最小 sudo 授权（仅延时重启 wrapper） |
+| `deploy/ops-rollback.sh` | 降权失败时回滚为 root 服务 |
+| `scripts/opsctl.py` | 运维 CLI：status/logs/restart/deploy-check |
 | `scripts/migrate_relpath.py` | body_path 绝对→相对迁移（幂等） |
 | `scripts/check_env.sh` | 环境与依赖自检 |
 | `scripts/verify.py` | 站点验收 + 部署防回归 |
+
+## 11. 服务降权与运维 agent（2026-10-20）
+
+站内运维 agent（`docs/OPS-AGENT.md`）会让 pi 在本机执行 read/write/edit/bash。
+**在 root 服务上开工具 = 把 root shell 的审批面交给模型**，因此上线顺序固定为：
+先降权，再开 `assistant.ops.enabled`。
+
+### 11.1 一条命令降权
+
+```bash
+cd <安装目录>
+sudo bash deploy/bootstrap.sh --run-as daimonkey --create-user
+```
+
+这条命令会：
+
+1. 创建系统用户 `daimonkey`（home=仓库目录，不重建目录）；
+2. `chown -R daimonkey:daimonkey <安装目录>`（含 `.git/.venv/dist/data`）；
+3. 若 `$ROOT/.ssh` 不存在，从 `/root/.ssh` 复制并收紧权限（知识库同步用）；
+4. 安装 `/usr/local/bin/daimonkey-restart`（root:root 0755，只做 `systemd-run` 延时重启）；
+5. 安装 `/etc/sudoers.d/daimonkey`（0440，`visudo -cf` 校验；只授权固定 wrapper）；
+6. 把 `daimonkey` 加入 `systemd-journal` 组（`opsctl logs` 读日志）；
+7. 单元模板渲染 `User=daimonkey` / `Group=daimonkey`，`daemon-reload` 后重启。
+
+### 11.2 验收
+
+```bash
+sudo -u daimonkey .venv/bin/python scripts/opsctl.py deploy-check   # 服务用户/属主/wrapper/sudoers
+systemctl show daimonkey -p User -p Group --value
+sudo -u daimonkey .venv/bin/python scripts/opsctl.py status
+sudo -u daimonkey .venv/bin/python scripts/opsctl.py logs -n 50
+```
+
+全部通过后，再把 `collector/registry.yaml → assistant.ops.enabled` 改为 `true`，
+`sudo systemctl restart daimonkey` 使配置生效（服务启动时加载 registry）。
+前端只有 `role=admin` 且 `ops_enabled=true` 才会出现「⚙ 运维」模式开关。
+
+### 11.3 回滚
+
+```bash
+sudo bash deploy/ops-rollback.sh          # User 改回 root 并重启
+# 同时把 assistant.ops.enabled 改回 false 并重启，避免 root 下暴露工具
+```
+
+数据/仓库属主保持 `daimonkey` 不影响 root 服务；如需完全还原再 `chown -R root:root`。
+
+### 11.4 边界与注意
+
+- 审批/路径黑名单/命令分级/审计是**护栏，不是沙箱**；残余风险见 `docs/OPS-AGENT.md §7`。
+- 运维会话仍受 `assistant.ops.daily_limit / daily_tokens` 配额与全局并发 1 限制。
+- `userctl` 以 root 运行会写 SQLite（可能新建 root 属主的 `-wal/-shm`）；降权后请用
+  `sudo -u daimonkey userctl ...`，或事后 `chown daimonkey:daimonkey data/heat_index.sqlite*`。
+- 运维 agent 只能通过 `daimonkey-restart` 延时重启；直接 `systemctl restart` 会中断当前轮。

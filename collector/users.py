@@ -80,11 +80,53 @@ def set_enabled(username: str, enabled: bool) -> bool:
         return cur.rowcount > 0
 
 
+ROLES = ("admin", "member")
+
+
+def get_role(username: str) -> str | None:
+    """账号角色:admin(可开运维会话) / member(仅对话与站点浏览);不存在返回 None。
+
+    历史账号迁移默认 admin,保持"全部账号等权"的旧语义;需要收紧时用
+    `userctl role <用户名> member`。
+    """
+    with db.conn() as c:
+        db.ensure_users_tables(c)
+        row = c.execute("SELECT role FROM users WHERE username = ?",
+                        (username,)).fetchone()
+    if row is None:
+        return None
+    return row["role"] or "admin"
+
+
+def set_role(username: str, role: str) -> bool:
+    if role not in ROLES:
+        return False
+    with db.conn() as c:
+        db.ensure_users_tables(c)
+        cur = c.execute("UPDATE users SET role = ? WHERE username = ?",
+                        (role, username))
+        return cur.rowcount > 0
+
+
+def is_admin(username: str) -> bool:
+    return get_role(username) == "admin"
+
+
+def is_active(username: str) -> bool:
+    """账号存在且启用。Cookie 每次请求都要过这一关：删号/禁用立即失效，
+    不能等 7 天 Cookie 自然过期。"""
+    with db.conn() as c:
+        db.ensure_users_tables(c)
+        row = c.execute("SELECT enabled FROM users WHERE username = ?",
+                        (username,)).fetchone()
+    return bool(row and row["enabled"])
+
+
 def list_users() -> list[dict]:
     with db.conn() as c:
         db.ensure_users_tables(c)
         rows = c.execute(
-            "SELECT username, enabled, created_at FROM users"
+            "SELECT username, enabled, role, created_at FROM users"
             " ORDER BY created_at").fetchall()
     return [dict(r) for r in rows]
 

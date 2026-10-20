@@ -9,6 +9,8 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import tests  # noqa: E402,F401  单测护栏:离线 + 快速 KDF
+
 
 spec = importlib.util.spec_from_file_location(
     "update_server", Path(__file__).resolve().parents[1] / "scripts" / "serve.py")

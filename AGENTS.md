@@ -42,6 +42,7 @@ InferTech 观察站(原智能体热度指数):以推理技术为重心,采集 Ag
 | 三方向频道专家 | [skills/directions/SKILL.md](skills/directions/SKILL.md) | 方向频道页/registry directions/门户入口/Harness 收录分层/方向周总结 |
 | 个人工作台专家 | [skills/workspace/SKILL.md](skills/workspace/SKILL.md) | 工作台分区/用户隔离/自配知识库仓库 |
 | 部署交付专家 | [skills/deployment/SKILL.md](skills/deployment/SKILL.md) | 新机安装、换机/迁移、备份恢复、systemd 托管、依赖版本与部署自检 |
+| 站内运维 agent 专家 | [skills/ops-agent/SKILL.md](skills/ops-agent/SKILL.md) | pi RPC 运行时、工具策略/审批/审计、运维会话、服务降权与 wrapper/sudoers |
 
 专家文档格式:frontmatter 仅 `name` + `description`(含"适用场景:"触发语);正文按 职责边界 → runbook/约束 → 常见调整表 → 排障表 → 决策记录(带日期)组织。
 
