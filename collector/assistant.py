@@ -529,10 +529,10 @@ def _tool_output(result) -> str:
     if isinstance(content, list):
         parts = [str(c.get("text", "")) for c in content
                  if isinstance(c, dict) and c.get("type") == "text"]
-        return _brief("\n".join(p for p in parts if p))
+        return _brief("\n".join(p for p in parts if p), _TOOL_OUTPUT_MAX)
     if isinstance(content, str):
-        return _brief(content)
-    return _brief(result)
+        return _brief(content, _TOOL_OUTPUT_MAX)
+    return _brief(result, _TOOL_OUTPUT_MAX)
 
 
 def _emit(run_id: str, type_: str, **fields) -> None:

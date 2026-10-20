@@ -14,7 +14,7 @@ status: active
 - **站点**:InferTech 观察站(品牌 daimonkey),门户+模型评测榜+智能体热度榜+AI 资讯+登录后个人工作台(报告厅/按用户隔离知识库/悬浮助手)。
 - **位置**:服务器目录 `/home/daimonkey`;仓库 `github.com/csoulnd/daimonkey`(main);服务 `systemd daimonkey`(端口 8080,`systemctl restart daimonkey`)。
 - **账号**:唯一账号 `dai`(需求方)。CLI `userctl add/passwd/repo/list`(任意目录)。
-- **健康基线**(2026-10-20):186 unittest + 2 node 测试全过;`scripts/verify.py` 83/83;serve RSS ~28MB/空闲线程归零;服务已降权为 `User=daimonkey`（`opsctl.py deploy-check` 15/15）。
+- **健康基线**(2026-10-20):187 unittest + 2 node 测试全过;`scripts/verify.py` 83/83;serve RSS ~28MB/空闲线程归零;服务已降权为 `User=daimonkey`（`opsctl.py deploy-check` 15/15）。
 
 ## 2. 架构要点(动手前必读)
 

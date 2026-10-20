@@ -26,4 +26,4 @@
 | 10 | M3 AA 接入(httpx、周缓存、raw 溯源) | model-eval | ✅ `d031ed4` | 153 tests;verify 74/74 |
 | 11 | M4 方向周总结(按 news_tag 参数化、AI 生成+人工可改) | directions+news-digest | ✅ 本次提交 | 167 tests;verify 83/83 |
 | 12 | M5 FM 切换 AA 总评分口径(需求方决定放弃 SuperCLUE) | model-eval | ✅ 本次提交 | 模型榜 40 个 AA 当前模型;168 tests;verify 83/83 |
-| 13 | 站内运维 agent(ops):pi RPC+工具+流式+审批+审计+降权 | ops-agent | ✅ 已上线(2026-10-20,服务已降权,ops 开启) | 186 tests;verify 83/83;线上冒烟通过;`docs/OPS-AGENT.md` §8-9 |
+| 13 | 站内运维 agent(ops):pi RPC+工具+流式+审批+审计+降权 | ops-agent | ✅ 已上线(2026-10-20,服务已降权,ops 开启) | 187 tests;verify 83/83;线上冒烟通过;`docs/OPS-AGENT.md` §8-9 |
