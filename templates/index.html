@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m %}
-{% block title %}{{ site.name }}{% endblock %}
+{% block title %}{% if seo_meta is defined and seo_meta and seo_meta.title %}{{ seo_meta.title }}{% else %}{{ site.name }}{% endif %}{% endblock %}
 {% block content %}
 <section class="hero">
   <div>

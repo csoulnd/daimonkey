@@ -94,7 +94,9 @@ class AssistantAuthTests(unittest.TestCase):
         conn = http.client.HTTPConnection(*self.httpd.server_address)
         # 未登录:助手数据端点 401
         conn.request("GET", "/api/v1/assistant/sessions")
-        self.assertEqual(conn.getresponse().status, 401)
+        response = conn.getresponse()
+        self.assertEqual(response.status, 401)
+        response.read()   # keep-alive:复用连接前必须读完响应体
         # 登录状态查询公开,且返回用户名
         status, body = get_json(conn, "/api/v1/assistant/session")
         self.assertFalse(body["authed"])
@@ -186,10 +188,14 @@ class AssistantAuthTests(unittest.TestCase):
         conn.request("POST", f"/api/v1/assistant/sessions/{sid}/rename",
                      body=json.dumps({"title": "抢注"}).encode(),
                      headers={"Content-Type": "application/json", "Cookie": bob})
-        self.assertEqual(conn.getresponse().status, 404)
+        response = conn.getresponse()
+        self.assertEqual(response.status, 404)
+        response.read()   # keep-alive:复用连接前必须读完响应体
         conn.request("DELETE", f"/api/v1/assistant/sessions/{sid}",
                      headers={"Cookie": bob})
-        self.assertEqual(conn.getresponse().status, 404)
+        response = conn.getresponse()
+        self.assertEqual(response.status, 404)
+        response.read()   # keep-alive:复用连接前必须读完响应体
         # alice 自己能看到并删除
         status, body = get_json(conn, "/api/v1/assistant/sessions", alice)
         self.assertEqual(len(body["sessions"]), 1)

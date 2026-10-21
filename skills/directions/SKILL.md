@@ -63,3 +63,5 @@ systemctl restart daimonkey                    # 仅当 serve.py 改动
 - 2026-10-19(M2)：按 DESIGN 1.4 默认 B 实施核心/生态分层；`harness_core` 继续使用原联合榜的二层分位算法，历史联合榜数据平滑过渡为只读别名；Browser Use 判定为框架（eco），其余 general/claw 消费级产品为 core。
 - 2026-10-19(M1)：建立专家骨架；方向配置驱动频道页，NV 用 `placeholder + planned_sources` 表达“空页起步”。
 - 2026-10-21(M6)：NV 从占位页升级为可用频道。`directions.nv` 挂 `nv_infer` 榜并接入 `infra` 新闻分类，占位标记移除；榜单成员、指标与排序全部来自 `sources.mlperf` 自动同步，模板仍不硬编码方向名。NV 数据源细节归 `skills/nv-hardware`。
+
+- 2026-10-21(方向页拆三子页)：方向频道由单页拆为 `/dir/{d}`（榜单）、`/dir/{d}/news`、`/dir/{d}/digest` 三页，右侧 rail + 顶部 tabs 共用 `_direction_tabs.html`；serve 对无扩展名路径回退命中扁平 `.html`（`/dir/{d}` → `dir/{d}.html`），所以链接统一不写扩展名；子页标签与图标可用 `directions.<key>.section_labels`（`{board, news, digest, board_icon, news_icon, digest_icon}`，可只写部分键）覆盖，模板仍不写死方向名。

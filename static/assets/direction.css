@@ -1,0 +1,169 @@
+/* =============================================================================
+   方向频道子页导航（榜单 / 新闻 / 每周总结）
+   - 桌面端：页面右侧竖向 sticky rail（三个入口，当前态高亮）
+   - ≤880px：转为顶部横向 tabs
+   设计令牌全部复用 style.css 的 :root 变量，随明暗主题自动切换。
+   ============================================================================= */
+
+.dir-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-5);
+}
+.dir-body { flex: 1; min-width: 0; }
+
+/* ---- 桌面端：右侧竖向 rail ---- */
+.dir-tabs {
+  order: 2;                 /* DOM 中在正文之前（键盘先到导航），视觉放到右侧 */
+  flex: none;
+  width: 168px;
+  position: sticky;
+  top: var(--sp-4);
+  align-self: flex-start;
+}
+.dir-tabs-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 2px var(--sp-2);
+  margin-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+}
+.dir-tabs-kicker {
+  font-family: var(--mono);
+  font-size: 0.68em;
+  letter-spacing: 0.16em;
+  color: var(--dim);
+}
+.dir-tabs-id { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.dir-tabs-brand {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  stroke: var(--acc);
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dir-tabs-name { font-size: 0.88em; font-weight: 600; color: var(--ink); }
+.dir-tabs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dir-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-s);
+  color: var(--dim);
+  font-size: 0.88em;
+  line-height: 1.35;
+}
+.dir-tab:hover { color: var(--ink); background: var(--panel); text-decoration: none; }
+.dir-tab-ic {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dir-tab.is-active {
+  color: var(--ink);
+  background: var(--panel2);
+  border-color: var(--line-strong);
+  font-weight: 600;
+}
+.dir-tab.is-active::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 7px;
+  bottom: 7px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--grad);
+}
+.dir-tab:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+.dir-tab-label { overflow-wrap: anywhere; }
+
+/* ---- 子页通用：简介元信息与榜表横向滚动兜底 ---- */
+.dir-intro { padding-bottom: 10px; }
+.dir-intro-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: var(--sp-1);
+}
+.dir-body .dir-section { margin-top: 26px; }
+.dir-board { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.dir-board .tbl { min-width: 560px; }
+
+/* 硬件规格总表：列多、表头长，窄屏由表格自身横向滚动，
+   绝不让表格的 max-content 宽度把 .dir-body / 页面撑宽。 */
+.tbl-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.tbl-scroll:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.hw-spec-table { min-width: 860px; }
+
+/* ---- ≤880px：顶部横向 tabs（与 style.css 的窄屏断点一致） ---- */
+@media (max-width: 880px) {
+  .dir-layout { display: flex; flex-direction: column; gap: 0; }
+  .dir-tabs {
+    order: 0;
+    width: auto;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    margin: 0 0 var(--sp-3);
+    padding: 8px 0;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .dir-tabs-head {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+    border-bottom: none;
+    padding: 0 0 6px;
+    margin: 0;
+  }
+  .dir-tabs-list {
+    flex-direction: row;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .dir-tabs-list::-webkit-scrollbar { display: none; }
+  .dir-tab {
+    flex: 1 0 auto;
+    justify-content: center;
+    padding: 7px 14px;
+    border-radius: var(--r-full);
+    white-space: nowrap;
+  }
+  .dir-tab.is-active { border-color: var(--acc); background: var(--panel); }
+  .dir-tab.is-active::before { display: none; }
+  .dir-tab-label { white-space: nowrap; }
+  /* 纵向堆叠后必须显式占满容器：.dir-layout 的 align-items:flex-start
+     会让 .dir-body 按 max-content 定宽，被宽表格撑成 1682px。 */
+  .dir-body { order: 1; width: 100%; max-width: 100%; min-width: 0; }
+  .dir-board .tbl { min-width: 0; }
+}

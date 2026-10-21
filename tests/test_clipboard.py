@@ -158,7 +158,9 @@ class ClipboardTests(unittest.TestCase):
         # 删除
         conn.request("DELETE", f"/api/v1/clipboard/items/{first_id}",
                      headers={"Cookie": alice})
-        self.assertEqual(conn.getresponse().status, 200)
+        response = conn.getresponse()
+        self.assertEqual(response.status, 200)
+        response.read()   # keep-alive:复用连接前必须读完响应体
         status, body = get_json(conn, "/api/v1/clipboard/items", alice)
         self.assertEqual([i["id"] for i in body["items"]], [second_id])
         conn.close()
@@ -224,7 +226,9 @@ class ClipboardTests(unittest.TestCase):
         # 删除后 404
         conn.request("DELETE", f"/api/v1/clipboard/items/{fid}",
                      headers={"Cookie": alice})
-        self.assertEqual(conn.getresponse().status, 200)
+        response = conn.getresponse()
+        self.assertEqual(response.status, 200)
+        response.read()   # keep-alive:复用连接前必须读完响应体
         conn.request("GET", f"/api/v1/clipboard/files/{fid}",
                      headers={"Cookie": alice})
         self.assertEqual(conn.getresponse().status, 404)
@@ -274,9 +278,13 @@ class ClipboardTests(unittest.TestCase):
         self.assertEqual(body["items"], [])
         # bob 下载/删除 alice 的文件与文本均 404
         conn.request("GET", f"/api/v1/clipboard/files/{fid}", headers={"Cookie": bob})
-        self.assertEqual(conn.getresponse().status, 404)
+        response = conn.getresponse()
+        self.assertEqual(response.status, 404)
+        response.read()   # keep-alive:复用连接前必须读完响应体
         conn.request("DELETE", f"/api/v1/clipboard/items/{aid}", headers={"Cookie": bob})
-        self.assertEqual(conn.getresponse().status, 404)
+        response = conn.getresponse()
+        self.assertEqual(response.status, 404)
+        response.read()   # keep-alive:复用连接前必须读完响应体
         # alice 自己的数据完好
         status, body = get_json(conn, "/api/v1/clipboard/items", alice)
         self.assertEqual(len(body["items"]), 2)

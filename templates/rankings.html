@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m %}
-{% block title %}{{ name }}{% endblock %}
+{% import "_chart.html" as ch %}
+{% block title %}{% if seo_meta is defined and seo_meta and seo_meta.title %}{{ seo_meta.title }}{% else %}{{ name }}{% endif %}{% endblock %}
 {% block crumb %}{{ name }}{% endblock %}
 {% block content %}
 <div class="sec-head">
@@ -15,10 +16,12 @@
 <p class="dim">数据截至 {{ snapshot_date }} · <a href="/#methodology">评分说明</a></p>
 
 {% if history_chart %}
-<div class="metric-card">
-  <h3>近 90 天热度走势（当前 Top 5）</h3>
-  {{ history_chart | safe }}
-</div>
+{{ ch.chart_card(history_chart, "近 90 天热度走势（当前 Top 5）",
+                 subtitle="多日快照对比 · 悬停查看当日数值",
+                 unit="score",
+                 source_name="站内榜单快照",
+                 source_url="/sources",
+                 note="构建期渲染；每个数字可在下表与产品页溯源") }}
 {% endif %}
 
 {% macro rows(items) -%}

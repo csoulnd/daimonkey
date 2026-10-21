@@ -1,0 +1,129 @@
+{# 硬件规格总表 + 厂商分组详情。
+   全部由 sitegen 的 _hw_context() 注入，模板不硬编码厂商名、型号或列名：
+     hw_specs   规格列表（collector/hw.py load 的结果）
+     hw_fields  列定义 [{key,label,unit}]，顺序来自 registry spec_fields
+     hw_vendors 厂商展示顺序（registry spec_vendors，含规格表中新出现的厂商）
+     hw_updated 规格表 updated_at
+     hw_bars    预渲染的条形图 [{key,title,unit,chart}]
+   仅当 hw_specs 存在时由方向页 include；空值统一显示 —。 #}
+{% import "_chart.html" as ch %}
+<section class="dir-section hw-specs" id="hw-specs">
+  <div class="sec-head">
+    <h2>硬件规格对比</h2>
+    <span class="dim">
+      {%- if hw_updated %}数据更新于 {{ hw_updated }} · {% endif -%}
+      官方规格口径；— 表示厂商未披露
+    </span>
+  </div>
+
+  {% if hw_bars %}
+  <div class="hw-bars">
+    {% for bar in hw_bars %}
+    {{ ch.chart_card(bar.chart, bar.title + "对比",
+                     subtitle="单卡官方规格",
+                     unit=bar.unit,
+                     source_name="厂商官方文档",
+                     source_url="#hw-specs",
+                     note="空值型号不参与条形对比") }}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="metric-card">
+    <div class="sec-head">
+      <h3>规格总表</h3>
+      <span class="dim">{{ hw_specs | length }} 个型号 · {{ hw_vendors | length }} 个厂商</span>
+    </div>
+    <div class="tbl-scroll" role="region" aria-label="硬件规格总表（可横向滚动）" tabindex="0">
+      <table class="tbl hw-spec-table">
+        <thead>
+          <tr>
+            {% for f in hw_fields %}
+            <th>{{ f.label }}{% if f.unit %}<span class="dim">（{{ f.unit }}）</span>{% endif %}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for vendor in hw_vendors %}
+          {% for s in hw_specs if s.vendor == vendor %}
+          <tr>
+            {% for f in hw_fields %}
+            {% set value = s.get(f.key) %}
+            <td>{% if value is none %}<span class="dim">—</span>{% else %}{{ value | hw_num }}{% endif %}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="hw-vendor-groups">
+    {% for vendor in hw_vendors %}
+    {% set vendor_specs = hw_specs | selectattr('vendor', 'equalto', vendor) | list %}
+    {% if vendor_specs %}
+    <div class="hw-vendor">
+      <div class="sec-head">
+        <h3>{{ vendor }}</h3>
+        <span class="dim">{{ vendor_specs | length }} 个型号</span>
+      </div>
+      {% for s in vendor_specs %}
+      <details class="obs-fold hw-model">
+        <summary>
+          <strong>{{ s.model }}</strong>
+          {% if s.series %}<span class="dim">{{ s.series }}</span>{% endif %}
+          {% if s.form_factor %}<span class="dim">{{ s.form_factor }}</span>{% endif %}
+          {% if s.release_year %}<span class="dim">{{ s.release_year }} 年</span>{% endif %}
+        </summary>
+        <div class="hw-model-body">
+          {% if s.servers %}
+          <h4>服务器 / 整机</h4>
+          <ul class="hw-server-list">
+            {% for item in s.servers %}
+            <li>
+              {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.model }}</a>{% else %}<span>{{ item.model }}</span>{% endif %}
+              {% if item.status %}<span class="chip">{{ item.status }}</span>{% endif %}
+              {% if item.note %}<span class="dim">{{ item.note }}</span>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+
+          {% if s.clusters %}
+          <h4>集群方案</h4>
+          <ul class="hw-cluster-list">
+            {% for item in s.clusters %}
+            <li>
+              {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.name }}</a>{% else %}<span>{{ item.name }}</span>{% endif %}
+              {% if item.status %}<span class="chip">{{ item.status }}</span>{% endif %}
+              {% if item.interconnect %}<span class="dim">互联：{{ item.interconnect }}</span>{% endif %}
+              {% if item.note %}<span class="dim">{{ item.note }}</span>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+
+          {% if s.official_docs %}
+          <h4>官方文档</h4>
+          <ul class="hw-doc-list">
+            {% for doc in s.official_docs %}
+            <li><a href="{{ doc.url }}" target="_blank" rel="noopener">{{ doc.title }}</a></li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+
+          {% if s.sources_note %}
+          <details class="obs-fold hw-note">
+            <summary>数据说明（官方口径与折算）</summary>
+            <p class="dim">{{ s.sources_note }}</p>
+          </details>
+          {% endif %}
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>

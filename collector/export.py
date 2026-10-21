@@ -7,8 +7,8 @@ from __future__ import annotations
 import json
 
 from . import db, queries, scoring
-from .config import (DIST_DIR, SNAPSHOT_DIR, date_days_ago, ensure_dirs,
-                     now_iso, registry, today_utc)
+from .config import (DIST_DIR, SNAPSHOT_DIR, date_days_ago, days_ago,
+                     ensure_dirs, now_iso, registry, today_utc)
 from .scoring import load_latest_metrics
 
 
@@ -117,10 +117,32 @@ def export_all() -> None:
                          for n in news_idx.get(p["id"], [])],
             })
 
-        # ---- raw/{id}.json ----
-        for r in c.execute("SELECT id FROM raw_payloads"):
-            d = queries.raw_detail(c, r["id"])
-            _jwrite(api / "raw" / f"{r['id']}.json", {
+        # ---- raw/{id}.json（只导出最近 raw_api_days 天） ----
+        # 全量原始响应与 dist/raw/*.html 溯源页内容重复，是 dist 体积大头。
+        # 这里只导出窗口内 payload，并用 raw/index.json 给全量清单（含未导出的
+        # 条目及其溯源页地址），既瘦身又不丢"每个数字可溯源"的入口。
+        raw_api = api / "raw"
+        raw_api.mkdir(parents=True, exist_ok=True)
+        try:
+            raw_api_days = int((reg.get("retention") or {}).get("raw_api_days", 14))
+        except (TypeError, ValueError):
+            raw_api_days = 14
+        raw_api_days = max(raw_api_days, 0)          # 0 = 不设窗口（全量）
+        cutoff = days_ago(raw_api_days) if raw_api_days else None
+        if cutoff:
+            window_rows = c.execute(
+                "SELECT id FROM raw_payloads WHERE fetched_at >= ?"
+                " ORDER BY fetched_at DESC, id DESC", (cutoff,)).fetchall()
+        else:
+            window_rows = c.execute(
+                "SELECT id FROM raw_payloads"
+                " ORDER BY fetched_at DESC, id DESC").fetchall()
+        exported: set[int] = set()
+        for r in window_rows:
+            rid = r["id"]
+            d = queries.raw_detail(c, rid)
+            exported.add(rid)
+            _jwrite(raw_api / f"{rid}.json", {
                 "meta": {"payload_id": d["id"],
                          "source": {"key": d["source_key"], "name": d["source_name"]},
                          "request_url": d["request_url"], "http_status": d["http_status"],
@@ -131,6 +153,47 @@ def export_all() -> None:
                 "raw_body": d["body"],
                 "extracted": d["extracted"],
             })
+        # 清理上次构建留下的窗口外文件（.json 与预压缩的 .json.gz）
+        for p in raw_api.glob("*.json"):
+            if p.stem.isdigit() and int(p.stem) not in exported:
+                p.unlink(missing_ok=True)
+                p.with_name(p.name + ".gz").unlink(missing_ok=True)
+        for p in raw_api.glob("*.json.gz"):
+            stem = p.name[:-len(".json.gz")]
+            if stem.isdigit() and int(stem) not in exported:
+                p.unlink(missing_ok=True)
+
+        # ---- raw/index.json：全量清单（id / 来源 / 时间 / 大小 / 是否导出） ----
+        manifest = [{
+            "id": r["id"],
+            "source": {"key": r["source_key"], "name": r["source_name"]},
+            "request_url": r["request_url"],
+            "http_status": r["http_status"],
+            "fetched_at": r["fetched_at"],
+            "size_bytes": r["body_bytes"],
+            "evicted": bool(r["body_evicted_at"]),
+            "exported": r["id"] in exported,
+            "api_path": f"raw/{r['id']}.json" if r["id"] in exported else None,
+            "trace_url": f"/raw/{r['id']}.html",
+        } for r in c.execute(
+            "SELECT rp.id, rp.request_url, rp.http_status, rp.fetched_at,"
+            " rp.body_bytes, rp.body_evicted_at, s.key AS source_key,"
+            " s.name AS source_name FROM raw_payloads rp"
+            " JOIN sources s ON s.id = rp.source_id"
+            " ORDER BY rp.fetched_at DESC, rp.id DESC")]
+        _jwrite(raw_api / "index.json", {
+            "meta": {
+                "schema_version": "1.0",
+                "generated_at": generated,
+                "window_days": raw_api_days,
+                "cutoff": cutoff,
+                "total": len(manifest),
+                "exported": len(exported),
+                "note": ("仅窗口内 payload 导出到 raw/<id>.json；"
+                         "更早条目仍可通过 trace_url 查看溯源页"),
+            },
+            "items": manifest,
+        })
 
         # ---- insights.json / news.json / meta.json ----
         insights = [dict(r) for r in c.execute(

@@ -17,6 +17,14 @@ Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 # 固定 PATH：保证 agent 调用的 sudo/systemd-run 等运维命令可预测（不依赖登录 shell）。
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
+# 站点基址与安全 Cookie（见 docs/deploy.md §13）：
+# - DM_SITE_URL：canonical / sitemap.xml / robots.txt 的站点基址，生产必须设置；
+#   未设置时这些产物会带 http://<host> 占位，仅供自测。
+# - DM_SECURE_COOKIES=1：HTTPS 部署后开启，给登录/会话 Cookie 加 Secure。
+# 当前是明文 HTTP 阶段，两行都保持注释；切 HTTPS 后取消注释并重跑 bootstrap
+# （或改 /etc/systemd/system/ 副本后 daemon-reload + restart）。
+# Environment=DM_SITE_URL=https://your-domain
+# Environment=DM_SECURE_COOKIES=1
 # 安全选项取舍（刻意保持最小改动，勿贸然加沙箱）：
 # - 不加 NoNewPrivileges=yes：agent 需要 `sudo -n /usr/local/bin/daimonkey-restart`，
 #   NoNewPrivileges 会禁止 sudo 的 setuid 提权，延时重启链路直接不可用。

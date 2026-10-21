@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}API{% endblock %}
+{% block title %}{% if seo_meta is defined and seo_meta and seo_meta.title %}{{ seo_meta.title }}{% else %}API{% endif %}{% endblock %}
 {% block crumb %}API{% endblock %}
 {% block content %}
 <h1>公开 JSON API <span class="pill">静态文件 · 契约冻结</span></h1>

@@ -138,7 +138,9 @@ def main() -> int:
     base = args.base.rstrip("/")
 
     print("== 1. 页面与 API 可访问性 ==")
-    paths = ["/", "/dir/harness", "/dir/fm", "/dir/nv",
+    paths = ["/", "/dir/harness", "/dir/harness/news", "/dir/harness/digest",
+             "/dir/fm", "/dir/fm/news", "/dir/fm/digest",
+             "/dir/nv", "/dir/nv/news", "/dir/nv/digest",
              "/rankings/unified", "/rankings/coding", "/rankings/harness_core",
              "/rankings/harness_eco", "/product/claude-code",
              "/sources", "/api.html",
@@ -154,14 +156,14 @@ def main() -> int:
             check(f"{p} ({e})", False)
 
     print("== 1b. 新闻功能结构(按方向聚合) ==")
-    harness_html = page(base + "/dir/harness")
+    harness_news_html = page(base + "/dir/harness/news")
     for name, pat in [
         ("方向新闻区", r'id="dir-news"'),
         ("新闻条目", r'class="news-item"'),
         ("轻量更新按钮", r'id="btn-news-update"'),
     ]:
-        check(name, bool(re.search(pat, harness_html)))
-    check("导航无全站新闻入口", 'href="/news"' not in harness_html)
+        check(name, bool(re.search(pat, harness_news_html)))
+    check("导航无全站新闻入口", 'href="/news"' not in harness_news_html)
     check("全站新闻页已下线(301)", news_redirect_ok(base))
     try:
         news_api = json.load(get(base + "/api/v1/news.json"))
@@ -177,6 +179,7 @@ def main() -> int:
     print("== 2. 页面关键结构 ==")
     home = page(base + "/")
     uni = page(base + "/dir/harness")
+    harness_news = page(base + "/dir/harness/news")
     model_page = page(base + "/rankings/model")
     harness_page = page(base + "/rankings/harness_core")
     for name, pat, html in [
@@ -184,7 +187,7 @@ def main() -> int:
         ("数据截至时间", r'id="asof"', home),
         ("来源标签", r'class="src-tag s-', uni),
         ("覆盖率条", r'class="cov"', uni),
-        ("榜单徽章", r'class="badge b-', uni),
+        ("榜单徽章", r'class="badge b-', harness_news),
         ("热度/动量切换", r'data-view="mom"', harness_page),
     ]:
         check(name, bool(re.search(pat, html)))
@@ -194,12 +197,13 @@ def main() -> int:
 
     print("== 2b. 三方向频道结构 ==")
     for key in ("harness", "fm", "nv"):
-        html = page(base + f"/dir/{key}")
-        for label, pat in [
-            ("方向新闻区", r'id="dir-news"'),
-            ("方向榜单区", r'id="dir-boards"'),
-            ("每周总结区", r'id="dir-digest"'),
-        ]:
+        # 三区已拆到三个子页:榜单页 / 新闻页 / 周总结页各校验自己的区块 id
+        pages = [
+            ("方向榜单区", page(base + f"/dir/{key}"), r'id="dir-boards"'),
+            ("方向新闻区", page(base + f"/dir/{key}/news"), r'id="dir-news"'),
+            ("每周总结区", page(base + f"/dir/{key}/digest"), r'id="dir-digest"'),
+        ]
+        for label, html, pat in pages:
             check(f"/dir/{key} {label}", bool(re.search(pat, html)))
     nv = page(base + "/dir/nv")
     check("NV 推理性能榜已上线", "推理性能榜" in nv and "建设中" not in nv)
@@ -302,7 +306,7 @@ def main() -> int:
 
     print("== 2f. 方向周总结与方向周报 ==")
     for key in ("harness", "fm"):
-        html = page(base + f"/dir/{key}")
+        html = page(base + f"/dir/{key}/digest")
         check(f"{key} 每周总结区", 'id="dir-digest"' in html)
         check(f"{key} 周总结卡片或空态",
               "ai-summary" in html or "empty-state" in html)

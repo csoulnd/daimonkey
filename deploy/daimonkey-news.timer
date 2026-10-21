@@ -1,0 +1,14 @@
+[Unit]
+Description=InferTech 观察站 - 每日新闻采集定时器
+Documentation=file://__INSTALL_ROOT__/docs/deploy.md
+
+[Timer]
+# 每日 06:30（本地时区）；Persistent 让关机错过的任务在下次启动后补跑一次
+OnCalendar=*-*-* 06:30:00
+Persistent=true
+RandomizedDelaySec=10min
+AccuracySec=1min
+Unit=daimonkey-news.service
+
+[Install]
+WantedBy=timers.target

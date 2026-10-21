@@ -232,15 +232,25 @@ def _copy_assets(slug: str) -> None:
         shutil.copy2(f, target)
 
 
-def build(env, common: dict) -> int:
-    """渲染报告厅索引与全部报告页，拷贝资源；返回已发布报告数。"""
+def build(env, common: dict, page_seo=None) -> int:
+    """渲染报告厅索引与全部报告页，拷贝资源；返回已发布报告数。
+
+    page_seo: 可选回调 ``(kind, ctx) -> dict``，用于注入 seo_meta / seo_jsonld。
+    报告厅属于私有区，站点构建传入 sitegen._seo_vars 生成 noindex 元数据。
+    """
     reports, warnings = load_registry()
     for w in warnings:
         print(f"[reports] 警告: {w}")
 
     def render(tpl: str, out: str, **ctx) -> None:
-        page = env.get_template(tpl).render(
-            **common, reports_page=True, reports_total=len(reports), **ctx)
+        page_ctx = {**common, "reports_page": True,
+                    "reports_total": len(reports), **ctx}
+        if page_seo is not None:
+            try:
+                page_ctx.update(page_seo("reports", page_ctx) or {})
+            except Exception:  # SEO 是增强项，失败不应阻断报告页渲染
+                pass
+        page = env.get_template(tpl).render(**page_ctx)
         p = DIST_DIR / out
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(page, encoding="utf-8")

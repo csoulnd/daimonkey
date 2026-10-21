@@ -1,0 +1,30 @@
+[Unit]
+Description=InferTech 观察站 - 每周数据备份（SQLite 热备 + data/ 关键内容）
+Documentation=file://__INSTALL_ROOT__/docs/deploy.md
+# 备份只依赖本地磁盘，不需要网络；先于全量更新 1.5h，避免与更新写库重叠
+After=network-online.target
+Wants=network-online.target
+# 失败不重试：不设 Restart，等下一个 timer 周期；避免失败风暴
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+User=daimonkey
+Group=daimonkey
+WorkingDirectory=__INSTALL_ROOT__
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+# systemd 管理的备份目录：自动创建并 chown 给运行用户（/var/lib/daimonkey-backups）
+StateDirectory=daimonkey-backups
+StateDirectoryMode=0700
+ExecStart=__INSTALL_ROOT__/deploy/backup.sh --out /var/lib/daimonkey-backups
+Restart=no
+TimeoutStartSec=30min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+SyslogIdentifier=daimonkey-backup
+
+[Install]
+WantedBy=multi-user.target

@@ -141,12 +141,12 @@ scripts/update.sh                  # 全量：采集→评分→LRU→导出→�
 .venv/bin/python scripts/sync_knowledge.py
 ```
 
-网页右上角「⟳ 更新」等价于全量更新（需登录账号）。不存在 cron/定时器；LRU 窗口见 `collector/registry.yaml → retention`。
+网页右上角「⟳ 更新」等价于全量更新（需登录账号）。**默认安装不启用 cron/定时器**，更新仍可手动触发；如需自动调度，用 `deploy/install-timers.sh` 安装分级 systemd timer（见 §12）。LRU 窗口见 `collector/registry.yaml → retention`。
 
 ## 6. 备份策略
 
 - 手动：`deploy/backup.sh`；建议每次大更新后、换机前各做一次。
-- 自动（可选，仅备份）：运维可自行加 cron，例如 `17 3 * * * <安装目录>/deploy/backup.sh --out /var/backups`。这不属于数据采集调度。
+- 自动（可选）：`deploy/install-timers.sh` 会安装 `daimonkey-backup.timer`（每周一 06:00，写 `/var/lib/daimonkey-backups`，systemd 自动创建并归 `daimonkey` 用户）。安装脚本与调度细节见 §12。
 - 恢复包必须与代码版本大致匹配（manifest 记录 git commit）；跨版本恢复后先跑 `deploy/smoke.sh`。
 
 ## 7. 自检与验收
@@ -165,6 +165,7 @@ deploy/smoke.sh --all                     # + 搬迁演练 + systemd 重启演�
 - `raw_payloads.body_path` **只存相对 `DATA_DIR` 的路径**（`raw/<源>/<日期>/<hash>.json.gz`），读取时拼当前数据目录；旧绝对路径用 `scripts/migrate_relpath.py` 迁移（幂等）。
 - 禁止在代码/文档中硬编码具体安装目录；`verify.py` 会扫描仓库文本文件（白名单仅 `docs/PLAN-deploy.md` 的历史记录）并在库内发现绝对路径时失败。
 - `data/` 是唯一可变数据目录；`dist/` 可随时重建；部署脚本只写 `data/`、`dist/`、`.venv/` 与 systemd 单元。
+- `dist/api/v1/raw` 只导出 `collector/registry.yaml → retention.raw_api_days`（默认 14 天）内的原始响应；全量清单在 `dist/api/v1/raw/index.json`（id/来源/时间/大小/是否导出），更早条目仍走 `dist/raw/<id>.html` 溯源页。
 - 密钥只进 `data/`（600），不进 git、不进镜像、不进文档。
 
 ## 9. 排障
@@ -192,6 +193,10 @@ deploy/smoke.sh --all                     # + 搬迁演练 + systemd 重启演�
 | `deploy/pi-ext/ops-policy.json` | 路径/命令/审计策略单一事实源 |
 | `deploy/sudoers.d/daimonkey` | 服务用户最小 sudo 授权（仅延时重启 wrapper） |
 | `deploy/ops-rollback.sh` | 降权失败时回滚为 root 服务 |
+| `deploy/daimonkey-news.timer/.service` | 每日新闻采集定时器与单元（可选，见 §12） |
+| `deploy/daimonkey-update.timer/.service` | 每周全量更新定时器与单元（可选，见 §12） |
+| `deploy/daimonkey-backup.timer/.service` | 每周备份定时器与单元（可选，见 §12） |
+| `deploy/install-timers.sh` | 渲染并启用分级定时任务（支持 `--dry-run`） |
 | `scripts/opsctl.py` | 运维 CLI：status/logs/restart/deploy-check |
 | `scripts/migrate_relpath.py` | body_path 绝对→相对迁移（幂等） |
 | `scripts/check_env.sh` | 环境与依赖自检 |
@@ -249,3 +254,68 @@ sudo bash deploy/ops-rollback.sh          # User 改回 root 并重启
 - `userctl` 以 root 运行会写 SQLite（可能新建 root 属主的 `-wal/-shm`）；降权后请用
   `sudo -u daimonkey userctl ...`，或事后 `chown daimonkey:daimonkey data/heat_index.sqlite*`。
 - 运维 agent 只能通过 `daimonkey-restart` 延时重启；直接 `systemctl restart` 会中断当前轮。
+
+
+## 12. 定时任务（systemd timer，2026-10-21）
+
+> 2026-09-23 的「无自动调度」是当时的默认；需求方 2026-10-21 明确要求分级定时更新后，仓库提供**可选**的 systemd timer 交付件。`bootstrap.sh` 不做任何改动，是否启用由运维单独执行安装脚本决定。
+
+### 12.1 单元清单
+
+| 单元 | 频率（本地时区） | 命令 | 说明 |
+|---|---|---|---|
+| `daimonkey-news.timer/.service` | 每日 06:30 | `.venv/bin/python -m collector --collect-news` | 轻量新闻采集，不重建全站 |
+| `daimonkey-update.timer/.service` | 每周一 07:30 | `.venv/bin/python -m collector --update` | 全量：采集 → 评分 → LRU → 导出 → 建站 |
+| `daimonkey-backup.timer/.service` | 每周一 06:00 | `deploy/backup.sh --out /var/lib/daimonkey-backups` | SQLite 热备 + `data/` 关键内容 |
+
+- 三份 service 全部 `User=daimonkey` / `Group=daimonkey`，`WorkingDirectory=__INSTALL_ROOT__`；
+- 模板里的 `__INSTALL_ROOT__` 由安装脚本渲染为当前仓库绝对路径（与 `daimonkey.service` 同一约定），换机/改目录后重跑安装脚本即可；
+- service 均为 `Type=oneshot` + `Restart=no`：失败只记一次失败，等下一个 timer 周期，不会重启风暴；
+- timer 均 `Persistent=true`：关机错过的周期在下次启动后补跑一次（仅补最近一次）。
+
+### 12.2 安装 / 停用
+
+```bash
+sudo deploy/install-timers.sh --dry-run   # 只渲染并打印命令，不写 /etc、不碰 systemd
+sudo deploy/install-timers.sh             # 安装 + daemon-reload + enable --now 三个 timer
+systemctl list-timers --all 'daimonkey-*'
+journalctl -u daimonkey-news -u daimonkey-update -u daimonkey-backup
+sudo systemctl disable --now daimonkey-news.timer daimonkey-update.timer daimonkey-backup.timer
+```
+
+前置条件：已跑过 `bootstrap.sh`（存在 `daimonkey` 用户、`.venv/` 与 `data/heat_index.sqlite`）。安装脚本会在缺失时给出 WARN，但不会替你建库。
+
+### 12.3 注意
+
+- 定时任务与网页「⟳ 更新」共用同一把更新锁：任一进行中，另一个触发返回 409/等待，不会并发写库。
+- 备份目录由 systemd `StateDirectory=daimonkey-backups` 管理（`/var/lib/daimonkey-backups`，0700，属主 `daimonkey`）；恢复仍走 `bootstrap.sh --restore`。
+- 不要手改 `/etc/systemd/system/` 下的单元副本：改仓库模板后重跑 `install-timers.sh`。
+- `deploy/smoke.sh` 不检查 timer（自动调度属可选运维项）；验收用 `systemctl list-timers` 与 journal。
+
+## 13. 站点基址与安全 Cookie（环境变量，2026-10-21）
+
+canonical、`sitemap.xml`、`robots.txt` 里的绝对 URL 与 Cookie 的 `Secure` 属性由两个环境变量控制，
+不写进 `registry.yaml`——同一份代码要在「HTTP 自测」和「HTTPS 生产」之间搬迁，配置跟着部署走：
+
+| 变量 | 作用 | 取值与时机 |
+|---|---|---|
+| `DM_SITE_URL` | canonical / `sitemap.xml` / `robots.txt` 的站点基址（`collector/seo.py → site_base_url`） | **生产必须设置**，如 `https://your-domain`（不带结尾斜杠、不带路径）。**未设置时输出 `http://<host>` 占位**，产物里会带「DM_SITE_URL 未设置」注释 |
+| `DM_SECURE_COOKIES` | 登录/会话 Cookie 是否追加 `Secure`（`scripts/serve.py → secure_cookies_enabled`） | HTTPS 部署后必须设为 `1`（`true/yes/on` 同义）；**当前明文 HTTP 阶段保持关闭**（不设置或 `0`），否则浏览器丢弃 Cookie、直接登录不上 |
+
+两项都写在 `deploy/daimonkey.service` 的 `[Service]` 段 `Environment=` 上；模板里已留**注释示例**（当前 HTTP 阶段不启用）：
+
+```ini
+Environment=DM_SITE_URL=https://your-domain
+Environment=DM_SECURE_COOKIES=1
+```
+
+- `DM_SITE_URL` 在**构建期**读取：改后要重新 `--build`（或全量更新），dist 里的 canonical/sitemap/robots 才会更新；
+- `DM_SECURE_COOKIES` 在**服务启动时**读取：改后 `systemctl restart daimonkey` 生效；
+- 走 bootstrap 托管时改模板后重跑 `sudo bash deploy/bootstrap.sh --host <host> --port <port>`（会重新渲染 `/etc/systemd/system/daimonkey.service` 并 `daemon-reload`），不要手改 `/etc` 下的单元副本。
+
+验收（在安装目录下）：
+
+```bash
+grep -o 'Sitemap: .*' dist/robots.txt            # 应为 DM_SITE_URL 的域名，不应出现 <host>
+grep -i 'DM_SITE_URL 未设置' dist/robots.txt dist/sitemap.xml   # 应无输出（有输出=仍在使用占位）
+```

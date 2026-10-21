@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m %}
-{% block title %}{% if direction %}{{ direction.name }}方向 · {% endif %}{{ week }} 周报 · AI 新闻{% endblock %}
+{% block title %}{% if seo_meta is defined and seo_meta and seo_meta.title %}{{ seo_meta.title }}{% else %}{% if direction %}{{ direction.name }}方向 · {% endif %}{{ week }} 周报 · AI 新闻{% endif %}{% endblock %}
 {% block content %}
 <div class="kb-breadcrumb"><a href="{{ digest_home | default('/news') }}">{{ digest_home_label | default('AI 新闻') }}</a> / <span>{{ week }} 周报</span></div>
 <section class="kb-intro news-intro">

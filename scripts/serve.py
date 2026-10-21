@@ -28,6 +28,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import hashlib
 import gzip
 import hmac
@@ -53,6 +54,21 @@ ASSISTANT_SECRET_FILE = ROOT / "data" / "assistant_secret"
 ASSISTANT_COOKIE = "assistant_session"
 ASSISTANT_COOKIE_MAX_AGE = 7 * 86400
 
+# /healthz 暴露的版本号；Server 响应头只给产品名，不再暴露版本
+SERVE_VERSION = "0.1"
+_STARTED_AT = time.time()          # uptime 起点（进程内导入时刻）
+
+
+def secure_cookies_enabled() -> bool:
+    """DM_SECURE_COOKIES=1 时给登录/会话 Cookie 追加 Secure。
+
+    当前站点以明文 HTTP 提供服务，强制 Secure 会让浏览器直接丢弃 Cookie、
+    导致无法登录，所以默认关闭。部署到 HTTPS 后必须开启：
+    systemd 里加 Environment=DM_SECURE_COOKIES=1，或在启动脚本中导出该变量。
+    """
+    return os.environ.get("DM_SECURE_COOKIES", "").strip().lower() in (
+        "1", "true", "yes", "on")
+
 
 def password_valid(supplied: str) -> bool:
     try:
@@ -63,6 +79,18 @@ def password_valid(supplied: str) -> bool:
     return bool(supplied) and secrets.compare_digest(actual, expected)
 
 # 旧信息架构 -> 三方向频道（301 永久跳转，保留外链与书签）
+def _direction_keys() -> list[str]:
+    """从 registry 动态读取方向键；读取失败时退回内置三方向，不阻断服务启动。"""
+    try:
+        from collector.config import registry
+        keys = list((registry().get("directions") or {}).keys())
+        return keys or ["harness", "fm", "nv"]
+    except Exception as e:
+        sys.stderr.write("WARN: 读取 registry directions 失败"
+                         f"（{type(e).__name__}: {e}），旧路由仅覆盖默认三方向\n")
+        return ["harness", "fm", "nv"]
+
+
 LEGACY_REDIRECTS = {
     # 全站新闻页已下线(2026-10-19):新闻按方向聚合到 /dir/*
     "/news": "/",
@@ -73,6 +101,20 @@ LEGACY_REDIRECTS = {
     "/rankings/claw": "/dir/harness",
     "/rankings/framework": "/rankings/harness_eco",
 }
+
+# 方向三子页（榜单/新闻/周总结）的旧地址与后缀变体 -> 规范地址。
+# 只做精确匹配：/dir/{d}/digest/{week}.html 是单期周报真实文件，绝不改写。
+for _key in _direction_keys():
+    _base = f"/dir/{_key}"
+    LEGACY_REDIRECTS.update({
+        f"{_base}/board": _base,               # 显式 board 子页并入榜单页
+        f"{_base}/board.html": _base,
+        f"{_base}/news/": f"{_base}/news",
+        f"{_base}/news.html": f"{_base}/news",
+        f"{_base}/digest/": f"{_base}/digest",
+        f"{_base}/digest.html": f"{_base}/digest",
+    })
+del _key, _base
 
 CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -277,16 +319,57 @@ def _start_chat_task(session_id, message: str, workflow: str | None,
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "heat-index/0.1"
-    timeout = 30  # 慢速连接读超时,防线程被长期占用
+    protocol_version = "HTTP/1.1"   # keep-alive:每个响应都必须有 Content-Length
+    server_version = "daimonkey"    # 只暴露产品名,不暴露版本与实现
+    sys_version = ""
+    # keep-alive 下每个空闲连接占 1 个线程(ThreadingHTTPServer 无连接上限),
+    # 空闲读超时从 30s 收紧到 10s,缩短慢连接/半开连接的线程占用时间。
+    timeout = 10
 
     def log_message(self, fmt, *args):  # 精简日志
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
+
+    def version_string(self) -> str:
+        # 默认实现返回 "server_version + ' ' + sys_version",这里避免尾部空格
+        return self.server_version
+
+    def handle_one_request(self) -> None:
+        # keep-alive 空闲连接被客户端 RST 时,socketserver 默认会打印整段
+        # "Exception occurred during processing of request" 堆栈;这里静默收尾。
+        try:
+            super().handle_one_request()
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
+
+    def send_response(self, code, message=None) -> None:
+        # HTTP/1.1 keep-alive:请求体若没被处理函数读完,残留字节会被当成下一个
+        # 请求解析(如 413/429/503 的提前返回)。这里不尝试 drain(可能阻塞/超大),
+        # 直接声明关闭连接,让客户端换一条新连接,避免协议错位。
+        super().send_response(code, message)
+        if (not self.close_connection
+                and self.command in ("GET", "POST", "DELETE")
+                and self._request_body_unread()):
+            self.send_header("Connection", "close")
+            self.close_connection = True
+
+    def _request_body_unread(self) -> bool:
+        """请求体是否可能仍有未读字节(keep-alive 复用判据)。"""
+        if getattr(self, "_body_fully_read", False):
+            return False
+        if self.headers.get("Transfer-Encoding", "").strip().lower() not in (
+                "", "identity"):
+            return True      # chunked 未解码,无法定位请求体边界
+        try:
+            return int(self.headers.get("Content-Length") or 0) > 0
+        except ValueError:
+            return True      # 声明长度非法,保守关闭
 
     # ---- 准入控制:null 字节拒绝 + 按 IP 分类限流 + 全局在途上限 ----
     def _admit(self) -> bool:
         """请求准入;拒绝时已写好响应并返回 False。"""
         self._admitted = False
+        # 每个请求重置:请求体是否已按声明长度读完(keep-alive 复用判据)
+        self._body_fully_read = False
         self._mark_t0()
         path = urlparse(self.path).path
         # 空字节(urlencode 后的 %00 在 unquote 才变 \x00,此处两者都拦,
@@ -331,6 +414,62 @@ class Handler(BaseHTTPRequestHandler):
         self._t0 = time.monotonic()
 
     # ---- helpers ----
+    def _html_security_headers(self) -> None:
+        """HTML 响应统一安全头(CSP 仍由 _file 按页面单独发送)。"""
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        self.send_header("Permissions-Policy",
+                         "geolocation=(), microphone=(), camera=()")
+        self.send_header("X-Frame-Options", "SAMEORIGIN")
+
+    def _not_found(self, path: str) -> None:
+        """404:页面请求优先回 dist/404.html(仍用 404 状态码);/api/* 恒 JSON。"""
+        page = DIST / "404.html"
+        if not path.startswith("/api/") and page.is_file():
+            try:
+                body = page.read_bytes()
+            except OSError:
+                body = None
+            if body is not None:
+                self.send_response(404)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self._html_security_headers()
+                if getattr(self, "_noindex", False):
+                    self.send_header("X-Robots-Tag", "noindex")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                if self.command != "HEAD":
+                    try:
+                        self.wfile.write(body)
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
+                return
+        self._json({"error": "not found", "path": path}, 404)
+
+    def _health(self) -> None:
+        """/healthz:DB 只读短查询 + dist/index.html 探活;异常 503。"""
+        db_state = "ok"
+        try:
+            from collector import db
+            # 库文件缺失时直接判错,避免 sqlite3.connect 顺手建出一个空库
+            if not Path(db.DB_PATH).is_file():
+                raise FileNotFoundError(str(db.DB_PATH))
+            with closing(db.conn()) as c:      # 只读探活,用完即关
+                c.execute("SELECT 1").fetchone()
+        except Exception:
+            db_state = "error"
+        dist_state = "ok" if (DIST / "index.html").is_file() else "missing"
+        ok = db_state == "ok" and dist_state == "ok"
+        self._json({
+            "ok": ok,
+            "uptime_s": int(time.time() - _STARTED_AT),
+            "db": db_state,
+            "dist": dist_state,
+            "version": SERVE_VERSION,
+            "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }, 200 if ok else 503)
+
     def _gzip_accepted(self) -> bool:
         qualities = {}
         for value in self.headers.get("Accept-Encoding", "").lower().split(","):
@@ -377,7 +516,13 @@ class Handler(BaseHTTPRequestHandler):
         if length <= 0 or length > 65536:
             return None
         try:
-            data = json.loads(self.rfile.read(length).decode("utf-8"))
+            raw = self.rfile.read(length)
+        except OSError:
+            return None
+        # 已按声明长度读完,keep-alive 可以安全复用这条连接
+        self._body_fully_read = True
+        try:
+            data = json.loads(raw.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError):
             return None
         return data if isinstance(data, dict) else None
@@ -402,6 +547,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Location", location)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "public, max-age=3600")
+        self._html_security_headers()
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         if self.command != "HEAD":
@@ -421,7 +567,7 @@ class Handler(BaseHTTPRequestHandler):
         if not f.is_file() and "." not in f.name:
             f = DIST / (rel + ".html")   # 无扩展名路径回退 .html（如 /rankings/unified）
         if not f.is_file():
-            self._json({"error": "not found", "path": path}, 404)
+            self._not_found(path)   # 页面请求优先回 dist/404.html,/api/* 保持 JSON
             return
         ext = f.suffix.lower()
         compressed_file = f.with_name(f.name + ".gz")
@@ -441,6 +587,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Vary", "Accept-Encoding")
         self.send_header("X-Content-Type-Options", "nosniff")
         if ext == ".html":
+            self._html_security_headers()
             # 基础 CSP:脚本/样式仅限同源(内联为模板预载与报告自带样式暂留);
             # 图片放行 https(知识库笔记引用外部图床),frame 嵌套仅限同源
             self.send_header("Content-Security-Policy",
@@ -452,7 +599,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("X-Robots-Tag", "noindex")
         self.send_header("ETag", etag)
         self.send_header("Last-Modified", formatdate(f.stat().st_mtime, usegmt=True))
-        if not not_modified:
+        if not_modified:
+            # 304 不得有 body;Content-Length 取 200 时的大小(RFC 7230 §3.3.2 允许),
+            # 给 keep-alive 客户端明确的帧边界,不必靠猜。
+            self.send_header("Content-Length", str(stat.st_size))
+        else:
             self.send_header("Content-Type", CONTENT_TYPES.get(ext, "application/octet-stream"))
             self.send_header("Content-Length", str(stat.st_size))
             if compressed:
@@ -470,6 +621,10 @@ class Handler(BaseHTTPRequestHandler):
             if not self._admit():
                 return
             path = urlparse(self.path).path
+            if path == "/healthz":
+                # 健康检查:免登录,但和普通静态请求一样先走限流(_admit 已执行)
+                self._health()
+                return
             target = LEGACY_REDIRECTS.get(path)
             if target is None and path.startswith("/news/"):
                 target = "/"
@@ -548,6 +703,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Robots-Tag", "noindex")
+        self._html_security_headers()
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         if self.command != "HEAD":
@@ -731,6 +887,9 @@ class Handler(BaseHTTPRequestHandler):
         name = unquote(self.headers.get("X-Filename", "") or "file")
         ctype = (self.headers.get("Content-Type") or "")[:100]
         item = clipboard.add_file(user, name, size, self.rfile.read, ctype)
+        # add_file 成功时恰好读完声明长度,keep-alive 可复用连接;
+        # 超限/配额等提前抛错的分支没有读完请求体,由 send_response 声明关闭。
+        self._body_fully_read = True
         self._json({"item": item}, 201)
 
     def do_HEAD(self) -> None:
@@ -748,7 +907,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if parsed.path not in ("/api/v1/update", "/api/v1/update/news",
                                    "/api/v1/update/knowledge"):
-                self._json({"error": "not found"}, 404)
+                self._not_found(parsed.path)   # /api/* 仍是 JSON,其它路径回 404 页
                 return
             # 登录账号完全权限(全部账号等权);不再接受 X-Update-Password 头,
             # 登录端点的失败锁定因此对更新入口同样生效(防爆破绕过)。
@@ -829,6 +988,8 @@ class Handler(BaseHTTPRequestHandler):
                 entry.update(failures=0, locked_until=0.0)
             cookie = (f"{ASSISTANT_COOKIE}={make_cookie_value(username)}; Path=/;"
                       f" Max-Age={ASSISTANT_COOKIE_MAX_AGE}; HttpOnly; SameSite=Strict")
+            if secure_cookies_enabled():
+                cookie += "; Secure"   # HTTPS 部署必须开启(见 secure_cookies_enabled)
             self._json({"ok": True, "user": username},
                        extra_headers=[("Set-Cookie", cookie)])
             return
@@ -857,6 +1018,8 @@ class Handler(BaseHTTPRequestHandler):
         if rest == "logout":
             cookie = f"{ASSISTANT_COOKIE}=; Path=/; Max-Age=0;"
             cookie += " HttpOnly; SameSite=Strict"
+            if secure_cookies_enabled():
+                cookie += "; Secure"   # 删除 Cookie 的属性必须与原 Cookie 一致
             self._json({"ok": True}, extra_headers=[("Set-Cookie", cookie)])
             return
 
@@ -1008,7 +1171,7 @@ class Handler(BaseHTTPRequestHandler):
                     else:
                         self._json({"error": "not found"}, 404)
                 else:
-                    self._json({"error": "not found"}, 404)
+                    self._not_found(path)   # /api/* 仍是 JSON,其它路径回 404 页
                 return
             user = self._assistant_user()
             sid = path[len(prefix):]
@@ -1048,6 +1211,8 @@ def main() -> None:
     except Exception as e:  # 助手表初始化失败不阻断静态站点服务
         print(f"警告: 助手表初始化失败（{e}），助手接口可能不可用")
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
+    # ThreadingHTTPServer 每连接一线程且 daemon_threads=True(stdlib 默认):
+    # 退出时不会被 keep-alive 线程拖住(_Threads 只 join 非 daemon 线程)。
     print(f"服务已启动: http://{args.host}:{args.port}  （Ctrl+C 停止）")
     print("触发更新: POST /api/v1/update（需登录账号 Cookie）|  状态: GET /api/v1/update/status")
     print("智能助手: 全站 🐱 面板 |  账号管理: scripts/userctl.py")

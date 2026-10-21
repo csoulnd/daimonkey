@@ -98,6 +98,10 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+/* 内联 SVG sprite 定义容器：0×0 但参与渲染。
+   不能 display:none：Chromium 会因此无法解析 <symbol> 内 fill="url(#…)"
+   的渐变引用（顶栏 #i-ava-* 头像会退化成纯黑圆）。 */
+.sprite-defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 a { color: var(--acc); text-decoration: none; }
 a:hover { text-decoration: underline; }
 code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; font-family: var(--mono); }
@@ -448,6 +452,47 @@ h3 { font-size: 0.96em; margin: 0.7em 0 0.35em; font-weight: 600; }
   .kb-search input { flex-basis: 100%; }
   .kb-intro h1 { font-size: 1.6em; }
   .knowledge-page .asof { white-space: normal; }
+}
+
+/* ---- 超窄屏（≤420）：顶栏/侧栏不撑宽 ----
+   登录态侧栏会多出「个人工作台 / 报告厅 / 个人知识库 / 剪贴板」四项，
+   加上顶栏的更新按钮与头像，原来在 375 下把页面撑到 412px。
+   这里让导航换行、顶栏元信息换行，按钮保持自身尺寸。 */
+@media (max-width: 420px) {
+  .side { flex-wrap: wrap; min-width: 0; }
+  .tree {
+    flex: 1 1 0;
+    flex-wrap: wrap;
+    row-gap: 2px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  /* 导航项保持内容宽度再换行，避免被 flex-shrink 压成互相重叠 */
+  .tree a { flex: 0 0 auto; }
+  .tree-group { flex-basis: 100%; }
+  .tophead { align-items: flex-start; }
+  .asof-box {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-content: flex-start;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .asof {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    min-width: 0;
+    max-width: 100%;
+  }
+  /* 新闻条目的长标题 / 产品徽章 / 溯源链接不得撑破视口 */
+  .news-item,
+  .news-head,
+  .news-meta { min-width: 0; }
+  .news-title,
+  .news-sum,
+  .news-meta .badge { overflow-wrap: anywhere; }
+  .news-meta { flex-wrap: wrap; }
 }
 
 /* ---- 智能助手：悬浮宠物 + 面板（全站组件） ---- */

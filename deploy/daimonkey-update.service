@@ -1,0 +1,26 @@
+[Unit]
+Description=InferTech 观察站 - 每周全量更新（采集/评分/导出/建站）
+Documentation=file://__INSTALL_ROOT__/docs/deploy.md
+After=network-online.target
+Wants=network-online.target
+# 失败不重试：不设 Restart，等下一个 timer 周期；避免失败风暴
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+User=daimonkey
+Group=daimonkey
+WorkingDirectory=__INSTALL_ROOT__
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=__INSTALL_ROOT__/.venv/bin/python -m collector --update
+Restart=no
+TimeoutStartSec=60min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+SyslogIdentifier=daimonkey-update
+
+[Install]
+WantedBy=multi-user.target

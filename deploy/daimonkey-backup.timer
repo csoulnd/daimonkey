@@ -1,0 +1,14 @@
+[Unit]
+Description=InferTech 观察站 - 每周数据备份定时器
+Documentation=file://__INSTALL_ROOT__/docs/deploy.md
+
+[Timer]
+# 每周一 06:00（本地时区），在 07:30 全量更新之前留出备份窗口
+OnCalendar=Mon 06:00:00
+Persistent=true
+RandomizedDelaySec=15min
+AccuracySec=1min
+Unit=daimonkey-backup.service
+
+[Install]
+WantedBy=timers.target

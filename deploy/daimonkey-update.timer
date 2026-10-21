@@ -1,0 +1,14 @@
+[Unit]
+Description=InferTech 观察站 - 每周全量更新定时器
+Documentation=file://__INSTALL_ROOT__/docs/deploy.md
+
+[Timer]
+# 每周一 07:30（本地时区），避开每日新闻采集
+OnCalendar=Mon 07:30:00
+Persistent=true
+RandomizedDelaySec=10min
+AccuracySec=1min
+Unit=daimonkey-update.service
+
+[Install]
+WantedBy=timers.target

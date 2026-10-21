@@ -96,3 +96,5 @@ deploy/smoke.sh --all                        # 在线 + 搬迁 + 重启
 - 2026-10-17: 落地 D1-D6。`body_path` 改存相对路径（1104 条迁移，0 缺失）；新增 `migrate_relpath.py`、bootstrap/backup/smoke、systemd 单元、`docs/deploy.md`；`verify.py` 增加相对路径/硬编码/交付件检查。生产 serve 从 nohup 迁移到 systemd，`Restart=always`、开机自启、journal 可查。
 - 2026-10-17: 搬迁演练发现并修复 bootstrap 未 `cd` 到安装根导致 `python -m collector` 用错目录；同轮发现 fresh venv 装到 Markdown 3.11.1，中文 `**研究判断：**` 不再解析为 strong，遂锁定全部直接依赖（`requirements.txt` 精确版本）。
 - 2026-10-17: 验收证据：117 Python 测试 + node 测试通过；`verify.py` 42/42；`smoke --all` 23/23（在线 9、搬迁 10、重启 4）；备份 39MB/1067 文件，恢复后账号数一致、溯源链完整。
+
+- 2026-10-21(定时任务与环境变量)：新增可选的 systemd timer 三件套（`daimonkey-news` 每日 / `daimonkey-update` 每周全量 / `daimonkey-backup` 每周备份）+ `install-timers.sh` 统一渲染安装，bootstrap 不做改动、默认仍是手动更新；站点基址与 Cookie 安全由环境变量控制——`DM_SITE_URL`（canonical/sitemap/robots 基址，生产必设，缺省输出 `http://<host>` 占位）与 `DM_SECURE_COOKIES=1`（HTTPS 后开启，当前明文 HTTP 保持关闭），两者写在 `daimonkey.service` 的 `Environment=`，模板只留注释示例。

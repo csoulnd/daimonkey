@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m %}
-{% block title %}{{ p.name }}{% endblock %}
+{% import "_chart.html" as ch %}
+{% block title %}{% if seo_meta is defined and seo_meta and seo_meta.title %}{{ seo_meta.title }}{% else %}{{ p.name }}{% endif %}{% endblock %}
 {% block crumb %}<a href="/rankings/{{ p.boards[0] }}">{{ board_names.get(p.boards[0], p.boards[0]) }}</a> / {{ p.name }}{% endblock %}
 {% block content %}
 <div class="sec-head">
@@ -62,9 +63,15 @@
 
 <h2>指标时序 <span class="dim">（每个数字可点入当次采集的原始响应）</span></h2>
 {% for key, pts in p.metrics_series.items() %}
+{% set unit = (chart_units | default({})).get(key, '') %}
+{% set chart_src = (chart_sources | default({})).get(key, {}) %}
 <div class="metric-card">
-  <h3>{{ metric_names.get(key, key) }}</h3>
-  {{ charts[key] | safe }}
+  {{ ch.chart_card(charts[key], metric_names.get(key, key),
+                   subtitle="近 90 天 · 构建期 SVG",
+                   unit=unit,
+                   source_name=chart_src.get('name', ''),
+                   source_url=chart_src.get('url', ''),
+                   note="每个数字可点入当次采集的原始响应") }}
   <table class="tbl mini">
     <thead><tr><th>日期</th><th>值</th><th>来源</th><th>采集时间</th></tr></thead>
     <tbody>

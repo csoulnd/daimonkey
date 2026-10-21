@@ -71,3 +71,5 @@ curl -s http://127.0.0.1:8080/api/v1/rankings/nv_infer.json | head
   “最多提交（12 张卡）/单位统一（Tokens/s）/最贴近推理吞吐”三点；DeepSeek-R1 与 Llama3.1-8B 只作展示列，
   避免不同模型的数值混进同一排名。官方 summary 无功耗字段，能效延后。加速卡自动入池 + 掉榜归档沿用 AA 的
   产品同步范式；组合卡折算不可比，直接跳过。
+
+- 2026-10-21(硬件规格数据层)：规格表从模板手写改为数据层——`collector/hw_specs.json` 存规格、`collector/hw.py` 提供 `load/by_model/field_labels/validate`；厂商固定 NVIDIA / 寒武纪 / 平头哥 PPU / 华为，官方未披露的字段填 `null`（页面显示 —，不猜值），方向页只按 registry 的 `spec_fields/spec_vendors` 取列，新增硬件方向无需改模板。

@@ -1,0 +1,303 @@
+/* 图表组件（daimonkey / collector/svgchart.py 专用）
+   配合 style.css 使用：只新增图表相关类，不覆盖既有组件规则。
+   颜色全部走令牌 + --chart-* 调色板；明色主题只覆盖颜色变量。
+   建议在 base.html 中于 style.css 之后引入：
+   <link rel="stylesheet" href="/assets/charts.css?v={{ assets_v }}"> */
+
+:root {
+  /* 图表调色板（暗色为默认，与 svgchart.PALETTE 的兜底值一致） */
+  --chart-1: #58a6ff;
+  --chart-2: #f87171;
+  --chart-3: #4ade80;
+  --chart-4: #fbbf24;
+  --chart-5: #c39bff;
+  --chart-6: #22d3ee;
+  /* 图表专用语义 */
+  --chart-grid: var(--line);
+  --chart-zero: var(--line-strong);
+  --chart-track: var(--panel2);
+  --chart-card-bg: var(--panel);
+  --chart-card-border: var(--line);
+  --chart-foot-border: var(--line);
+}
+
+html[data-theme="light"] {
+  /* 明色下加深前景色，保证白底对比度 */
+  --chart-1: #1a5fb4;
+  --chart-2: #b42318;
+  --chart-3: #15803d;
+  --chart-4: #9a6700;
+  --chart-5: #6d28d9;
+  --chart-6: #0e7490;
+  --chart-grid: var(--line);
+  --chart-zero: var(--line-strong);
+  --chart-track: var(--panel2);
+  --chart-card-bg: var(--panel);
+  --chart-card-border: var(--line);
+  --chart-foot-border: var(--line);
+}
+
+/* ---- SVG 图体 ---- */
+.chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.chart .c-grid-line {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.chart .c-grid-line.c-zero {
+  stroke: var(--chart-zero);
+  stroke-dasharray: 3 3;
+}
+.chart .c-axis {
+  stroke: var(--line);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.chart .c-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.chart .c-area {
+  pointer-events: none;
+}
+.chart .c-dot {
+  pointer-events: none;
+}
+.chart .c-hit {
+  fill: transparent;
+  cursor: crosshair;
+}
+.chart .c-hit:hover {
+  fill: var(--acc);
+  fill-opacity: 0.08;
+  stroke: none;
+}
+
+/* SVG 文本：字号/颜色统一走令牌；数值等宽便于对齐 */
+.chart text,
+.chart .ax {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  fill: var(--dim);
+}
+.chart .c-x {
+  font-size: 10.5px;
+}
+.chart .c-unit,
+.chart .c-xlabel {
+  font-size: 10px;
+  fill: var(--dim);
+  letter-spacing: 0.02em;
+}
+.chart .c-last {
+  font-size: 11.5px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.chart .c-bar-label {
+  fill: var(--ink);
+  font-size: 11.5px;
+}
+.chart .c-bar-val {
+  fill: var(--ink);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.chart .c-bar-track {
+  fill: var(--chart-track);
+}
+.chart .c-bar {
+  fill: var(--chart-1);
+}
+
+/* ---- 多线图图例（保持与旧 .mchart .legend 结构兼容）---- */
+.mchart {
+  margin: 0;
+}
+.mchart .legend {
+  display: flex;
+  gap: var(--sp-3) var(--sp-4);
+  flex-wrap: wrap;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+}
+.mchart .lg {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--dim);
+  font-size: var(--fs-xs);
+}
+.mchart .lg i {
+  width: 14px;
+  height: 3px;
+  border-radius: var(--r-full);
+  display: inline-block;
+  flex: 0 0 auto;
+}
+.mchart .lg:hover {
+  color: var(--ink);
+}
+
+/* ---- 图表卡片（templates/_chart.html 的 chart_card macro）---- */
+.chart-card {
+  margin: var(--sp-5) 0;
+  padding: var(--sp-4);
+  background: var(--chart-card-bg);
+  border: 1px solid var(--chart-card-border);
+  border-radius: var(--r-m);
+}
+.chart-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.chart-card-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.chart-card-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.chart-card-sub {
+  font-size: var(--fs-xs);
+  color: var(--dim);
+  line-height: 1.5;
+}
+.chart-card-unit {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--dim);
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  padding: 1px var(--sp-2);
+  white-space: nowrap;
+}
+.chart-card-body {
+  min-width: 0;
+}
+.chart-card-body > .chart-empty {
+  margin: 0;
+}
+.chart-card-foot {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-2);
+  border-top: 1px dashed var(--chart-foot-border);
+  font-size: var(--fs-xs);
+  color: var(--dim);
+  line-height: 1.6;
+}
+.chart-card-foot a {
+  color: var(--dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.chart-card-foot a:hover {
+  color: var(--acc);
+}
+
+/* ---- 空态 ---- */
+.chart-empty {
+  display: block;
+  padding: var(--sp-5) var(--sp-2);
+  color: var(--dim);
+  text-align: center;
+  font-size: var(--fs-sm);
+}
+.chart-empty .ce-hint {
+  display: block;
+  margin-top: var(--sp-1);
+  font-size: var(--fs-xs);
+  opacity: 0.75;
+}
+.chart-empty.inline {
+  display: inline-block;
+  padding: 0;
+  font-size: var(--fs-xs);
+  text-align: left;
+}
+
+/* ---- Sparkline（列表 / 榜单单元格）---- */
+.chart.chart-spark {
+  width: 96px;
+  height: 28px;
+  display: inline-block;
+  vertical-align: middle;
+  overflow: visible;
+}
+.spark-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  white-space: nowrap;
+}
+.spark-cell .spark-label {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.spark-cell a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: inherit;
+}
+.spark-cell a:hover {
+  text-decoration: none;
+  color: var(--acc);
+}
+
+/* ---- 横向条形图 ---- */
+.chart.chart-bar {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+/* ---- 响应式 / 打印 ---- */
+@media (max-width: 640px) {
+  .chart-card {
+    padding: var(--sp-3);
+    margin: var(--sp-4) 0;
+  }
+  .chart-card-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .chart .c-x {
+    font-size: 9.5px;
+  }
+}
+
+@media print {
+  .chart-card {
+    break-inside: avoid;
+    background: transparent;
+  }
+  .chart {
+    max-width: 100%;
+  }
+}

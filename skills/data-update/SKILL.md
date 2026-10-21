@@ -38,3 +38,8 @@ description: 本站数据更新操作与排障。适用场景：热度/新闻数
 - 超过 48 小时未更新，页面自动挂横幅提醒。
 - LRU 保留窗口在 `collector/registry.yaml → retention` 调整，`0` = 永久。
 - **溯源路径可搬迁**（2026-10-17）：`body_path` 存 `raw/<源>/<日期>/<hash>.json.gz` 相对路径，读取拼 `DATA_DIR`；禁止写绝对路径。换机走 `deploy/backup.sh` + `deploy/bootstrap.sh --restore`，不要手工搬 `data/`。备份排除 `dist/`（可重建）与 `data/cache/`（可再生）。
+
+## 决策记录
+
+- 2026-10-21(原始响应窗口化)：`/api/v1/raw` 只导出 `retention.raw_api_days`（默认 14 天）窗口内的响应体，`raw/index.json` 保留全量清单（id/来源/时间/大小/是否导出），`dist/raw/*.html` 溯源页不删——既控 API 与 dist 体积，又不破坏已发布的外链。
+- 2026-10-21(AI 摘要数字对账)：摘要里的统计数字以「板块最新快照」为唯一口径，生成后校验；对不上时降级为模板文案，不让模型给出的数字直接进页面。

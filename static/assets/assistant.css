@@ -1,0 +1,591 @@
+/* ==========================================================================
+   悬浮智能助手（assistant.css）
+   --------------------------------------------------------------------------
+   style.css 中的旧 .asst-* 规则保持不动（并行开发中，禁止改 style.css），
+   本文件在其后加载，用 id 选择器 / 更高特异性覆盖必要的旧规则。
+   布局原则：
+   1) 面板是固定外框：宽高随视口用 clamp()/dvh 自适应，JS 可写 --asst-w/--asst-h；
+   2) 外框网格 = 标题(固定) + 模式条(固定) + 主体(1fr)，主体内部再滚动；
+   3) 消息区 flex:1 + min-height:0，小窗时自动占满剩余高度，绝不撑破面板；
+   4) 对话/运维共用同一套固定高度的工具栏与输入区，切换不改变外层尺寸；
+   5) ≤720px 改为全屏底部 sheet，会话列表变横向抽屉，专家 popover 绝对定位悬浮。
+   颜色一律使用 style.css 的 :root 设计令牌，不写裸色值。
+   ========================================================================== */
+
+/* 额外的表情 symbol 容器（i-monkey-hat），零尺寸隐藏，不影响布局 */
+.asst-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* ---- 悬浮宠物入口 ---- */
+#asst-pet {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 60;
+}
+#asst-pet:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 3px;
+}
+#asst-pet.hide { display: none; }
+
+/* 未登录不可见：登录态由 base.html head 预载脚本在首帧给 <html> 挂 .authed */
+#asst-pet { display: none; }
+html.authed #asst-pet { display: flex; }
+/* 面板打开时宠物带 .hide 让位；必须压过上面这条显示规则（更高特异性） */
+html.authed #asst-pet.hide { display: none; }
+
+/* ---- 面板外框：自适应尺寸 / 拖拽尺寸 / 恢复默认 ---- */
+#asst-panel {
+  /* 默认尺寸：宽度随视口比例，高度随视口高度；--asst-w/--asst-h 由 JS 写入时优先 */
+  --asst-w: clamp(340px, 32vw, 480px);
+  --asst-h: clamp(420px, 66vh, 760px);
+  --asst-head-h: 46px;
+  --asst-mode-h: 40px;
+  --asst-side-w: 148px;
+  --asst-input-h: 56px;
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 61;
+  width: var(--asst-w);
+  height: var(--asst-h);
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  display: grid;
+  grid-template-rows: var(--asst-head-h) var(--asst-mode-h) minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  box-shadow: var(--shadow);
+  animation: asst-pop 0.18s ease-out;
+  /* 字号动态缩放（A- / A+ 写 --asst-scale） */
+  --fs-xs: calc(0.75rem * var(--asst-scale, 1));
+  --fs-sm: calc(0.875rem * var(--asst-scale, 1));
+}
+#asst-panel[hidden] { display: none; }
+@supports (height: 100dvh) {
+  #asst-panel {
+    --asst-h: clamp(420px, 66dvh, 760px);
+    max-height: calc(100dvh - 32px);
+  }
+}
+/* 大窗模式：JS 同时写入 --asst-w/--asst-h；这里的变量是禁用 JS 时的兜底 */
+#asst-panel.max {
+  --asst-w: clamp(560px, 58vw, 900px);
+  --asst-h: clamp(520px, 86vh, 920px);
+  --asst-side-w: 190px;
+}
+@supports (height: 100dvh) {
+  #asst-panel.max { --asst-h: clamp(520px, 86dvh, 920px); }
+}
+
+/* 左上角拖拽点：面板以右下角为锚，向左/向上拖动即放大 */
+#asst-panel .asst-resize {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  z-index: 9;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+#asst-panel .asst-resize::before,
+#asst-panel .asst-resize::after {
+  content: "";
+  position: absolute;
+  border-left: 2px solid var(--line-strong);
+  border-top: 2px solid var(--line-strong);
+  border-radius: 3px 0 0 0;
+  opacity: 0.65;
+  transition: border-color 0.15s ease, opacity 0.15s ease;
+}
+#asst-panel .asst-resize::before { left: 6px; top: 6px; width: 10px; height: 10px; }
+#asst-panel .asst-resize::after { left: 2px; top: 2px; width: 5px; height: 5px; opacity: 0.32; }
+#asst-panel .asst-resize:hover::before,
+#asst-panel.resizing .asst-resize::before { border-color: var(--acc); opacity: 1; }
+#asst-panel.resizing { user-select: none; }
+#asst-panel.resizing .asst-resize { cursor: nwse-resize; }
+
+/* ---- 顶部：标题 + 窗口操作 ---- */
+#asst-panel .asst-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-width: 0;
+  height: var(--asst-head-h);
+  padding: 0 var(--sp-3) 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+#asst-panel .asst-panel-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+#asst-panel .asst-panel-title svg.pet-icon {
+  width: 22px;
+  height: 18px;
+  vertical-align: -2px;
+  flex: none;
+}
+#asst-panel .asst-title-text { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#asst-panel .asst-title-sub {
+  flex: none;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  color: var(--dim);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+#asst-panel .asst-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+#asst-panel .asst-panel-actions button {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  background: none;
+  color: var(--dim);
+  font-size: var(--fs-xs);
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+#asst-panel .asst-panel-actions button:hover { color: var(--ink); border-color: var(--line-strong); }
+#asst-panel .asst-panel-actions button.icon {
+  width: 26px;
+  min-width: 26px;
+  padding: 0;
+  text-align: center;
+  font-size: var(--fs-sm);
+}
+#asst-panel .asst-account-name {
+  max-width: 7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim);
+  font-size: var(--fs-xs);
+}
+/* 面板较窄时（JS 按实际宽度加 .compact）收起次要标签，保证标题与窗口按钮不溢出 */
+#asst-panel.compact .asst-title-sub,
+#asst-panel.compact .asst-account-name { display: none; }
+
+/* ---- 第二行：模式分段控件（固定高度，切模式不跳动） ---- */
+#asst-panel .asst-modebar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  height: var(--asst-mode-h);
+  padding: 0 var(--sp-3) 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+#asst-panel .asst-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--panel2);
+}
+#asst-panel .asst-mode[hidden] { display: none; }
+#asst-panel .asst-mode button {
+  height: 22px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--dim);
+  font-size: var(--fs-xs);
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+#asst-panel .asst-mode button:hover { color: var(--ink); }
+#asst-panel .asst-mode button.on {
+  background: var(--acc);
+  color: var(--acc-ink);
+}
+#asst-panel .asst-mode-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim);
+  font-size: var(--fs-xs);
+}
+#asst-panel[data-mode="ops"] .asst-mode-hint { color: var(--heat); }
+#asst-panel[data-mode="ops"] .asst-mode-hint::before { content: "⚙ "; }
+#asst-panel .asst-mobile-sessions {
+  display: none;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--dim);
+  font-size: var(--fs-xs);
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#asst-panel .asst-mobile-sessions[aria-expanded="true"] {
+  color: var(--acc);
+  border-color: var(--acc);
+}
+
+/* ---- 主体：左会话 / 右对话 ---- */
+#asst-panel .asst-body {
+  display: grid;
+  grid-template-columns: var(--asst-side-w) minmax(0, 1fr);
+  gap: var(--sp-3);
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  padding: var(--sp-3);
+  /* 不用 hidden：专家 popover 向上展开时需要越过消息区；面板自身仍是裁切边界 */
+  overflow: visible;
+}
+#asst-panel .asst-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: 0;
+  min-width: 0;
+  padding-right: var(--sp-2);
+  border-right: 1px solid var(--line);
+}
+#asst-panel .asst-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex: none;
+}
+#asst-panel .asst-side-cap {
+  color: var(--dim);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+}
+#asst-panel #asst-new {
+  flex: none;
+  padding: 5px 8px;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+}
+#asst-panel .asst-session-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+#asst-panel .asst-session-list li { min-width: 0; }
+#asst-panel .asst-s-acts { display: none; }
+#asst-panel .asst-session-list li:hover .asst-s-acts,
+#asst-panel .asst-session-list li:focus-within .asst-s-acts { display: inline-flex; }
+#asst-panel .asst-s-empty {
+  cursor: default;
+  color: var(--dim);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  padding: 6px 2px;
+}
+#asst-panel .asst-usage { min-width: 0; }
+#asst-panel .asst-usage-line {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- 右侧对话列：行内操作 / 消息 / 审批 / 输入 / 提示 ---- */
+#asst-panel .asst-chat-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: 0;
+  min-width: 0;
+  overflow: visible;
+}
+#asst-panel .asst-inline-row { flex: none; }
+#asst-panel #asst-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+#asst-panel .asst-empty {
+  margin: auto;
+  padding: var(--sp-4);
+  max-width: 34em;
+  color: var(--dim);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  text-align: center;
+}
+#asst-panel .asst-bubble { max-width: 88%; }
+#asst-panel .asst-approval { flex: none; }
+
+/* ---- 输入区：固定高度，模式切换不改变外框尺寸 ---- */
+#asst-panel .asst-composer {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+#asst-panel .asst-form {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-2);
+}
+#asst-panel .asst-form textarea {
+  flex: 1;
+  min-width: 0;
+  height: var(--asst-input-h);
+  min-height: var(--asst-input-h);
+  max-height: var(--asst-input-h);
+  resize: none;
+  overflow-y: auto;
+}
+#asst-panel #asst-send {
+  flex: none;
+  min-width: 64px;
+  height: var(--asst-input-h);
+  padding: 0 16px;
+}
+#asst-panel #asst-stop {
+  flex: none;
+  height: var(--asst-input-h);
+  padding: 0 12px;
+}
+
+/* ---- 内置专家 / Skill：popover 绝对定位，悬浮在输入区上方，不改变外框尺寸 ---- */
+#asst-panel .asst-experts {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+#asst-panel .asst-experts-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 24px;
+  padding: 0 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--dim);
+  font-size: var(--fs-xs);
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#asst-panel .asst-experts-toggle > span:not(.asst-experts-count) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#asst-panel .asst-experts-toggle:hover { color: var(--ink); border-color: var(--line-strong); }
+#asst-panel .asst-experts-toggle[aria-expanded="true"] { color: var(--acc); border-color: var(--acc); }
+#asst-panel .asst-ic {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#asst-panel .asst-experts-count { color: var(--dim); }
+#asst-panel .asst-experts-count:not(:empty)::before { content: "· "; }
+#asst-panel .asst-experts-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 8;
+  max-height: min(280px, calc(var(--asst-h) - 140px));
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-m);
+  box-shadow: var(--shadow);
+}
+#asst-panel .asst-experts-list[hidden] { display: none; }
+#asst-panel .asst-expert {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-s);
+  background: none;
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+#asst-panel .asst-expert:hover { background: var(--panel2); border-color: var(--line); }
+#asst-panel .asst-expert-name { color: var(--acc); font-size: var(--fs-xs); font-weight: 600; }
+#asst-panel .asst-expert-desc { color: var(--dim); font-size: var(--fs-xs); line-height: 1.45; }
+#asst-panel .asst-experts-empty { padding: 8px; color: var(--dim); font-size: var(--fs-xs); line-height: 1.6; }
+
+/* ---- 底部一行：状态提示（固定高度，消息再长也不把它挤走） ---- */
+#asst-panel .asst-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  min-height: 18px;
+}
+#asst-panel .asst-msg {
+  min-height: 1.1em;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- 可访问性 ---- */
+#asst-panel button:focus-visible,
+#asst-panel textarea:focus-visible,
+#asst-panel input:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+}
+
+/* ---- 中窄桌面（881–1375）：面板加宽 + 会话栏收窄，救回被压扁的聊天列 ----
+   340px 面板下 148px 会话栏只剩 ~154px 聊天列、输入框 82px；
+   这里面板取 min(440px, 100vw-32px)，会话栏 118px，聊天列回到 ~296px。
+   上沿取 1375px：覆盖 1280/1366 笔记本主流宽度；1375 以上 32vw ≥ 440，
+   不再需要特殊规则。输入区同步收紧 gap 与发送按钮，使 textarea ≥ 220px
+   且 placeholder 一行放得下。 */
+@media (min-width: 881px) and (max-width: 1375px) {
+  #asst-panel {
+    --asst-w: min(440px, calc(100vw - 32px));
+    --asst-side-w: 118px;
+  }
+  #asst-panel .asst-body { gap: var(--sp-2); padding: var(--sp-2); }
+  #asst-panel .asst-form { gap: 6px; }
+  #asst-panel #asst-send { min-width: 52px; padding: 0 10px; }
+}
+
+/* ---- 窄桌面（721–880）：收窄，但不切换为 sheet ---- */
+@media (min-width: 721px) and (max-width: 880px) {
+  #asst-panel {
+    --asst-side-w: 118px;
+    right: 12px;
+    bottom: 12px;
+  }
+  #asst-panel .asst-body { gap: var(--sp-2); padding: var(--sp-2); }
+  #asst-pet { right: 14px; bottom: 14px; }
+}
+
+/* ---- 移动端（≤720px）：全屏底部 sheet + 会话抽屉 ---- */
+@media (max-width: 720px) {
+  #asst-panel {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    height: calc(100vh - env(safe-area-inset-top, 0px));
+    max-height: calc(100vh - env(safe-area-inset-top, 0px));
+    border-radius: var(--r-l) var(--r-l) 0 0;
+    border-bottom: 0;
+    animation: asst-sheet-in 0.22s ease-out;
+  }
+  @supports (height: 100dvh) {
+    #asst-panel {
+      height: calc(100dvh - env(safe-area-inset-top, 0px));
+      max-height: calc(100dvh - env(safe-area-inset-top, 0px));
+    }
+  }
+  #asst-panel .asst-resize { display: none; }
+  #asst-panel .asst-panel-head { padding-left: var(--sp-3); }
+  #asst-panel .asst-modebar { padding-left: var(--sp-3); }
+  #asst-panel .asst-title-sub { display: none; }
+  #asst-panel .asst-panel-actions #asst-reset,
+  #asst-panel .asst-panel-actions #asst-max { display: none; }
+  #asst-panel .asst-body {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--sp-2) var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px));
+    gap: 0;
+  }
+  #asst-panel .asst-side-col {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(280px, 84vw);
+    z-index: 6;
+    padding: var(--sp-3);
+    background: var(--panel);
+    border-right: 1px solid var(--line-strong);
+    transform: translateX(-104%);
+    transition: transform 0.2s ease;
+    box-shadow: var(--shadow);
+  }
+  #asst-panel.drawer-open .asst-side-col { transform: none; }
+  /* 抽屉遮罩：只盖住主体区，标题和模式条仍可点 */
+  #asst-panel.drawer-open::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: calc(var(--asst-head-h) + var(--asst-mode-h));
+    z-index: 5;
+    background: color-mix(in srgb, var(--bg) 45%, transparent);
+  }
+  #asst-panel .asst-mobile-sessions { display: inline-flex; }
+  #asst-panel .asst-side-col .asst-s-acts { display: inline-flex; }
+  #asst-panel .asst-mode-hint { display: none; }
+  #asst-panel .asst-experts-list { max-height: min(240px, 36dvh); }
+}
+@keyframes asst-sheet-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 触屏设备没有 hover：会话项的重命名/删除按钮常显 */
+@media (hover: none) {
+  #asst-panel .asst-s-acts { display: inline-flex; }
+}

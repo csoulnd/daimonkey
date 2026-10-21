@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{% if seo_meta is defined and seo_meta and seo_meta.title %}{{ seo_meta.title }}{% else %}{{ direction.name }} · {{ page_label }} · {{ site.name }}{% endif %}{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/assets/direction.css?v={{ assets_v }}">
+<div class="dir-layout">
+  {% include "_direction_tabs.html" %}
+  <div class="dir-body">
+    <section class="kb-intro dir-intro">
+      <div class="dim">{{ direction.short }} · DIRECTION</div>
+      <h1>{{ direction.name }} · {{ page_label }}</h1>
+      <p>{{ direction.description }}</p>
+      <div class="dir-intro-meta dim">
+        {% if direction.news_categories %}<span>新闻范围：{{ direction.news_categories | join(' / ') }}</span>{% endif %}
+        <span>新闻截至 {{ news_meta.last_fetched_at | dt if news_meta.last_fetched_at else '暂无' }}</span>
+      </div>
+    </section>
+
+    {% if direction.placeholder %}
+    <div class="note-box">{{ direction.placeholder_note }}</div>
+    {% endif %}
+
+    <section class="dir-section" id="dir-news">
+      <div class="sec-head">
+        <h2>{{ page_label }}</h2>
+        <span class="dim">按方向聚合 · 每条带来源与站内名次</span>
+      </div>
+      {% if direction_news %}
+      <div class="news-list">
+        {% for n in direction_news %}
+        <article class="news-item">
+          <div class="news-head">
+            <span class="chip nc-{{ n.category }}">{{ news_categories.get(n.category, n.category) }}</span>
+            <a class="news-title" href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
+            {% if n.points %}<span class="news-pts" title="Hacker News 社区热度">{{ n.points }} 分</span>{% endif %}
+          </div>
+          {% if n.summary %}<p class="news-sum dim">{{ n.summary }}</p>{% endif %}
+          <div class="news-meta dim">
+            <span>{{ (n.published_at or n.fetched_at)[:10] }}</span><span>{{ n.source_name }}</span>
+            {% for p in n.products %}
+            {%- if news_rank.get(p.slug) -%}
+            <a class="badge b-{{ news_rank[p.slug].board }}" href="/product/{{ p.slug }}" title="当前主榜名次">{{ p.name }} #{{ news_rank[p.slug].rank }}</a>
+            {%- else -%}
+            <a class="badge" href="/product/{{ p.slug }}">{{ p.name }}</a>
+            {%- endif -%}
+            {% endfor %}
+            <a class="dim" href="/raw/{{ n.raw_payload_id }}">溯源</a>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">
+        {% if direction.placeholder %}该方向新闻源尚未接入。{% else %}当前新闻窗口内没有匹配条目，稍后再来看看。{% endif %}
+      </div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

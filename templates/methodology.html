@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}方法论{% endblock %}
+{% block title %}{% if seo_meta is defined and seo_meta and seo_meta.title %}{{ seo_meta.title }}{% else %}方法论{% endif %}{% endblock %}
 {% block crumb %}方法论{% endblock %}
 {% block content %}
 <h1>评分方法论 <span class="pill">{{ meta.methodology_version }}</span></h1>

@@ -1,0 +1,54 @@
+{# 图表卡片组件：标题 + 副标题 + 单位 + 图体 + 脚注/溯源提示。
+   用法：
+     {% import "_chart.html" as ch %}
+     {% set card = ch.chart_card(charts[key], metric_names.get(key, key),
+                                 subtitle="近 90 天", unit="GB/s",
+                                 source_name="Artificial Analysis",
+                                 source_url="/sources#aa",
+                                 note="数值可点入当次原始响应") %}
+     {{ card }}
+   注意：图体由 collector/svgchart.py 在构建期生成，必须 |safe 注入。 #}
+
+{% macro chart_card(chart, title, subtitle='', unit='', note='',
+                    source_name='', source_url='', chart_id='', class_name='') -%}
+<figure class="chart-card{% if class_name %} {{ class_name }}{% endif %}"{% if chart_id %} id="{{ chart_id }}"{% endif %}>
+  <figcaption class="chart-card-head">
+    <span class="chart-card-titles">
+      <span class="chart-card-title">{{ title }}</span>
+      {% if subtitle %}<span class="chart-card-sub">{{ subtitle }}</span>{% endif %}
+    </span>
+    {% if unit %}<span class="chart-card-unit" title="数值单位">{{ unit }}</span>{% endif %}
+  </figcaption>
+  <div class="chart-card-body">{{ chart | safe }}</div>
+  {% if note or source_name or source_url %}
+  <div class="chart-card-foot">
+    {% if source_url %}<a href="{{ source_url }}" rel="noopener">{% endif %}
+    {%- if source_name %}数据来源：{{ source_name }}{% endif -%}
+    {% if source_url %}</a>{% endif %}
+    {%- if note %}{% if source_name or source_url %} · {% endif %}{{ note }}{% endif -%}
+  </div>
+  {% endif %}
+</figure>
+{%- endmacro %}
+
+{# 列表/榜单单元格用的小图：图 + 可选数值标签，整块可点。 #}
+{% macro spark_cell(chart, label='', href='', title='') -%}
+<span class="spark-cell"{% if title %} title="{{ title }}"{% endif %}>
+  {%- if href %}<a href="{{ href }}">{% endif -%}
+  {{ chart | safe }}
+  {%- if label %}<span class="spark-label">{{ label }}</span>{% endif -%}
+  {%- if href %}</a>{% endif -%}
+</span>
+{%- endmacro %}
+
+{# 只有脚注、没有图体时使用（例如卡片底部统一溯源行）。 #}
+{% macro chart_foot(note='', source_name='', source_url='') -%}
+{% if note or source_name or source_url %}
+<div class="chart-card-foot">
+  {% if source_url %}<a href="{{ source_url }}" rel="noopener">{% endif %}
+  {%- if source_name %}数据来源：{{ source_name }}{% endif -%}
+  {% if source_url %}</a>{% endif %}
+  {%- if note %}{% if source_name or source_url %} · {% endif %}{{ note }}{% endif -%}
+</div>
+{% endif %}
+{%- endmacro %}

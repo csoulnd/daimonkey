@@ -1,0 +1,24 @@
+{# 方向频道子页导航（榜单 / 新闻 / 每周总结）。
+   入口清单与标签全部由 sitegen 从 registry.directions 生成，本文件不写死方向名或板块名。
+   变量：direction、direction_tabs、active_tab。 #}
+<nav class="dir-tabs" aria-label="{{ direction.name }}频道导航" data-active="{{ active_tab }}">
+  <div class="dir-tabs-head">
+    <span class="dir-tabs-kicker">{{ direction.short }}</span>
+    <span class="dir-tabs-id">
+      <svg class="dir-tabs-brand" aria-hidden="true"><use href="#{{ direction.icon or 'i-index' }}"/></svg>
+      <span class="dir-tabs-name">{{ direction.name }}</span>
+    </span>
+  </div>
+  <ul class="dir-tabs-list">
+    {% for tab in direction_tabs %}
+    <li>
+      <a class="dir-tab{% if tab.key == active_tab %} is-active{% endif %}"
+         href="{{ tab.href }}" data-tab="{{ tab.key }}"
+         {%- if tab.key == active_tab %} aria-current="page"{% endif %}>
+        <svg class="dir-tab-ic" aria-hidden="true"><use href="#{{ tab.icon }}"/></svg>
+        <span class="dir-tab-label">{{ tab.label }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</nav>

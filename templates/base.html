@@ -3,17 +3,45 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="{{ meta_desc | default('以推理技术为重心,聚合智能体热度榜单、AI 新闻、报告厅与个人知识库的可溯源技术观察站。') }}">
-<title>{% block title %}{{ site.name }}{% endblock %}</title>
+{% set _seo = seo_meta if (seo_meta is defined and seo_meta) else none %}
+{% set _seo_private = (_seo.noindex if _seo else false) or knowledge_page or reports_page or clipboard_page or notes_page %}
+{% set _fallback_desc = '以推理技术为重心,聚合智能体热度榜单、AI 新闻、报告厅与个人知识库的可溯源技术观察站。' %}
+<meta name="description" content="{% if _seo and _seo.description %}{{ _seo.description }}{% elif meta_desc %}{{ meta_desc }}{% else %}{{ _fallback_desc }}{% endif %}">
+<title>{% block title %}{{ seo_meta.title if (seo_meta is defined and seo_meta and seo_meta.title) else site.name }}{% endblock %}</title>
+{% if _seo and not _seo_private %}
+{% if _seo.canonical %}<link rel="canonical" href="{{ _seo.canonical }}">{% endif %}
+<meta name="robots" content="{{ _seo.robots or 'index, follow' }}">
+{% for _k, _v in (_seo.og or {}).items() if _v %}<meta property="og:{{ _k }}" content="{{ _v }}">
+{% endfor %}
+{% for _k, _v in (_seo.twitter or {}).items() if _v %}<meta name="twitter:{{ _k }}" content="{{ _v }}">
+{% endfor %}
+{% if seo_jsonld is defined and seo_jsonld %}<script type="application/ld+json">{{ seo_jsonld | safe }}</script>
+{% elif _seo.jsonld %}<script type="application/ld+json">{{ _seo.jsonld | tojson }}</script>
+{% endif %}
+{% elif _seo_private %}
+<meta name="robots" content="noindex, nofollow">
+{% endif %}
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <script>try{if(localStorage.getItem("side")==="closed")document.documentElement.classList.add("no-side")}catch(e){}</script>
 <script>try{if(localStorage.getItem("authed")==="1")document.documentElement.classList.add("authed")}catch(e){}</script>
 <script>try{var t=localStorage.getItem("theme");if(t==="light"||(!t&&matchMedia("(prefers-color-scheme: light)").matches))document.documentElement.dataset.theme="light"}catch(e){}</script>
 <link rel="stylesheet" href="/assets/style.css?v={{ assets_v }}">
+<link rel="stylesheet" href="/assets/assistant.css?v={{ assets_v }}">
+<link rel="stylesheet" href="/assets/charts.css?v={{ assets_v }}">
+<link rel="stylesheet" href="/assets/search.css?v={{ assets_v }}">
+<style>
+  /* 顶栏「更新」类按钮的登录态显隐:沿用 head 预载的 html.authed(首帧前挂类),
+     默认隐藏、登录后显示,不依赖 JS 首帧,避免匿名用户看到不可用功能。 */
+  html.authed .asof-box button.auth-only { display: inline-block !important; }
+</style>
+{% block head_extra %}{% endblock %}
 </head>
 <body{% if knowledge_page %} class="knowledge-page"{% endif %}>
-<!-- 内联 SVG 图标系统:symbol 复用,currentColor 继承,无外部依赖 -->
-<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+<!-- 内联 SVG 图标系统:symbol 复用,currentColor 继承,无外部依赖。
+     容器必须是 0×0 但「参与渲染」：display:none 会让 Chromium 丢弃
+     #i-ava-* 里 fill="url(#dm-ava)" 的渐变引用，头像退化成纯黑圆。
+     具体尺寸/定位见 /assets/style.css 的 .sprite-defs。 -->
+<svg xmlns="http://www.w3.org/2000/svg" class="sprite-defs" aria-hidden="true" focusable="false">
   <symbol id="i-index" viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 6-8 3 4"/><path d="M3 21h18"/></symbol>
   <symbol id="i-news" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></symbol>
   <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h6M9 16h6"/></symbol>
@@ -80,21 +108,22 @@
         <span class="asof-box">
           {% if knowledge_page %}
           <span class="asof">仓库快照 {{ kb.updated[:10] if kb.updated else '尚未同步' }} · {{ kb.short_commit }}</span>
-          <button id="btn-kb-update" type="button" title="从 GitHub 同步知识库代码仓（约 10~60 秒），不重采热度数据">⟳ 同步知识库</button>
+          <button id="btn-kb-update" type="button" class="auth-only" title="从 GitHub 同步知识库代码仓（约 10~60 秒），不重采热度数据">⟳ 同步知识库</button>
           {% elif reports_page %}
           <span class="asof">共 {{ reports_total }} 份报告</span>
           {% elif clipboard_page %}
           <span class="asof">两台设备间同步 · 文本与文件</span>
           {% elif news_page or direction_page %}
           <span class="asof" title="新闻与热度数据的最后采集时间">新闻截至 {{ news_meta.last_fetched_at | dt if news_meta.last_fetched_at else '暂无' }} · 热度截至 {{ meta.last_collected_at | dt if meta.last_collected_at else '暂无数据' }}</span>
-          <button id="btn-news-update" type="button" title="仅采集新闻（约 1 分钟），不重采热度数据">⟳ 仅更新新闻</button>
-          <button id="btn-update" type="button">⟳ 全量更新</button>
+          <button id="btn-news-update" type="button" class="auth-only" title="仅采集新闻（约 1 分钟），不重采热度数据">⟳ 仅更新新闻</button>
+          <button id="btn-update" type="button" class="auth-only">⟳ 全量更新</button>
           {% else %}
           <span class="asof" id="asof" title="数据截至（最后采集时间）">截至 {{ meta.last_collected_at | dt if meta.last_collected_at else '暂无数据' }}</span>
-          <button id="btn-update" type="button">⟳ 更新</button>
+          <button id="btn-update" type="button" class="auth-only">⟳ 更新</button>
           {% endif %}
-          <button id="btn-theme" type="button" title="切换明暗主题">◐</button>
-          <a href="/login" id="nav-login" class="login-link">登录</a>
+          <button id="btn-theme" type="button" title="切换明暗主题" aria-label="切换明暗主题">◐</button>
+          <button id="search-open" type="button" class="stg" title="搜索（Ctrl+K）" aria-label="站内搜索" aria-haspopup="dialog" aria-controls="search-root" aria-expanded="false">⌕</button>
+          <a href="/login" id="nav-login" class="login-link" aria-label="登录">登录</a>
           <script>try{var _u=localStorage.getItem("authuser");if(_u&&localStorage.getItem("authed")==="1"){var _l=document.getElementById("nav-login");if(_l){_l.style.display="none";var _b=document.createElement("span");_b.className="account-box";_b.id="account-box";var _a=document.createElement("button");_a.className="avatar";_a.type="button";_a.title=_u;var _avs=["monkey","happy","angry","hat"];var _av=localStorage.getItem("dm-avatar");if(_avs.indexOf(_av)<0)_av="monkey";_a.innerHTML='<svg aria-hidden="true"><use href="#i-ava-'+_av+'"/></svg>';_b.appendChild(_a);_l.parentNode.insertBefore(_b,_l);}}}catch(e){}</script>
         </span>
       </header>
@@ -117,66 +146,10 @@
   </div>
 </div>
 
-<!-- 悬浮智能助手（全站入口，仿 DSH 布局：左侧会话栏 + 右侧对话区） -->
-<div class="asst-pet" id="asst-pet" title="智能助手 daimonkey" role="button" tabindex="0" aria-label="打开智能助手"><svg class="pet-icon"><use href="#i-monkey"/></svg></div>
-<section class="asst-panel" id="asst-panel" hidden aria-label="智能助手">
-  <div class="asst-panel-head">
-    <span class="asst-panel-title"><svg class="pet-icon sm"><use href="#i-monkey"/></svg> 智能助手</span>
-    <span class="asst-panel-actions">
-      <span id="asst-user-label" class="asst-user-label" hidden></span>
-      <button id="asst-logout" type="button" title="退出登录：清除本浏览器的登录态（公用电脑时用）" hidden>退出登录</button>
-      <button id="asst-font-minus" class="icon" type="button" title="字号缩小">A-</button>
-      <button id="asst-font-plus" class="icon" type="button" title="字号放大">A+</button>
-      <button id="asst-max" class="icon" type="button" title="大窗 / 小窗切换">⛶</button>
-      <button id="asst-min" class="icon" type="button" title="最小化（变回宠物，Esc 同效）">─</button>
-    </span>
-  </div>
-  <div class="asst-body">
-    <aside class="asst-side-col">
-      <button id="asst-new" type="button" title="新会话">＋ 新会话</button>
-      <ul id="asst-session-list" class="asst-session-list"></ul>
-      <div class="asst-usage" id="asst-usage"></div>
-    </aside>
-    <div class="asst-chat-col">
-      <div class="asst-workflows" id="asst-workflows"></div>
-      <div class="asst-inline-row" id="asst-rename-row" hidden>
-        <input type="text" id="asst-rename-input" placeholder="会话标题" maxlength="80">
-        <button id="asst-rename-ok" type="button">确定</button>
-        <button id="asst-rename-cancel" type="button" class="muted">取消</button>
-      </div>
-      <div class="asst-inline-row confirm" id="asst-delete-row" hidden>
-        <span class="asst-confirm-text">删除该会话及全部消息？不可恢复。</span>
-        <button id="asst-delete-ok" type="button" class="danger">删除</button>
-        <button id="asst-delete-cancel" type="button" class="muted">取消</button>
-      </div>
-      <div class="asst-inline-row" id="asst-login-row" hidden>
-        <input type="text" id="asst-user" placeholder="用户名" maxlength="32" autocomplete="username">
-        <input type="password" id="asst-password" placeholder="密码，回车登录" maxlength="128" autocomplete="current-password">
-      </div>
-      <div id="asst-messages" class="asst-messages" aria-live="polite"></div>
-      <div class="asst-approval" id="asst-approval" hidden role="alert">
-        <div class="asst-approval-head">⚠ 助手请求执行<span id="asst-approval-title"></span></div>
-        <code class="asst-approval-cmd" id="asst-approval-cmd"></code>
-        <div class="asst-approval-acts">
-          <button id="asst-approval-allow" type="button" class="allow">允许</button>
-          <button id="asst-approval-deny" type="button" class="deny">拒绝</button>
-        </div>
-      </div>
-      <form id="asst-form" class="asst-form">
-        <textarea id="asst-input" rows="2" maxlength="8000" placeholder="输入消息，Ctrl+Enter 发送"></textarea>
-        <button id="asst-stop" type="button" title="停止当前运维任务" hidden>■ 停止</button>
-        <button id="asst-send" type="submit">发送</button>
-      </form>
-      <div class="asst-foot">
-        <div class="asst-mode" id="asst-mode" role="group" aria-label="会话模式" hidden>
-          <button type="button" data-mode="chat" aria-pressed="false">对话</button>
-          <button type="button" data-mode="ops" aria-pressed="false">⚙ 运维</button>
-        </div>
-        <div class="asst-msg" id="asst-msg"></div>
-      </div>
-    </div>
-  </div>
-</section>
+{% include "_assistant.html" %}
+
+<div id="search-root"></div>
+<script src="/assets/search.js?v={{ assets_v }}" defer></script>
 
 <script src="/assets/app.js?v={{ assets_v }}"></script>
 {% if knowledge_page %}<script src="/assets/knowledge.js?v={{ assets_v }}" defer></script>{% endif %}

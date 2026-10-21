@@ -9,11 +9,14 @@ assistant.workflows 下补充展示描述），零框架成本、天然进 git�
 from __future__ import annotations
 
 import json
+import logging
+import re
 from dataclasses import dataclass
 
 from . import ai as ai_mod
-from . import assistant, db, news
-from .config import registry
+from . import assistant, db, news, queries
+from .config import registry, today_utc
+from .scoring import load_latest_metrics
 
 
 @dataclass
@@ -235,100 +238,235 @@ def _num(v, fmt: str = ".0f", dash: str = "—") -> str:
 
 # ---- 工作流 4：页面 AI 摘要（首页 / 新闻 / 知识库三板块统一格式） ----
 
+log = logging.getLogger("daimonkey.ai")
+
+# 摘要数字对账：只抽取与"数量/名次"相关的数字。
+# 日期（2026-10-12）不带这些量词，因此不会被误判；"2026 年"也不匹配。
+_UNIT_NUMBER_RE = re.compile(r"(\d{1,6})\s*(?:个|条|名|篇|位|家|项|款|种)")
+_RANK_NUMBER_RE = re.compile(r"第\s*(\d{1,4})")
+_DATE_RE = re.compile(r"(\d{4})\s*[-/年]\s*(\d{1,2})\s*[-/月]\s*(\d{1,2})")
+
+
+def _pair_sums(values: list[int]) -> set[int]:
+    """允许"两项合计"这类可解释的派生数字（如分类计数 69+68=137）。"""
+    vals = sorted({int(v) for v in values})
+    out = set(vals)
+    for i, a in enumerate(vals):
+        for b in vals[i + 1:]:
+            out.add(a + b)
+    return out
+
+
+def _board_scope(c, board: str = "harness_core") -> dict:
+    """某榜单最新快照的"板块口径"（与页面渲染同一套查询）。
+
+    口径规则：条数只数该 board 最新快照内的 rankings 行，绝不使用
+    products 全站计数（那会把 AA 模型、MLPerf 卡等其他板块算进来）。
+    harness_core / harness_eco / model / nv_infer 各自独立口径。
+    """
+    boards = registry().get("boards") or {}
+    if board not in boards:
+        raise assistant.AssistantError(f"未知榜单: {board}")
+    name = boards[board].get("name") or board
+    snap = c.execute("SELECT MAX(snapshot_date) d FROM rankings WHERE board=?",
+                     (board,)).fetchone()["d"]
+    if not snap:
+        raise assistant.AssistantError(f"{name}暂无榜单数据")
+    latest = load_latest_metrics(c, today_utc())
+    items = queries.board_items(c, board, snap, latest)
+    if not items:
+        raise assistant.AssistantError(f"{name}最新快照为空")
+    observation = queries.observation_items(
+        c, board, snap, latest, queries.all_products(c))
+    sources = {m["source"]["key"] for it in items
+               for m in it.get("metrics", {}).values()
+               if (m.get("source") or {}).get("key")}
+    return {"key": board, "name": name, "snapshot": snap, "items": items,
+            "total": len(items), "observation": len(observation),
+            "sources": sources}
+
+
+def _scope_line(scope: dict) -> str:
+    """提示词里的显式口径行，防止模型把别的板块也算进来。"""
+    return (f"榜单口径：{scope['key']}（{scope['name']}），快照 {scope['snapshot']}，"
+            f"共 {scope['total']} 条（不含其他板块）")
+
+
+def _base_allowed() -> set[int]:
+    """数量对账的公共合法数字：0 在"个/条/名"语境下恒可解释（观察区 0 个、
+    缺口 0 条等），不能因为本板块某个计数恰好非 0 就把它判成幻觉。"""
+    return {0}
+
+
+def _summary_allowed(scope: dict, top_n: int) -> set[int]:
+    """本板块内可解释的数字集合：条数、观察区、TOP N、数据源数、已有名次。"""
+    allowed = _base_allowed() | {
+        scope["total"], scope["observation"], top_n, len(scope["sources"])}
+    allowed |= set(range(1, scope["total"] + 1))   # 第 N 名必须是该榜真实名次
+    return allowed
+
+
+def _page_summary_data(c, page: str, board: str | None = None) -> dict:
+    """组装提示词数据 + 对账允许集合 + 纯数据模板（AI 不合格时降级用）。"""
+    if page in ("home", "board"):
+        key = "harness_core" if page == "home" else (board or "harness_core")
+        top_n = 10 if page == "home" else 15
+        scope = _board_scope(c, key)
+        rows = scope["items"][:top_n]
+        allowed = _summary_allowed(scope, top_n)
+        if page == "home":
+            lines = [
+                f"{r['rank']}. {r['name']}（{r['vendor']}）热度{_num(r['heat_score'])}"
+                f" 动量{_num(r['momentum_score'])}"
+                + (f" 7日{_num(r['delta_7d'], '+.1f')}"
+                   if r['delta_7d'] is not None else "")
+                for r in rows]
+            data = (f"{_scope_line(scope)}；本次列出前 {len(rows)} 条"
+                    f"，观察区 {scope['observation']} 个"
+                    f"，本榜数据源 {len(scope['sources'])} 个：\n"
+                    + "\n".join(lines))
+            shown = rows[:5]
+            allowed.add(len(shown))
+            template = (
+                f"{scope['name']}（{scope['key']}）最新快照 {scope['snapshot']} "
+                f"共 {scope['total']} 条（不含其他板块），观察区 {scope['observation']} 个。"
+                f"前 {len(shown)} 名："
+                + "、".join(f"{r['name']}（热度{_num(r['heat_score'])}）"
+                            for r in shown)
+                + "。")
+        else:
+            lines = [
+                f"{r['rank']}. {r['name']}（{r['vendor']}）算法{_num(r['heat_score'])}"
+                f" 动量{_num(r['momentum_score'])}"
+                + (f" 7日{_num(r['delta_7d'], '+.1f')}"
+                   if r['delta_7d'] is not None else "")
+                + (f" AI复评{_num(r.get('ai_score'), 'd')}:{r.get('ai_rationale')}"
+                   if r.get("ai_score") is not None else " 无AI复评")
+                for r in rows]
+            data = (f"{_scope_line(scope)}；本次列出前 {len(rows)} 条"
+                    f"，观察区 {scope['observation']} 个"
+                    f"，本榜数据源 {len(scope['sources'])} 个：\n"
+                    + "\n".join(lines))
+            shown = rows[:5]
+            allowed.add(len(shown))
+            template = (
+                f"{scope['name']}（{scope['key']}）最新快照 {scope['snapshot']} "
+                f"共 {scope['total']} 条（不含其他板块），观察区 {scope['observation']} 个。"
+                f"前 {len(shown)} 名："
+                + "、".join(f"{r['name']}（算法{_num(r['heat_score'])}）"
+                            for r in shown)
+                + "。")
+        return {"data": data, "allowed": allowed, "template": template,
+                "allowed_dates": {scope["snapshot"]}}
+
+    if page == "news":
+        rows = c.execute(
+            "SELECT title, source_name, category,"
+            " COALESCE(published_at, fetched_at) AS published_at FROM news_items"
+            " ORDER BY COALESCE(published_at, fetched_at) DESC LIMIT 40").fetchall()
+        if not rows:
+            raise assistant.AssistantError("暂无新闻数据")
+        total = c.execute("SELECT COUNT(*) n FROM news_items").fetchone()["n"]
+        counts = c.execute("SELECT category, COUNT(*) n FROM news_items"
+                           " GROUP BY category ORDER BY n DESC").fetchall()
+        counts_n = [r["n"] for r in counts]
+        lines = [f"- [{r['category']}] {r['title']}（{r['source_name']}）"
+                 for r in rows]
+        data = (f"新闻口径：最近 {len(rows)} 条（全库共 {total} 条；分类计数："
+                + "、".join(f"{r['category']}{r['n']}" for r in counts) + "）：\n"
+                + "\n".join(lines))
+        allowed = _base_allowed() | {len(rows), total, len(counts)} | _pair_sums(counts_n)
+        allowed_dates = {r["published_at"][:10] for r in rows if r["published_at"]}
+        template = (f"本期新闻最近 {len(rows)} 条，全库共 {total} 条。分类分布："
+                    + "、".join(f"{r['category']} {r['n']} 条" for r in counts)
+                    + "。")
+        return {"data": data, "allowed": allowed, "template": template,
+                "allowed_dates": allowed_dates}
+
+    if page == "knowledge":
+        from .knowledge import load_notes
+        meta, notes = load_notes()
+        if not notes:
+            raise assistant.AssistantError("暂无知识库快照")
+        groups: dict[str, int] = {}
+        for n in notes:
+            groups[n["group_name"]] = groups.get(n["group_name"], 0) + 1
+        group_n = list(groups.values())
+        data = (f"知识库口径：共 {meta['count']} 篇文档，快照于 {meta['updated'][:10]}"
+                f"（commit {meta['short_commit']}）；分组："
+                + "、".join(f"{k} {v} 篇" for k, v in sorted(groups.items())))
+        allowed = _base_allowed() | {meta["count"], len(groups)} | _pair_sums(group_n)
+        template = (f"知识库共 {meta['count']} 篇文档，快照于 {meta['updated'][:10]}"
+                    f"（commit {meta['short_commit']}）。分组："
+                    + "、".join(f"{k} {v} 篇" for k, v in sorted(groups.items()))
+                    + "。")
+        return {"data": data, "allowed": allowed, "template": template,
+                "allowed_dates": {meta["updated"][:10]}}
+
+    raise assistant.AssistantError(f"未知摘要页: {page}")
+
+
+def extract_summary_numbers(text: str) -> list[int]:
+    """抽取摘要中可被对数校验的数字（N 个/条/名/篇/位/家/项/款/种、第 N）。"""
+    nums = [int(m.group(1)) for m in _UNIT_NUMBER_RE.finditer(text or "")]
+    nums += [int(m.group(1)) for m in _RANK_NUMBER_RE.finditer(text or "")]
+    return nums
+
+
+def find_unexplained_numbers(text: str, allowed: set[int]) -> list[int]:
+    """返回摘要里无法用本板块数据解释的数字（去重、升序）。"""
+    bad = {n for n in extract_summary_numbers(text) if n not in allowed}
+    return sorted(bad)
+
+
+def find_unexplained_dates(text: str, allowed_dates: set[str]) -> list[str]:
+    """返回摘要中与允许日期（本板块快照/样本日期）不符的日期串。"""
+    bad: set[str] = set()
+    for m in _DATE_RE.finditer(text or ""):
+        date = f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+        if date not in allowed_dates:
+            bad.add(date)
+    return sorted(bad)
+
+
 def _page_summary_task(payload: dict) -> str:
     page = payload.get("page")
     with db.conn() as c:
-        if page == "home":
-            rows = c.execute(
-                "SELECT r.rank, r.heat_score, r.momentum_score, r.delta_7d,"
-                " r.coverage, p.name, p.vendor FROM rankings r"
-                " JOIN products p ON p.id = r.product_id"
-                " WHERE r.board = 'harness_core'"
-                " ORDER BY r.snapshot_date DESC, r.rank"
-                " LIMIT 10").fetchall()
-            if not rows:
-                raise assistant.AssistantError("暂无榜单数据")
-            total = c.execute("SELECT COUNT(*) n FROM products").fetchone()["n"]
-            obs = c.execute(
-                "SELECT COUNT(*) n FROM rankings WHERE board = 'harness_core'"
-                " AND coverage < 0.5 AND snapshot_date ="
-                " (SELECT MAX(snapshot_date) FROM rankings WHERE board='harness_core')"
-            ).fetchone()["n"]
-            lines = [f"{r['rank']}. {r['name']}（{r['vendor']}）热度{_num(r['heat_score'])}"
-                     f" 动量{_num(r['momentum_score'])}"
-                     + (f" 7日{_num(r['delta_7d'], '+.1f')}"
-                        if r['delta_7d'] is not None else "")
-                     for r in rows]
-            data = (f"核心产品榜前 10（共收录 {total} 个产品，观察区 {obs} 个）：\n"
-                    + "\n".join(lines))
-        elif page == "news":
-            rows = c.execute(
-                "SELECT title, source_name, category FROM news_items"
-                " ORDER BY published_at DESC LIMIT 40").fetchall()
-            if not rows:
-                raise assistant.AssistantError("暂无新闻数据")
-            counts = c.execute("SELECT category, COUNT(*) n FROM news_items"
-                               " GROUP BY category ORDER BY n DESC").fetchall()
-            lines = [f"- [{r['category']}] {r['title']}（{r['source_name']}）"
-                     for r in rows]
-            data = ("最近 40 条新闻（分类计数：" +
-                    "、".join(f"{r['category']}{r['n']}" for r in counts) + "）：\n"
-                    + "\n".join(lines))
-        elif page == "board":
-            snap = c.execute(
-                "SELECT MAX(snapshot_date) d FROM rankings"
-                " WHERE board='harness_core'").fetchone()["d"]
-            rows = (c.execute(
-                "SELECT r.rank, r.heat_score, r.momentum_score, r.delta_7d,"
-                " r.coverage, r.product_id, p.name, p.vendor FROM rankings r"
-                " JOIN products p ON p.id = r.product_id"
-                " WHERE r.board='harness_core' AND r.snapshot_date=?"
-                " ORDER BY r.rank LIMIT 15", (snap,)).fetchall()
-                if snap else [])
-            if not rows:
-                raise assistant.AssistantError("暂无榜单数据")
-            ai = {r["product_id"]: (r["ai_score"], r["rationale"])
-                  for r in c.execute(
-                      "SELECT product_id, ai_score, rationale FROM ai_scores"
-                      " WHERE board='harness_core' AND snapshot_date=?", (snap,))}
-            obs = c.execute(
-                "SELECT COUNT(*) n FROM rankings WHERE board='harness_core'"
-                " AND coverage < 0.5 AND snapshot_date=?", (snap,)).fetchone()["n"]
-            lines = []
-            for r in rows:
-                a = ai.get(r["product_id"])
-                lines.append(
-                    f"{r['rank']}. {r['name']}（{r['vendor']}）算法{_num(r['heat_score'])}"
-                    f" 动量{_num(r['momentum_score'])}"
-                    + (f" AI复评{_num(a[0], 'd')}:{a[1]}" if a else " 无AI复评"))
-            data = (f"核心产品榜快照 {snap}(前 15,观察区 {obs} 个):\n"
-                    + "\n".join(lines))
-        elif page == "knowledge":
-            from .knowledge import load_notes
-            meta, notes = load_notes()
-            if not notes:
-                raise assistant.AssistantError("暂无知识库快照")
-            groups: dict[str, int] = {}
-            for n in notes:
-                groups[n["group_name"]] = groups.get(n["group_name"], 0) + 1
-            data = (f"知识库共 {meta['count']} 篇文档，快照于 {meta['updated'][:10]}"
-                    f"（commit {meta['short_commit']}）；分组："
-                    + "、".join(f"{k} {v} 篇" for k, v in sorted(groups.items())))
-        else:
-            raise assistant.AssistantError(f"未知摘要页: {page}")
+        ctx = _page_summary_data(c, page, payload.get("board"))
     return (
-        "以下是本站数据页面的当周概况。\n" + data
+        "以下是本站数据页面的当周概况。\n" + ctx["data"]
         + "\n\n请用中文写一段 150-200 字的页面摘要，面向初次访问的读者："
           "先说这个板块是什么，再概括当前的重点信息与变化趋势；"
+          "涉及数量时只能引用上文给出的板块口径数字，不要估算、不要累加其他板块；"
           "只输出摘要正文，不要标题、不要解释、不要 Markdown 语法。")
 
 
 def _page_summary_store(payload: dict, reply: str) -> None:
+    """落库前做数字对账：无法解释的数字一律降级为纯数据模板并记日志。
+
+    119 事故的根因是提示词给了全站 products 计数，模型顺手把它说成
+    "核心产品"。这里从生成侧之后再加一道闸：任何不在本板块允许集合里的
+    "N 个/条/第 N" 都视为幻觉，宁可牺牲文采也不用不可溯源的数字。
+    """
     page = str(payload.get("page", ""))
     signature = payload.get("signature")
+    text = (reply or "").strip()
+    try:
+        with db.conn() as c:
+            ctx = _page_summary_data(c, page, payload.get("board"))
+        bad = find_unexplained_numbers(text, ctx["allowed"])
+        bad_dates = find_unexplained_dates(text, ctx.get("allowed_dates") or set())
+    except Exception as e:  # 对账自身失败不能拖垮 AI 步骤，保留模型原文
+        log.warning("AI 摘要数字对账无法执行 page=%s: %s: %s；保留原文",
+                    page, type(e).__name__, e)
+    else:
+        if bad or bad_dates:
+            log.warning("AI 摘要数字对账失败 page=%s 未解释数字=%s 日期=%s；"
+                        "降级模板摘要", page, bad, bad_dates)
+            text = ctx["template"]
     with db.conn() as c:
         db.ensure_ai_tables(c)
-        ai_mod.save_summary(c, page, reply.strip(), str(signature) if signature else None)
+        ai_mod.save_summary(c, page, text, str(signature) if signature else None)
 
 
 # ---- 工作流 5：榜单 AI 分析评分（与规则分平行存储） ----

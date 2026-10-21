@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}数据源{% endblock %}
+{# base.html 把 seo_meta 归一化为 _seo；没有 SEO 上下文（如单独渲染本模板）时保留短标题 #}
+{% block title %}{{ _seo.title if (_seo is defined and _seo and _seo.title) else '数据源' }}{% endblock %}
 {% block crumb %}数据源{% endblock %}
 {% block content %}
 <h1>数据源清单与健康状态</h1>

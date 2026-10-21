@@ -1,0 +1,497 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-10-21",
+  "vendor_note": {
+    "PPU": "『PPU』按公开资料与出货量最主流的口径，指平头哥（T-Head，阿里巴巴）自研并行处理器（Parallel Processing Unit）『真武』系列；后摩智能等厂商也用 PPU 指代各自的存算一体架构，本表不混收，只收平头哥真武 810E / M890 / V900。三者官方均未披露算力、功耗与制程，相关字段为 null，勿按媒体估算补齐。",
+    "NVIDIA": "NVIDIA 官方产品页中带 * 的 Tensor Core 数值为稀疏（sparsity）口径；本表统一折算为 dense 值（官方稀疏值 ÷ 2），并在每条 sources_note 标注官方原始数字，便于与寒武纪/华为的标称值横向比较。",
+    "寒武纪": "数值取自寒武纪官网对应产品页（MLU370-X8 / MLU370-S4/S8），均为官方标称峰值；官方规格页未列 FP8，按 null 处理，不引用第三方补值。",
+    "华为": "华为官方只公开整机与单卡混合口径（Atlas 800T/800I A3、Atlas 900 A3 SuperPoD、Atlas 300I Duo）；910C 为业界通用型号，官方页面写作『昇腾910』。单卡算力按官方整机 8 卡数值折算者，均在 sources_note 说明。"
+  },
+  "specs": [
+    {
+      "vendor": "NVIDIA",
+      "series": "Hopper",
+      "model": "H100 SXM",
+      "aliases": [
+        "NVIDIA H100 SXM",
+        "H100 SXM5",
+        "H100 80GB HBM3",
+        "NVIDIA H100 80GB HBM3",
+        "H100"
+      ],
+      "release_year": 2022,
+      "process": "TSMC 4N",
+      "fp16_tflops": 989,
+      "bf16_tflops": 989,
+      "fp8_tflops": 1979,
+      "int8_tops": 1979,
+      "hbm_gb": 80,
+      "hbm_bw_gbs": 3350,
+      "interconnect": "NVLink 4",
+      "interconnect_bw_gbs": 900,
+      "tdp_w": 700,
+      "form_factor": "SXM5",
+      "servers": [
+        {
+          "model": "NVIDIA DGX H100",
+          "status": "已收录",
+          "note": "8×H100 SXM 整机"
+        },
+        {
+          "model": "NVIDIA HGX H100",
+          "status": "已收录",
+          "note": "4/8 卡合作伙伴整机基板",
+          "url": "https://www.nvidia.com/en-us/data-center/hgx/"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "NVIDIA DGX SuperPOD（H100）",
+          "status": "已收录",
+          "interconnect": "NVLink + Quantum-2 InfiniBand",
+          "note": "参考架构，规模随客户配置"
+        }
+      ],
+      "official_docs": [
+        {
+          "title": "NVIDIA H100 Tensor Core GPU 产品页",
+          "url": "https://www.nvidia.com/en-us/data-center/h100/"
+        }
+      ],
+      "sources_note": "官方产品页规格表（2026-10 核对）：H100 SXM 官方稀疏值 FP16/BF16 1,979 TFLOPS、FP8/INT8 3,958；本表 ÷2 记 dense（989 / 1,979）。显存 80GB HBM3、带宽 3.35TB/s、NVLink 900GB/s、TDP 700W 均为官方值。"
+    },
+    {
+      "vendor": "NVIDIA",
+      "series": "Hopper",
+      "model": "H200 SXM",
+      "aliases": [
+        "NVIDIA H200 SXM",
+        "H200 SXM5",
+        "H200 141GB HBM3e",
+        "NVIDIA H200 141GB HBM3e",
+        "H200"
+      ],
+      "release_year": 2024,
+      "process": "TSMC 4N",
+      "fp16_tflops": 989,
+      "bf16_tflops": 989,
+      "fp8_tflops": 1979,
+      "int8_tops": 1979,
+      "hbm_gb": 141,
+      "hbm_bw_gbs": 4800,
+      "interconnect": "NVLink 4",
+      "interconnect_bw_gbs": 900,
+      "tdp_w": 700,
+      "form_factor": "SXM5",
+      "servers": [
+        {
+          "model": "NVIDIA DGX H200",
+          "status": "已收录",
+          "note": "8×H200 SXM 整机"
+        },
+        {
+          "model": "NVIDIA HGX H200",
+          "status": "已收录",
+          "note": "4/8 卡合作伙伴整机基板",
+          "url": "https://www.nvidia.com/en-us/data-center/hgx/"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "NVIDIA DGX SuperPOD（H200）",
+          "status": "已收录",
+          "interconnect": "NVLink + Quantum-2 InfiniBand",
+          "note": "参考架构，规模随客户配置"
+        }
+      ],
+      "official_docs": [
+        {
+          "title": "NVIDIA H200 Tensor Core GPU 产品页",
+          "url": "https://www.nvidia.com/en-us/data-center/h200/"
+        }
+      ],
+      "sources_note": "官方产品页规格表（2026-10 核对）：H200 SXM 官方稀疏值 FP16/BF16 1,979 TFLOPS、FP8/INT8 3,958；本表 ÷2 记 dense（989 / 1,979）。显存 141GB HBM3e、带宽 4.8TB/s、NVLink 900GB/s、TDP 700W 均为官方值。"
+    },
+    {
+      "vendor": "NVIDIA",
+      "series": "Blackwell",
+      "model": "B200",
+      "aliases": [
+        "NVIDIA B200",
+        "B200 SXM",
+        "NVIDIA B200 192GB HBM3e",
+        "B200 192GB HBM3e",
+        "Blackwell B200"
+      ],
+      "release_year": 2024,
+      "process": "TSMC 4NP",
+      "fp16_tflops": 2250,
+      "bf16_tflops": 2250,
+      "fp8_tflops": 4500,
+      "int8_tops": 4500,
+      "hbm_gb": 192,
+      "hbm_bw_gbs": 8000,
+      "interconnect": "NVLink 5",
+      "interconnect_bw_gbs": 1800,
+      "tdp_w": 1000,
+      "form_factor": "SXM",
+      "servers": [
+        {
+          "model": "NVIDIA DGX B200",
+          "status": "已收录",
+          "note": "8×B200 整机，1,440GB HBM3e",
+          "url": "https://www.nvidia.com/en-us/data-center/dgx-b200/"
+        },
+        {
+          "model": "NVIDIA HGX B200",
+          "status": "已收录",
+          "note": "8 卡合作伙伴整机基板",
+          "url": "https://www.nvidia.com/en-us/data-center/hgx/"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "NVIDIA GB200 NVL72",
+          "status": "已收录",
+          "interconnect": "NVLink 5 / NVLink Switch",
+          "note": "72 GPU + 36 Grace CPU 机柜级超节点",
+          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/"
+        },
+        {
+          "name": "NVIDIA DGX SuperPOD（B200）",
+          "status": "已收录",
+          "interconnect": "NVLink + Quantum-2 InfiniBand",
+          "note": "参考架构，规模随客户配置"
+        }
+      ],
+      "official_docs": [
+        {
+          "title": "NVIDIA DGX B200 系统规格",
+          "url": "https://www.nvidia.com/en-us/data-center/dgx-b200/"
+        },
+        {
+          "title": "NVIDIA GB200 NVL72 系统规格",
+          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/"
+        }
+      ],
+      "sources_note": "B200 单卡 dense 规格：FP16/BF16 2.25 PFLOPS、FP8/INT8 4.5 PFLOPS（官方稀疏口径加倍）、192GB HBM3e / 8TB/s、TDP 1,000W。DGX B200 官方页以 8 卡 1,440GB / 64TB/s 折算为 180GB / 8TB/s（可用容量口径）；GB200 NVL72 官方页给出单 GPU NVLink 1.8TB/s。"
+    },
+    {
+      "vendor": "寒武纪",
+      "series": "思元370",
+      "model": "MLU370-X8",
+      "aliases": [
+        "寒武纪 MLU370-X8",
+        "Cambricon MLU370-X8",
+        "MLU370 X8",
+        "思元370-X8",
+        "MLU370-X8 智能加速卡"
+      ],
+      "release_year": 2022,
+      "process": "7nm",
+      "fp16_tflops": 96,
+      "bf16_tflops": 96,
+      "fp8_tflops": null,
+      "int8_tops": 256,
+      "hbm_gb": 48,
+      "hbm_bw_gbs": 614.4,
+      "interconnect": "MLU-Link",
+      "interconnect_bw_gbs": 200,
+      "tdp_w": 250,
+      "form_factor": "全高全长双槽位",
+      "servers": [
+        {
+          "model": "浪潮 NF5468M5（8×MLU370-X8）",
+          "status": "已收录",
+          "note": "寒武纪官方性能对比页给出的 8 卡测试平台"
+        },
+        {
+          "model": "寒武纪 8 卡 MLU-Link 整机（型号待补）",
+          "status": "规划中"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "MLU-Link 多机训练集群（方案待补）",
+          "status": "规划中"
+        }
+      ],
+      "official_docs": [
+        {
+          "title": "寒武纪 MLU370-X8 智能加速卡产品规格",
+          "url": "https://cambricon.com/index.php?m=content&c=index&a=lists&catid=406"
+        }
+      ],
+      "sources_note": "寒武纪官网产品页：7nm、FP16/BF16 96 TFLOPS、INT8 256 TOPS、48GB LPDDR5、614.4GB/s、MLU-Link 200GB/s、250W、全高全长双槽位。官方未列 FP8，按 null 处理；产品页未给出标准整机型号，浪潮 NF5468M5 来自官方测试环境说明。"
+    },
+    {
+      "vendor": "寒武纪",
+      "series": "思元370",
+      "model": "MLU370-S4",
+      "aliases": [
+        "MLU370-S4/S8",
+        "MLU370-S8",
+        "寒武纪 MLU370-S4",
+        "Cambricon MLU370-S4",
+        "思元370-S4"
+      ],
+      "release_year": 2022,
+      "process": "7nm",
+      "fp16_tflops": 72,
+      "bf16_tflops": 72,
+      "fp8_tflops": null,
+      "int8_tops": 192,
+      "hbm_gb": 24,
+      "hbm_bw_gbs": 307.2,
+      "interconnect": "PCIe Gen4 x16",
+      "interconnect_bw_gbs": null,
+      "tdp_w": 75,
+      "form_factor": "半高半长单槽位",
+      "servers": [
+        {
+          "model": "高密度推理服务器（4×/8×MLU370-S4，型号待补）",
+          "status": "规划中"
+        }
+      ],
+      "clusters": [],
+      "official_docs": [
+        {
+          "title": "寒武纪 MLU370-S4/S8 智能加速卡产品规格",
+          "url": "https://cambricon.com/index.php?m=content&c=index&a=lists&catid=365"
+        }
+      ],
+      "sources_note": "寒武纪官网产品页：7nm、FP16/BF16 72 TFLOPS、INT8 192 TOPS、LPDDR5 24GB/48GB、307.2GB/s、75W、半高半长单槽位。本表按 S4 记 24GB（S8 为 48GB）；官方未列 FP8 与 PCIe 带宽，相关字段为 null。"
+    },
+    {
+      "vendor": "平头哥",
+      "series": "真武 PPU",
+      "model": "真武810E",
+      "aliases": [
+        "PPU 810E",
+        "T-Head 810E",
+        "平头哥 真武810E",
+        "Zhenwu 810E",
+        "真武 810E"
+      ],
+      "release_year": 2026,
+      "process": null,
+      "fp16_tflops": null,
+      "bf16_tflops": null,
+      "fp8_tflops": null,
+      "int8_tops": null,
+      "hbm_gb": 96,
+      "hbm_bw_gbs": 2700,
+      "interconnect": "ICN（自研片间互联）",
+      "interconnect_bw_gbs": 700,
+      "tdp_w": null,
+      "form_factor": "AI 训推一体加速卡",
+      "servers": [
+        {
+          "model": "阿里云 真武 PPU 实例（规格待补）",
+          "status": "规划中"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "阿里云 真武 PPU 万卡集群",
+          "status": "已收录",
+          "interconnect": "ICN",
+          "note": "平头哥官方页称已实现多个万卡集群部署"
+        }
+      ],
+      "official_docs": [
+        {
+          "title": "平头哥 真武810E 产品页",
+          "url": "https://www.t-head.cn/product?id=7"
+        }
+      ],
+      "sources_note": "平头哥官网产品页公开：显存 96GB、显存带宽 2.7TB/s、片间互联 700GB/s、7 个 ICN 端口；官方未披露算力、功耗与制程，相关字段为 null。页面为客户端渲染，规格取自其官方接口数据。"
+    },
+    {
+      "vendor": "平头哥",
+      "series": "真武 PPU",
+      "model": "真武M890",
+      "aliases": [
+        "PPU M890",
+        "T-Head M890",
+        "平头哥 真武M890",
+        "Zhenwu M890",
+        "真武 M890"
+      ],
+      "release_year": 2026,
+      "process": null,
+      "fp16_tflops": null,
+      "bf16_tflops": null,
+      "fp8_tflops": null,
+      "int8_tops": null,
+      "hbm_gb": 144,
+      "hbm_bw_gbs": null,
+      "interconnect": "ICN（支持 ICN Switch 组网）",
+      "interconnect_bw_gbs": 800,
+      "tdp_w": null,
+      "form_factor": "AI 训推一体加速卡",
+      "servers": [
+        {
+          "model": "真武 M890 128 卡超节点服务器",
+          "status": "已收录",
+          "note": "官方新闻：搭载 ICN Switch 1.0，面向 Agent 并发推理与大模型训练"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "真武 M890 64 卡 ICN Switch 全带宽超节点",
+          "status": "已收录",
+          "interconnect": "ICN Switch",
+          "note": "官方规格：64 卡无差异化全带宽互联"
+        }
+      ],
+      "official_docs": [
+        {
+          "title": "平头哥 真武M890 产品页",
+          "url": "https://www.t-head.cn/product?id=11"
+        }
+      ],
+      "sources_note": "平头哥官网产品页公开：显存 144GB、片间互联 800GB/s、支持 FP8/FP4、64 卡全带宽互联；官方未披露算力、显存带宽、功耗与制程，相关字段为 null。"
+    },
+    {
+      "vendor": "平头哥",
+      "series": "真武 PPU",
+      "model": "真武V900",
+      "aliases": [
+        "PPU V900",
+        "T-Head V900",
+        "平头哥 真武V900",
+        "Zhenwu V900",
+        "真武 V900"
+      ],
+      "release_year": 2026,
+      "process": null,
+      "fp16_tflops": null,
+      "bf16_tflops": null,
+      "fp8_tflops": null,
+      "int8_tops": null,
+      "hbm_gb": 216,
+      "hbm_bw_gbs": null,
+      "interconnect": "ICN（支持两层 ICN Switch）",
+      "interconnect_bw_gbs": 1200,
+      "tdp_w": null,
+      "form_factor": "AI 训推一体加速卡",
+      "servers": [
+        {
+          "model": "真武 V900 超节点服务器（规格待补）",
+          "status": "规划中"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "真武 V900 1024 卡 Scale-Up 域",
+          "status": "已收录",
+          "interconnect": "两层 ICN Switch",
+          "note": "官方规格：1024 颗芯片组成集群级全带宽 Scale-Up 域"
+        }
+      ],
+      "official_docs": [
+        {
+          "title": "平头哥 真武V900 产品页",
+          "url": "https://www.t-head.cn/product?id=12"
+        }
+      ],
+      "sources_note": "平头哥官网产品页公开：显存 216GB、片间互联 1200GB/s、FP8/FP4、1024 卡全带宽 Scale-Up；官方未披露算力、显存带宽、功耗与制程，相关字段为 null。"
+    },
+    {
+      "vendor": "华为",
+      "series": "Atlas",
+      "model": "Atlas 300I Duo",
+      "aliases": [
+        "Atlas 300I Duo 推理卡",
+        "Huawei Atlas 300I Duo",
+        "300I Duo"
+      ],
+      "release_year": 2022,
+      "process": null,
+      "fp16_tflops": 140,
+      "bf16_tflops": null,
+      "fp8_tflops": null,
+      "int8_tops": 280,
+      "hbm_gb": 96,
+      "hbm_bw_gbs": 408,
+      "interconnect": "PCIe Gen4 x16",
+      "interconnect_bw_gbs": null,
+      "tdp_w": 150,
+      "form_factor": "单槽全高全长（10.5 英寸）",
+      "servers": [
+        {
+          "model": "Atlas 800 推理服务器（型号 3000）",
+          "status": "已收录",
+          "url": "https://e.huawei.com/cn/products/computing/ascend/atlas-800-inference-3000"
+        }
+      ],
+      "clusters": [],
+      "official_docs": [
+        {
+          "title": "华为 Atlas 300I Duo 推理卡技术规格",
+          "url": "https://e.huawei.com/cn/products/computing/ascend/atlas-300i-duo"
+        }
+      ],
+      "sources_note": "华为官网技术规格：INT8 280 TOPS、FP16 140 TFLOPS、LPDDR4X 96GB/48GB、408GB/s、150W、单槽全高全长、PCIe Gen4 x16。本表取 96GB 配置；官方未列 BF16/FP8 与 PCIe 带宽，相关字段为 null。"
+    },
+    {
+      "vendor": "华为",
+      "series": "昇腾",
+      "model": "Ascend 910C",
+      "aliases": [
+        "昇腾910C",
+        "昇腾 910C",
+        "Huawei Ascend 910C",
+        "Ascend 910C",
+        "昇腾910"
+      ],
+      "release_year": 2025,
+      "process": null,
+      "fp16_tflops": 750,
+      "bf16_tflops": 750,
+      "fp8_tflops": null,
+      "int8_tops": 1500,
+      "hbm_gb": 128,
+      "hbm_bw_gbs": 3200,
+      "interconnect": "灵衢（UnifiedBus）D2D",
+      "interconnect_bw_gbs": 784,
+      "tdp_w": null,
+      "form_factor": "超节点 NPU",
+      "servers": [
+        {
+          "model": "Atlas 800T A3 超节点服务器",
+          "status": "已收录",
+          "note": "8×昇腾910，10U，可多机组成 384 卡超节点",
+          "url": "https://e.huawei.com/cn/products/computing/ascend/atlas-800t-a3"
+        },
+        {
+          "model": "Atlas 800I A3 超节点服务器",
+          "status": "已收录",
+          "note": "8×昇腾910，10U，面向大模型推理",
+          "url": "https://e.huawei.com/cn/products/computing/ascend/atlas-800i-a3"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "Atlas 900 A3 SuperPoD",
+          "status": "已收录",
+          "interconnect": "灵衢 D2D 784GB/s",
+          "note": "最大 384×昇腾910，48TB 片上内存，307.2/288.7 PFLOPS FP16",
+          "url": "https://e.huawei.com/cn/products/computing/ascend/atlas-900-a3-superpod"
+        }
+      ],
+      "official_docs": [
+        {
+          "title": "华为 Atlas 800T A3 超节点服务器技术规格",
+          "url": "https://e.huawei.com/cn/products/computing/ascend/atlas-800t-a3"
+        },
+        {
+          "title": "华为 Atlas 900 A3 SuperPoD 技术规格",
+          "url": "https://e.huawei.com/cn/products/computing/ascend/atlas-900-a3-superpod"
+        }
+      ],
+      "sources_note": "华为官方 Atlas 800T A3 / 800I A3 页面写『昇腾910』（业界型号 910C），给出整机 8 卡 6.0 PFLOPS FP16 / 12.0 POPS INT8、8×128GB、3.2TB/s、D2D 784GB/s；本表单卡 750 TFLOPS / 1,500 TOPS 按 8 卡折算。制程、功耗、FP8 官方未披露，填 null。"
+    }
+  ]
+}

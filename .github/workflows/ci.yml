@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Python unit tests
+        run: python -m unittest discover -s tests -v
+
+  frontend:
+    name: Frontend JS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # 仓库没有 Node 构建链：node 只用于跑测试脚本与语法检查
+      - name: Node tests
+        run: |
+          node tests/test_knowledge_search.cjs
+          node tests/test_knowledge_lazy.cjs
+
+      - name: Syntax check all frontend JS
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find static -type f -name '*.js' | sort)
+          for f in "${files[@]}"; do
+            node --check "$f"
+          done
+          echo "node --check: ${#files[@]} files OK"
+
+      - name: Syntax check test scripts
+        run: |
+          for f in tests/*.cjs; do node --check "$f"; done

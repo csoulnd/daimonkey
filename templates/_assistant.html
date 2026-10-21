@@ -1,0 +1,101 @@
+{# 悬浮智能助手（全站入口）：
+   结构层次 —— 顶部=标题+模式，左侧=会话，右侧=对话，底部=输入；
+   移动端（≤720px）纵向堆叠，会话列表收纳为抽屉。
+   样式：/assets/assistant.css；逻辑：/assets/assistant.js。
+   说明：本文件由 base.html 通过 include 引入，不再在 base.html 内维护助手 DOM。 #}
+<svg class="asst-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <!-- 头像可选「戴帽子」时需要一张同款宠物脸；base.html 的表情集里没有 i-monkey-hat，这里用 i-monkey 复用补一个 -->
+  <symbol id="i-monkey-hat" viewBox="0 0 640 520"><use href="#i-monkey"/><path fill="currentColor" d="M215 100 C215 52 268 30 320 30 C372 30 425 52 425 100 Z"/><rect x="203" y="96" width="234" height="16" rx="8" fill="currentColor"/><circle cx="320" cy="40" r="12" fill="currentColor"/></symbol>
+</svg>
+
+<div class="asst-pet" id="asst-pet" role="button" tabindex="0" aria-label="打开智能助手" aria-controls="asst-panel" aria-expanded="false" title="智能助手 daimonkey"><svg class="pet-icon" aria-hidden="true"><use href="#i-monkey"/></svg></div>
+
+<section class="asst-panel" id="asst-panel" hidden aria-label="智能助手">
+  <header class="asst-panel-head">
+    <div class="asst-panel-title" id="asst-panel-title">
+      <svg class="pet-icon sm" aria-hidden="true"><use href="#i-monkey"/></svg>
+      <span class="asst-title-text">智能助手</span>
+      <span class="asst-title-sub" id="asst-avatar-face">平静</span>
+    </div>
+    <div class="asst-panel-actions">
+      <span id="asst-account-name" class="asst-account-name" hidden></span>
+      <button id="asst-logout" type="button" title="退出登录：清除本浏览器的登录态（公用电脑时用）" hidden>退出</button>
+      <button id="asst-font-minus" class="icon" type="button" title="字号缩小">A-</button>
+      <button id="asst-font-plus" class="icon" type="button" title="字号放大">A+</button>
+      <button id="asst-reset" class="icon" type="button" title="恢复默认尺寸（双击左上角拖拽点同效）">⟲</button>
+      <button id="asst-max" class="icon" type="button" title="大窗 / 小窗切换" aria-pressed="false">⛶</button>
+      <button id="asst-min" class="icon" type="button" title="最小化（变回宠物，Esc 同效）">─</button>
+    </div>
+  </header>
+
+  <div class="asst-modebar">
+    <!-- 功能区 2/3：对话 / 运维模式切换（分段控件；整条固定 40px，切换不跳动） -->
+    <div class="asst-mode" id="asst-mode" role="group" aria-label="会话模式" hidden>
+      <button type="button" data-mode="chat" aria-pressed="false">对话</button>
+      <button type="button" data-mode="ops" aria-pressed="false">⚙ 运维</button>
+    </div>
+    <span class="asst-mode-hint" id="asst-mode-hint">对话模式</span>
+    <button id="asst-mobile-sessions" class="asst-mobile-sessions" type="button" aria-controls="asst-side-col" aria-expanded="false" title="展开会话列表">☰ 会话</button>
+  </div>
+
+  <div class="asst-body">
+    <aside class="asst-side-col" id="asst-side-col" aria-label="会话列表">
+      <!-- 功能区 1/3：会话管理（列表 + 新建 / 重命名 / 删除）；移动端收纳为抽屉 -->
+      <div class="asst-side-head">
+        <span class="asst-side-cap">会话</span>
+        <button id="asst-new" type="button" title="新建会话">＋ 新会话</button>
+      </div>
+      <ul id="asst-session-list" class="asst-session-list"></ul>
+      <div class="asst-usage" id="asst-usage"></div>
+    </aside>
+
+    <div class="asst-chat-col">
+      <div class="asst-inline-row" id="asst-rename-row" hidden>
+        <input type="text" id="asst-rename-input" placeholder="会话标题" maxlength="80">
+        <button id="asst-rename-ok" type="button">确定</button>
+        <button id="asst-rename-cancel" type="button" class="muted">取消</button>
+      </div>
+      <div class="asst-inline-row confirm" id="asst-delete-row" hidden>
+        <span class="asst-confirm-text">删除该会话及全部消息？不可恢复。</span>
+        <button id="asst-delete-ok" type="button" class="danger">删除</button>
+        <button id="asst-delete-cancel" type="button" class="muted">取消</button>
+      </div>
+
+      <div id="asst-messages" class="asst-messages" aria-live="polite"></div>
+
+      <div class="asst-approval" id="asst-approval" hidden role="alert">
+        <div class="asst-approval-head">⚠ 助手请求执行<span id="asst-approval-title"></span></div>
+        <code class="asst-approval-cmd" id="asst-approval-cmd"></code>
+        <div class="asst-approval-acts">
+          <button id="asst-approval-allow" type="button" class="allow">允许</button>
+          <button id="asst-approval-deny" type="button" class="deny">拒绝</button>
+        </div>
+      </div>
+
+      <div class="asst-composer">
+        <!-- 功能区 3/3：内置专家 / Skill（popover 折叠，展示名称+说明） -->
+        <div class="asst-experts" id="asst-experts">
+          <button id="asst-experts-toggle" class="asst-experts-toggle" type="button" aria-expanded="false" aria-controls="asst-experts-list" title="内置专家与 Skill：点击运行">
+            <svg class="asst-ic" aria-hidden="true"><use href="#i-book"/></svg>
+            <span>专家 / Skill</span>
+            <span class="asst-experts-count" id="asst-experts-count"></span>
+          </button>
+          <div class="asst-experts-list" id="asst-experts-list" role="group" aria-label="内置专家与 Skill" hidden>
+            <div class="asst-experts-empty">登录后可见内置专家与 Skill</div>
+          </div>
+        </div>
+        <form id="asst-form" class="asst-form">
+          <textarea id="asst-input" rows="2" maxlength="8000" placeholder="输入消息，Ctrl+Enter 发送"></textarea>
+          <button id="asst-stop" type="button" title="停止当前运维任务" hidden>■ 停止</button>
+          <button id="asst-send" type="submit">发送</button>
+        </form>
+      </div>
+
+      <div class="asst-foot">
+        <div class="asst-msg" id="asst-msg" role="status"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="asst-resize" id="asst-resize" title="拖拽调整面板大小（双击恢复默认）" aria-hidden="true"></div>
+</section>
