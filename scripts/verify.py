@@ -202,8 +202,10 @@ def main() -> int:
         ]:
             check(f"/dir/{key} {label}", bool(re.search(pat, html)))
     nv = page(base + "/dir/nv")
-    check("NV 建设中说明", "建设中" in nv)
-    check("NV 规划数据源清单", "规划中的数据源" in nv and "MLPerf" in nv)
+    check("NV 推理性能榜已上线", "推理性能榜" in nv and "建设中" not in nv)
+    check("NV 榜含 MLPerf 榜首与来源标注",
+          "NVIDIA GB300" in nv and "MLPerf" in nv and "src-tag s-mlperf" in nv)
+    check("NV 榜数字带溯源链接", bool(re.search(r'/raw/\d+', nv)))
     check("导航三方向入口", all(f'href="/dir/{k}"' in home
                                 for k in ("harness", "fm", "nv")))
     harness_html = page(base + "/dir/harness")
@@ -263,6 +265,40 @@ def main() -> int:
         check("SuperCLUE 源已停用", meta_src.get("superclue", {}).get("enabled") == 0)
     except Exception as e:
         check(f"AA 总评分检查 ({e})", False)
+
+    print("== 2e2. NV 推理性能榜(MLPerf) ==")
+    try:
+        nv_api = json.load(get(base + "/api/v1/rankings/nv_infer.json"))
+        items = nv_api["items"]
+        check(f"NV 榜入池加速卡（{len(items)} 张）", len(items) >= 8)
+        check("NV 榜成员均为 MLPerf 自动入池",
+              all(it.get("origin") == "mlperf" and it.get("status") == "active"
+                  for it in items))
+        check("NV 榜 heat 口径为 gpt-oss-120b 单卡吞吐",
+              nv_api["meta"].get("weights", {}).get("heat")
+              == {"mlperf_gptoss_120b": 1.0})
+        primary = [it for it in items
+                   if it["metrics"].get("mlperf_gptoss_120b")]
+        check("NV 榜主指标覆盖 ≥8 张卡", len(primary) >= 8)
+        if primary:
+            top = primary[0]
+            check("NV 榜首为 GB300 且单卡吞吐 ≥10000 Tokens/s",
+                  top["name"] == "NVIDIA GB300"
+                  and top["metrics"]["mlperf_gptoss_120b"]["value"] >= 10000)
+            check("NV 数值带来源与溯源",
+                  all(it["metrics"]["mlperf_gptoss_120b"].get("raw_payload_id")
+                      and it["metrics"]["mlperf_gptoss_120b"]["source"]["key"] == "mlperf"
+                      for it in primary))
+            rid = top["metrics"]["mlperf_gptoss_120b"]["raw_payload_id"]
+            raw = json.load(get(f"{base}/api/v1/raw/{rid}.json"))
+            extracted = {x["metric_key"] for x in raw["extracted"]}
+            check("MLPerf raw 归档可回放", raw["raw_body"] is not None
+                  and any(k.startswith("mlperf_") for k in extracted))
+        meta_src = {s["key"]: s for s in json.load(
+            get(base + "/api/v1/meta.json"))["sources"]}
+        check("MLPerf 源健康可达", meta_src.get("mlperf", {}).get("reachable") == 1)
+    except Exception as e:
+        check(f"NV 推理榜检查 ({e})", False)
 
     print("== 2f. 方向周总结与方向周报 ==")
     for key in ("harness", "fm"):

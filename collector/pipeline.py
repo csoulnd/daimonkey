@@ -16,6 +16,7 @@ from .sources.base import Ctx
 
 STATUS_FILE = DATA_DIR / "update_status.json"
 NEWS_SOURCE_KEYS = {"news_rss", "news_hn"}   # 仅新闻更新模式执行的源
+AUTO_ORIGINS = {"aa", "mlperf"}              # 自动入池的外部榜单成员（非 registry 手写）
 
 
 def write_status(state: str, **extra) -> None:
@@ -96,7 +97,7 @@ def _collect_inner(only: set[str] | None, reg: dict, started: str) -> dict:
             registry_slugs = {p["slug"] for p in products}
             scoring_products = [
                 p for p in queries.all_products(c)
-                if p["slug"] in registry_slugs or p.get("origin") == "aa"]
+                if p["slug"] in registry_slugs or p.get("origin") in AUTO_ORIGINS]
             summary = scoring.compute_all(c, scoring_products, today_utc())
         else:
             summary = {"skipped": "news-only run"}

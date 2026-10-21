@@ -107,7 +107,9 @@ class TestGeneration(DigestTestCase):
         self.assertEqual({p["direction"] for _, p in calls}, {"harness", "fm"})
         self.assertTrue(all(p["week"] == WEEK for _, p in calls))
         self.assertTrue(any("已生成" in n for n in notes))
-        self.assertTrue(any("无新闻范围" in n for n in notes))  # nv
+        nv_notes = [n for n in notes if n.startswith("[dir:nv]")]
+        self.assertTrue(nv_notes and all("跳过" in n for n in nv_notes))
+        self.assertNotIn("nv", {p["direction"] for _, p in calls})
 
     def test_existing_week_is_not_regenerated(self):
         with db.conn() as c:

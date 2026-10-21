@@ -18,6 +18,7 @@ status: active
 | M3 AA 接入 | ✅ 已上线 | `d031ed4` | AA 免费 API 4 页 704 模型、逐页 raw 溯源、7 天缓存；153 tests，verify 74/74 |
 | M4 方向周总结 | ✅ 已上线 | `cbc3955` | W42 harness/fm 周总结已发布；方向周报页 `4` 期/方向；`digestctl` 人工编辑；167 tests，verify 83/83 |
 | M5 FM 切换 AA 总评分口径 | ✅ 已上线 | 本次提交 | 需求方明确“按照 AA 为准，放弃 SuperCLUE，模型太老了”；模型榜 Top 40 自动入池、按 Intelligence Index 排序；SuperCLUE 停用；168 tests，verify 83/83 |
+| M6 NV 接入 MLPerf | ✅ 已上线 | 本次提交 | MLPerf Inference v6.1 官方 `summary.json` 自动入池（closed/datacenter/Offline，单卡 Tokens/s）；14 张加速卡、10 张进主榜、4 张观察区；NV 频道含榜单/新闻/周总结；196 tests，verify 92/92 |
 
 实施补充与偏差:
 

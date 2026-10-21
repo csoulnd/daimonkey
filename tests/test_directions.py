@@ -51,10 +51,14 @@ class TestDirectionsConfig(unittest.TestCase):
             for cat in d.get("news_categories") or []:
                 self.assertIn(cat, known, f"{key} -> {cat}")
 
-    def test_nv_is_placeholder_with_planned_sources(self):
+    def test_nv_channel_is_live_with_mlperf_board(self):
         nv = self.dirs["nv"]
-        self.assertTrue(nv.get("placeholder"))
-        self.assertEqual(nv.get("boards"), [])
+        self.assertFalse(nv.get("placeholder"))
+        self.assertEqual(nv.get("boards"), ["nv_infer"])
+        self.assertIn("nv_infer", self.reg["boards"])
+        self.assertEqual(nv.get("news_categories"), ["infra"])
+        source_keys = {s["key"] for s in self.reg["sources"]}
+        self.assertIn("mlperf", source_keys)
         self.assertTrue(nv.get("planned_sources"))
         for src in nv["planned_sources"]:
             self.assertIn("name", src)

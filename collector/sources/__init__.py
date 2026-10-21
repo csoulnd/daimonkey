@@ -9,6 +9,7 @@ from .news_rss import NewsRssSource
 from .npm import NpmSource
 from .pypi import PypiSource
 from .vscode_marketplace import VscodeMarketplaceSource
+from .mlperf import MlperfSource
 
 SOURCE_REGISTRY = [
     GithubSource,
@@ -21,6 +22,7 @@ SOURCE_REGISTRY = [
     NewsHnSource,
     SuperClueSource,
     AASource,
+    MlperfSource,
 ]
 
 __all__ = ["SOURCE_REGISTRY"]

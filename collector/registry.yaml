@@ -52,15 +52,12 @@ directions:
     name: 硬件
     short: NV
     icon: i-chip
-    tagline: 方向建设中
-    description: 推理硬件与算力基础设施方向，以空页起步，数据源接入后逐项填充。
-    boards: []
+    tagline: MLPerf 推理性能 · 季度
+    description: 以 MLPerf Inference 官方结果为准，按加速卡单卡推理吞吐排名（gpt-oss-120b Offline，Tokens/s per 卡）；厂商规格与云定价后续接入。
+    boards: [nv_infer]
     news_tag: nv
-    news_categories: []
-    placeholder: true
-    placeholder_note: 硬件方向以空页起步，新闻/榜单/每周总结三件套骨架已就位；以下数据源接入后逐项填充。
+    news_categories: [infra]
     planned_sources:
-      - {name: MLPerf, note: 训练与推理性能基准, status: 接入中}
       - {name: 厂商官方规格, note: GPU/加速卡与整机规格, status: 规划中}
       - {name: 云厂商价格页, note: 按需/预留实例价格, status: 规划中}
 
@@ -122,6 +119,10 @@ metric_definitions:
   aa_healthcare:            {unit: score, direction: higher}
   aa_engineering:           {unit: score, direction: higher}
   aa_economics:             {unit: score, direction: higher}
+  # MLPerf Inference（NV 方向）：单卡吞吐，单位 Tokens/s per accelerator
+  mlperf_gptoss_120b:       {unit: tokens_s, direction: higher}
+  mlperf_deepseek_r1:       {unit: tokens_s, direction: higher}
+  mlperf_llama3_8b:         {unit: tokens_s, direction: higher}
 
 # 由历史指标推导的增长率（评分期计算，不单独存储）
 derived_growth:
@@ -168,6 +169,16 @@ boards:
       aa_intelligence: 1.0
     momentum:
       aa_intelligence: 1.0
+  nv_infer:
+    name: 推理性能榜
+    overlay: true               # 独立硬件榜，不并入 Harness
+    # 成员由 MLPerf 源自动同步（origin=mlperf、status=active）。
+    # 主口径：gpt-oss-120b Offline 单卡吞吐（Tokens/s per 卡）；另外两列为展示列。
+    select: {origin: mlperf, status: active}
+    display_metrics: [mlperf_gptoss_120b, mlperf_deepseek_r1, mlperf_llama3_8b]
+    heat:
+      mlperf_gptoss_120b: 1.0
+    momentum: {}
   # 分类源榜：仅用于派生核心榜、观察区与产品页溯源，不单独进导航/门户
   coding:
     name: 编码智能体（源榜）
@@ -260,6 +271,18 @@ sources:
     notes: >-
       AA_API_KEY 存 data/model_eval.env（600，严禁入库）；必须用 httpx（curl 在此线路会截断）。
       FM 榜唯一排名口径：Intelligence Index 总评分；模型池自动同步，SuperCLUE 已停用。
+  - key: mlperf
+    type: api
+    name: MLPerf Inference 官方汇总
+    base_url: "https://raw.githubusercontent.com/mlcommons/inference_results_v6.1/main/summary.json"
+    auth: none
+    rate_limit: 单一静态文件；源内七天缓存
+    cache_days: 7
+    cache_file: mlperf_summary.json
+    enabled: true
+    notes: >-
+      取 closed/datacenter/Offline 的 LLM 结果，Result/total_accelerators 折算单卡 Tokens/s；
+      v6.1 的 has_power 全为 false，首版不做能效指标；换季只需改 base_url 版本号。
   - key: github
     name: GitHub REST API
     type: api

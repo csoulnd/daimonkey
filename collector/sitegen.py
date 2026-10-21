@@ -53,6 +53,10 @@ METRIC_NAMES = {
     "aa_healthcare": "AA 医疗指数",
     "aa_engineering": "AA 工程指数",
     "aa_economics": "AA 经济指数",
+    # MLPerf：单卡吞吐（Tokens/s per accelerator）
+    "mlperf_gptoss_120b": "gpt-oss-120b 单卡 Tokens/s",
+    "mlperf_deepseek_r1": "DeepSeek-R1 单卡 Tokens/s",
+    "mlperf_llama3_8b": "Llama3.1-8B 单卡 Tokens/s",
 }
 
 
