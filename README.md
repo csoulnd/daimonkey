@@ -39,7 +39,7 @@ python3 -m venv .venv
 .venv/bin/python scripts/serve.py --host 0.0.0.0   # http://<IP>:8080
 ```
 
-无任何自动调度:全站手动更新(页面「⟳ 更新」按钮或 CLI),页面显著展示数据截至时间。对外访问需在云安全组放行 TCP 8080。绑定域名与 HTTPS 见 **[docs/domain-and-https.md](docs/domain-and-https.md)**。
+无任何自动调度:全站手动更新(页面「⟳ 更新」按钮或 CLI),页面显著展示数据截至时间。对外访问需在云安全组放行 TCP 8080；未绑定域名、未启用 HTTPS。
 
 ## 账号与权限
 

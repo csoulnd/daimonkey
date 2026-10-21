@@ -97,4 +97,5 @@ deploy/smoke.sh --all                        # 在线 + 搬迁 + 重启
 - 2026-10-17: 搬迁演练发现并修复 bootstrap 未 `cd` 到安装根导致 `python -m collector` 用错目录；同轮发现 fresh venv 装到 Markdown 3.11.1，中文 `**研究判断：**` 不再解析为 strong，遂锁定全部直接依赖（`requirements.txt` 精确版本）。
 - 2026-10-17: 验收证据：117 Python 测试 + node 测试通过；`verify.py` 42/42；`smoke --all` 23/23（在线 9、搬迁 10、重启 4）；备份 39MB/1067 文件，恢复后账号数一致、溯源链完整。
 
-- 2026-10-21(定时任务与环境变量)：新增可选的 systemd timer 三件套（`daimonkey-news` 每日 / `daimonkey-update` 每周全量 / `daimonkey-backup` 每周备份）+ `install-timers.sh` 统一渲染安装，bootstrap 不做改动、默认仍是手动更新；站点基址与 Cookie 安全由环境变量控制——`DM_SITE_URL`（canonical/sitemap/robots 基址，生产必设，缺省输出 `http://<host>` 占位）与 `DM_SECURE_COOKIES=1`（HTTPS 后开启，当前明文 HTTP 保持关闭），两者写在 `daimonkey.service` 的 `Environment=`，模板只留注释示例。
+- 2026-10-21(定时任务与环境变量)：新增可选的 systemd timer 三件套（`daimonkey-news` 每日 / `daimonkey-update` 每周全量 / `daimonkey-backup` 每周备份）+ `install-timers.sh` 统一渲染安装，bootstrap 不做改动、默认仍是手动更新；站点基址与 Cookie 安全由环境变量控制——`DM_SITE_URL`（canonical/sitemap/robots 基址，生产必设，缺省输出 `http://<host>` 占位）与 `DM_SECURE_COOKIES=1`（当前仅 HTTP（8080），未启用 HTTPS；保留给未来反向代理/HTTPS 场景），两者写在 `daimonkey.service` 的 `Environment=`，模板只留注释示例。
+- 2026-10-21(决策)：需求方决定不启用 HTTPS、不绑定域名；已删除域名/HTTPS 上线手册；admin 建议走 SSH 隧道访问管理面。

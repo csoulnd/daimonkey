@@ -2,12 +2,12 @@
 {% import "_macros.html" as m %}
 {% import "_chart.html" as ch %}
 {% block title %}{% if seo_meta is defined and seo_meta and seo_meta.title %}{{ seo_meta.title }}{% else %}{{ p.name }}{% endif %}{% endblock %}
-{% block crumb %}<a href="/rankings/{{ p.boards[0] }}">{{ board_names.get(p.boards[0], p.boards[0]) }}</a> / {{ p.name }}{% endblock %}
+{% block crumb %}{% set b0 = p.boards[0] if p.boards else none %}{% if b0 and board_pages is defined and b0 in board_pages %}<a href="/rankings/{{ b0 }}">{{ board_names.get(b0, b0) }}</a> / {% elif b0 %}<span>{{ board_names.get(b0, b0) }}</span> / {% endif %}{{ p.name }}{% endblock %}
 {% block content %}
 <div class="sec-head">
   <h1>{{ p.name }} <span class="vendor">{{ p.vendor }}</span>
     {% if p.status == 'stale' %}<span class="stale-tag">仓库停滞（&gt;90 天无推送）</span>{% endif %}</h1>
-  <div>{% for b in p.boards %}{{ m.badge(b, board_names) }} {% endfor %}</div>
+  <div>{% for b in p.boards %}{{ m.badge(b, board_names, board_pages | default([])) }} {% endfor %}</div>
 </div>
 <p class="dim">
 {% if p.repo %}<a href="https://github.com/{{ p.repo }}" rel="noopener">github.com/{{ p.repo }}</a>{% if p.repo_aliases_list %}（曾用名：{{ p.repo_aliases_list | join('、') }}）{% endif %} · {% endif %}
@@ -26,12 +26,13 @@
 <h2>最新排名</h2>
 <div class="rank-cards">
   {% for b, r in p.latest_ranks.items() %}
-  <a class="rcard" href="/rankings/{{ b }}">
+  {% set linked = b in (board_pages | default([])) %}
+  <{{ 'a' if linked else 'div' }} class="rcard"{% if linked %} href="/rankings/{{ b }}"{% endif %}>
     <span class="rk">#{{ r.rank }}</span>
     <span>{{ board_names.get(b, b) }}</span>
     <span class="dim">热度 {{ '%.1f' | format(r.heat_score) }} · {{ r.snapshot_date }}</span>
     {% if p.latest_ai.get(b) %}<span class="ai-score" title="AI 分析分：{{ p.latest_ai[b].rationale or '基于规则分与指标的分析' }}（不影响排序）">AI {{ p.latest_ai[b].ai_score | round | int }}</span>{% endif %}
-  </a>
+  </{{ 'a' if linked else 'div' }}>
   {% endfor %}
 </div>
 {% endif %}

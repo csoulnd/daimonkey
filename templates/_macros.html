@@ -17,8 +17,9 @@
 {% if v is none %}<span class="dim" title="历史数据累积中（需约30天）">—</span>{% else %}<span class="score {{ kind }}">{{ '%.1f' | format(v) }}</span>{% if bar %}<i class="hbar" style="width: {{ (v * 0.9) | round(0) | int }}px"></i>{% endif %}{% endif %}
 {%- endmacro %}
 
-{% macro badge(board, names) -%}
-<a class="badge b-{{ board }}" href="/rankings/{{ board }}">{{ names.get(board, board) }}</a>
+{# pages=None 表示调用方未提供「有榜单页的 board 集合」，保持旧行为（可点）。 #}
+{% macro badge(board, names, pages=None) -%}
+{% if pages is none or board in pages %}<a class="badge b-{{ board }}" href="/rankings/{{ board }}">{{ names.get(board, board) }}</a>{% else %}<span class="badge b-{{ board }}">{{ names.get(board, board) }}</span>{% endif %}
 {%- endmacro %}
 
 {# AI 分析分单元格（v1.4）：悬停显示一句话理由；未生成时显 — #}

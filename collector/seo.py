@@ -146,7 +146,7 @@ def site_base_url(base_url: str | None = None) -> str:
 
 
 def is_placeholder_base(base_url: str) -> bool:
-    """是否为未配置域名的占位 URL。"""
+    """是否为未配置站点基址的占位 URL。"""
     return "<host>" in (base_url or "")
 
 
@@ -720,8 +720,8 @@ def write_robots(dist_dir: str | Path) -> Path:
     base = site_base_url()
     lines = [f"# robots.txt · {SITE_NAME}"]
     if is_placeholder_base(base):
-        lines.append("# DM_SITE_URL 未设置：Sitemap 使用 http://<host> 占位，"
-                     "部署时请设置 DM_SITE_URL=https://your-domain")
+        lines.append("# DM_SITE_URL 未设置，将使用 http://<host> 占位；"
+                     "部署时请设置 DM_SITE_URL=http://106.12.30.116:8080")
     lines.extend([
         "User-agent: *",
         "Allow: /",
@@ -871,8 +871,8 @@ def write_sitemap(dist_dir: str | Path, base_url: str | None = None, *,
         '<?xml version="1.0" encoding="UTF-8"?>',
     ]
     if placeholder:
-        lines.append("<!-- DM_SITE_URL 未设置：以下 <loc> 用 http://<host> 占位，"
-                     "部署时请设置 DM_SITE_URL=https://your-domain -->")
+        lines.append("<!-- DM_SITE_URL 未设置，将使用 http://<host> 占位；"
+                     "部署时请设置 DM_SITE_URL=http://106.12.30.116:8080 -->")
     lines.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
     for loc, lastmod, url_path in entries:
         changefreq, priority = _sitemap_meta(url_path)

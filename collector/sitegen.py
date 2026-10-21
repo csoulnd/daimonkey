@@ -540,6 +540,9 @@ def build() -> None:
             "metric_names": METRIC_NAMES,
             "nav_boards": [{"key": b, "name": reg["boards"][b]["name"]}
                            for b in order if b in snaps],
+            # 本次真正生成榜单页的 board（hidden 源榜与无快照 board 不在内）。
+            # 产品页据此决定 /rankings/{board} 是否可点，避免 404 死链。
+            "board_pages": rendered_boards,
             "threshold_pct": int(reg["methodology"]["observation_threshold"] * 100),
             "stale": _is_stale(meta.get("last_collected_at")),
             "assets_v": _assets_version(),

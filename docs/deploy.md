@@ -24,7 +24,7 @@ status: active
 | AI 密钥 | 可选 | `data/assistant.env` 内的 `DEEPSEEK_API_KEY`；缺失时助手/AI 复评降级 |
 | systemd | 建议可用 | bootstrap 安装并 `enable --now`；容器内无 systemd 时用 `--no-service` 手动起 |
 
-> 绑定正式域名、ICP 备案、DNS 解析与 Nginx/HTTPS 改造见 **[domain-and-https.md](domain-and-https.md)**。大陆 BCC 需先完成 ICP 备案，再将域名解析到公网 IP。
+> 当前对外仅提供 HTTP（8080），未启用 HTTPS。
 
 ## 2. 首次安装（全新服务器）
 
@@ -295,18 +295,19 @@ sudo systemctl disable --now daimonkey-news.timer daimonkey-update.timer daimonk
 ## 13. 站点基址与安全 Cookie（环境变量，2026-10-21）
 
 canonical、`sitemap.xml`、`robots.txt` 里的绝对 URL 与 Cookie 的 `Secure` 属性由两个环境变量控制，
-不写进 `registry.yaml`——同一份代码要在「HTTP 自测」和「HTTPS 生产」之间搬迁，配置跟着部署走：
+不写进 `registry.yaml`——配置跟着部署走：
 
 | 变量 | 作用 | 取值与时机 |
 |---|---|---|
-| `DM_SITE_URL` | canonical / `sitemap.xml` / `robots.txt` 的站点基址（`collector/seo.py → site_base_url`） | **生产必须设置**，如 `https://your-domain`（不带结尾斜杠、不带路径）。**未设置时输出 `http://<host>` 占位**，产物里会带「DM_SITE_URL 未设置」注释 |
-| `DM_SECURE_COOKIES` | 登录/会话 Cookie 是否追加 `Secure`（`scripts/serve.py → secure_cookies_enabled`） | HTTPS 部署后必须设为 `1`（`true/yes/on` 同义）；**当前明文 HTTP 阶段保持关闭**（不设置或 `0`），否则浏览器丢弃 Cookie、直接登录不上 |
+| `DM_SITE_URL` | canonical / `sitemap.xml` / `robots.txt` 的站点基址（`collector/seo.py → site_base_url`） | **生产必须设置**，本站用公网 IP：`http://106.12.30.116:8080`（不带结尾斜杠、不带路径）。**未设置时输出 `http://<host>` 占位**，产物里会带「DM_SITE_URL 未设置」注释 |
+| `DM_SECURE_COOKIES` | 登录/会话 Cookie 是否追加 `Secure`（`scripts/serve.py → secure_cookies_enabled`） | 仅在外部反向代理负责 HTTPS 时设为 `1`（`true/yes/on` 同义）；**当前仅 HTTP 阶段保持关闭**（不设置或 `0`），否则浏览器丢弃 Cookie、直接登录不上 |
 
 两项都写在 `deploy/daimonkey.service` 的 `[Service]` 段 `Environment=` 上；模板里已留**注释示例**（当前 HTTP 阶段不启用）：
 
 ```ini
-Environment=DM_SITE_URL=https://your-domain
-Environment=DM_SECURE_COOKIES=1
+Environment=DM_SITE_URL=http://106.12.30.116:8080
+# 仅外部反向代理负责 HTTPS 时需要，当前仅 HTTP 不启用：
+# Environment=DM_SECURE_COOKIES=1
 ```
 
 - `DM_SITE_URL` 在**构建期**读取：改后要重新 `--build`（或全量更新），dist 里的 canonical/sitemap/robots 才会更新；
@@ -316,6 +317,6 @@ Environment=DM_SECURE_COOKIES=1
 验收（在安装目录下）：
 
 ```bash
-grep -o 'Sitemap: .*' dist/robots.txt            # 应为 DM_SITE_URL 的域名，不应出现 <host>
+grep -o 'Sitemap: .*' dist/robots.txt            # 应为 DM_SITE_URL 的站点基址，不应出现 <host>
 grep -i 'DM_SITE_URL 未设置' dist/robots.txt dist/sitemap.xml   # 应无输出（有输出=仍在使用占位）
 ```

@@ -26,8 +26,7 @@ CHECKS: list[tuple[str, bool]] = []
 
 # 部署防回归例外：这两份文档分别记录历史问题示例与当前服务器交接信息，
 # 属于说明性文本，不参与运行路径解析。
-HARDCODE_ALLOW = {"docs/PLAN-deploy.md", "docs/HANDOVER.md",
-                  "docs/domain-and-https.md"}
+HARDCODE_ALLOW = {"docs/PLAN-deploy.md", "docs/HANDOVER.md"}
 # 拆开拼接，避免本文件自身命中检查
 HARDCODE_NEEDLE = "/home/" + "daimonkey"
 TEXT_SUFFIXES = {".py", ".sh", ".md", ".html", ".js", ".cjs", ".css",

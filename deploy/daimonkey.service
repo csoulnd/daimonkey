@@ -19,11 +19,12 @@ Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 # 站点基址与安全 Cookie（见 docs/deploy.md §13）：
 # - DM_SITE_URL：canonical / sitemap.xml / robots.txt 的站点基址，生产必须设置；
-#   未设置时这些产物会带 http://<host> 占位，仅供自测。
-# - DM_SECURE_COOKIES=1：HTTPS 部署后开启，给登录/会话 Cookie 加 Secure。
-# 当前是明文 HTTP 阶段，两行都保持注释；切 HTTPS 后取消注释并重跑 bootstrap
-# （或改 /etc/systemd/system/ 副本后 daemon-reload + restart）。
-# Environment=DM_SITE_URL=https://your-domain
+#   本站直接用公网 IP（示例见下一行）；未设置时产物用 http://<host> 占位，仅供自测。
+# - DM_SECURE_COOKIES=1：仅在外部反向代理负责 HTTPS 时启用；当前站点仅 HTTP（8080），
+#   保持注释，否则浏览器会丢弃 Cookie、直接登录不上。
+# 两行都保持注释；需要时改 /etc/systemd/system/ 副本后 daemon-reload + restart
+# （或改模板后重跑 bootstrap）。
+# Environment=DM_SITE_URL=http://106.12.30.116:8080
 # Environment=DM_SECURE_COOKIES=1
 # 安全选项取舍（刻意保持最小改动，勿贸然加沙箱）：
 # - 不加 NoNewPrivileges=yes：agent 需要 `sudo -n /usr/local/bin/daimonkey-restart`，
