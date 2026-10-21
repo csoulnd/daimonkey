@@ -36,7 +36,7 @@ description: NV 硬件方向专家。适用场景:MLPerf Inference 结果接入�
 ## runbook
 
 ```bash
-cd /home/daimonkey
+cd <安装目录>
 .venv/bin/python -m unittest tests.test_mlperf -v      # 源单测（解析/归一/同步/缓存）
 .venv/bin/python -m collector --update                 # 全量：采集 → 评分 → 建站
 .venv/bin/python scripts/verify.py                     # 2e2 节校验 NV 榜

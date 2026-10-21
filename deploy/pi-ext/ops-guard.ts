@@ -354,6 +354,14 @@ function audit(entry: Record<string, unknown>): void {
   }
 }
 
+function summarizeInput(tool: string, input: unknown): string {
+  if (!input || typeof input !== "object") return brief(input, 600);
+  const obj = input as Record<string, unknown>;
+  if (tool === "bash") return `命令：${brief(obj.command, 600)}`;
+  if (obj.path) return `路径：${brief(obj.path, 300)}`;
+  return brief(input, 600);
+}
+
 function brief(value: unknown, limit = 300): string {
   let text: string;
   if (typeof value === "string") text = value;
@@ -441,8 +449,8 @@ export default function (pi: ExtensionAPI): void {
         return { block: true, reason: "需要人工审批，但当前会话没有审批界面（fail-closed）" };
       }
       const allowed = await ctx.ui.confirm(
-        `允许 ${event.toolName} 操作？`,
-        `${reason}\n${brief((event as { input?: unknown }).input, 800)}`,
+        `需要确认：${event.toolName}`,
+        `${summarizeInput(event.toolName, (event as { input?: unknown }).input)}\n原因：${reason}`,
       );
       if (!allowed) {
         audit({ ...base, decision: "denied", reason });

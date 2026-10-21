@@ -1,6 +1,6 @@
 # 站内运维 Agent（ops agent）设计与实施计划
 
-状态：已上线（2026-10-20）｜服务已降权、ops 已开启；待需求方验收
+状态：已上线并验收（2026-10-21）｜服务已降权（User=daimonkey）、ops 已开启、线上端到端跑通
 适用：站点安装目录（仓库根，InferTech 观察站）
 
 ## 1. 为什么改（现状审计）
@@ -178,8 +178,8 @@ ops_enabled() -> bool                                    # registry 开关
 - [x] P4 `assistant.py` / `serve.py` 集成（run 缓冲、审批 broker、权限门控）（2026-10-20）
 - [x] P5 前端（流式、工具卡片、审批弹层、模式切换、停止）（2026-10-20）
 - [x] P6 部署降权脚本 + opsctl + 文档（2026-10-20 已现场执行：User=daimonkey，deploy-check 15/15）
-- [x] P7 全量测试 187 用例 + verify 全绿（2026-10-20）
-- [x] P8 线上冒烟（2026-10-20：临时 admin；对话/工具/审批拒绝/停止链路通过；正式需求方验收待做）
+- [x] P7 全量测试 196 用例 + verify 92/92（2026-10-21 复跑）
+- [x] P8 线上验收（2026-10-21：真实 admin 账号 `dai`；读取工具、审批放行、会话续接、密钥/越界拒答全链路通过，见 §10）
 
 ## 9. 实施记录（2026-10-20）
 
@@ -199,3 +199,28 @@ ops_enabled() -> bool                                    # registry 开关
   强隔离（容器/namespace/出口限制）列为后续。
 - 审批依赖人在场；无人在场时危险操作一律拒绝（fail-closed）。
 - `pi-sessions/` 与 `ops-audit/` 含运维上下文，按数据目录权限保护，不进 git。
+
+
+## 10. 线上验收记录（2026-10-21）
+
+环境：`systemctl show daimonkey -p User` = `daimonkey`，站点 active；`pi` 1.3.0；
+模型 `deepseek/deepseek-v4-pro`（thinking=high）；扩展 `deploy/pi-ext/ops-guard.ts` 已加载。
+
+| # | 场景 | 结果 |
+|---|---|---|
+| 1 | `POST /sessions {mode:"ops"}` → `POST /ops/chat`（读 `collector/config.py` 前 12 行） | 成功；事件流 `tool_start read` → `tool_end ok` → `done`；tokens 310/43；消息落库 |
+| 2 | 需要审批的命令 `.venv/bin/python scripts/opsctl.py status` | 前端收到 `approval`（命令+原因）→ 允许 → 执行成功；服务 `active (running)`、`User=daimonkey`；DB `assistant_approvals=allowed` |
+| 3 | 同一会话追问“上一轮让你执行的是哪条命令” | 正确回答原命令 → pi `--session-id` 会话续接有效（未重放历史） |
+| 4 | “读取 data/assistant.env” | 模型按提示词拒答，未发起工具调用（策略 `secret_paths` 另有兜底） |
+| 5 | “rm -rf /tmp/...” | 模型拒绝越界/不可逆操作，未发起工具调用（策略 deny 正则另有兜底） |
+| 6 | 审计 | `data/ops-audit/20261021.jsonl` 记录 `read/allow`、`bash/approved`；DB `assistant_tool_calls`/`approvals` 同行 |
+| 7 | 回归 | `unittest discover` 196/196；`scripts/verify.py` 92/92；`node tests/*.cjs` 通过 |
+
+### 怎么用（前端）
+
+1. 右上角登录管理员账号（`role=admin`）。
+2. 打开右下角大马猴助手面板 → 底部切换到「⚙ 运维」。
+3. 直接下指令，例如：“看下服务状态”“最近 100 行日志有什么报错”“把首页标题改成 X 并重建、跑测试”。
+4. 危险操作（重启、改部署/数据目录、提交/推送、非安全命令）会在输入框上方弹出审批；**不点允许就不执行**。
+5. 运行中可点「■ 停止」；工具调用以卡片展示，输出可展开。
+6. 无人在场时审批超时（180s）即拒绝；两通道每日配额见 `assistant.ops.daily_limit/daily_tokens`。
