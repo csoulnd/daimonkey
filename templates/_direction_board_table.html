@@ -46,6 +46,10 @@
         <td class="rank{% if it.rank <= 3 %} top{% endif %}">{{ it.rank }}</td>
         {% elif col.type in ('metric', 'hw') %}
         <td class="num">{{ bcell(c, col) }}</td>
+        {% elif col.type == 'doc' %}
+        <td class="doc-link">{{ bcell(c, col) }}</td>
+        {% elif col.type == 'precision' %}
+        <td class="lowp">{{ bcell(c, col) }}</td>
         {% else %}
         <td>{{ bcell(c, col) }}</td>
         {% endif %}

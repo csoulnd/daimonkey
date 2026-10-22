@@ -44,6 +44,21 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 数值列表头保持单行，避免长标签在窄列里竖排。 */
+.board-table th.num {
+  white-space: nowrap;
+}
+
+/* 文档列链接与低精度列不折行；表格变宽时交给容器横向滚动。 */
+.board-table td.doc-link,
+.board-table td.doc-link a {
+  white-space: nowrap;
+}
+
+.board-table td.lowp {
+  white-space: nowrap;
+}
+
 .board-table td.num .sv {
   display: inline-flex;
   justify-content: flex-end;
@@ -64,5 +79,12 @@
 @media (max-width: 880px) {
   .board-table {
     min-width: 680px;
+  }
+
+  /* 窄屏保留列宽与文字完整性，不压缩单元格，改为容器横向滚动。 */
+  .tbl-scroll.board-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
