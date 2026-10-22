@@ -4,8 +4,24 @@ from __future__ import annotations
 import json
 
 from . import db
-from .config import normalize_board_tags, registry
+from .config import normalize_board_tags, now_iso, registry
 from .scoring import board_members, load_latest_metrics, weighted_coverage
+
+# 硬件天梯（`/rankings/nv_infer` 页面与 `/api/v1/hardware/ladder.json` 共用）：
+# 成员 = board_tags 命中该榜且 active 的产品；按 FP16 稠密算力降序，缺值最后。
+# 页面与 API 都只调用 `hardware_ladder()`，不得再复制一份成员/排序逻辑。
+LADDER_BOARD = "nv_infer"
+LADDER_NUMERIC_FIELDS = (
+    "fp16_tflops", "fp8_tflops", "int8_tops", "bf16_tflops",
+    "hbm_gb", "hbm_bw_gbs", "interconnect_bw_gbs", "tdp_w",
+)
+# 规格口径 API 的固定字段与顺序（export 只做投影，不再重排/重算）。
+LADDER_API_FIELDS = (
+    "rank", "slug", "name", "vendor",
+    "fp16_tflops", "fp8_tflops", "int8_tops", "bf16_tflops",
+    "lowp_label", "hbm_gb", "hbm_bw_gbs", "interconnect",
+    "interconnect_bw_gbs", "tdp_w", "official_docs", "product_url",
+)
 
 
 def boards_order(include_hidden: bool = False) -> list[str]:
@@ -218,33 +234,126 @@ def _column_cell(col: dict, product: dict, metrics: dict, spec: dict | None) -> 
     return None
 
 
+def _is_spec_board(cfg: dict) -> bool:
+    """榜单是否以规格列为主口径（硬件天梯）：由 registry 列类型推导，不硬编码榜名。"""
+    return any(col.get("type") == "hw" for col in (cfg.get("columns") or []))
+
+
+def _hw_spec_for(product: dict) -> dict | None:
+    """产品 → hw_specs.json 条目；规格表损坏时降级 None（页面照常出榜）。"""
+    try:
+        from . import hw as hwlib
+        return hwlib.by_model(str(product.get("name") or ""))
+    except Exception:  # pragma: no cover - 规格文件损坏时仍应能出榜
+        return None
+
+
+def _ladder_num(value):
+    """规格数值：只有数字才返回，None/空串一律 None，不用 0 占位。"""
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def _num_text(value) -> str:
+    f = float(value)
+    return str(int(f)) if f.is_integer() else f"{f:g}"
+
+
+def _ladder_row(product: dict, spec: dict | None) -> dict:
+    """单张加速卡的天梯行（页面与 API 共用的唯一行结构）。"""
+    spec = spec or {}
+    values = {key: _ladder_num(spec.get(key)) for key in LADDER_NUMERIC_FIELDS}
+    interconnect = spec.get("interconnect")
+    if not isinstance(interconnect, str) or not interconnect.strip():
+        interconnect = None
+    lowp = []
+    if values["fp8_tflops"] is not None:
+        lowp.append(f"FP8 {_num_text(values['fp8_tflops'])}")
+    if values["int8_tops"] is not None:
+        lowp.append(f"INT8 {_num_text(values['int8_tops'])} TOPS")
+    if values["bf16_tflops"] is not None:
+        lowp.append(f"BF16 {_num_text(values['bf16_tflops'])}")
+    docs = [{"title": str(d.get("title") or ""), "url": d.get("url")}
+            for d in (spec.get("official_docs") or [])
+            if isinstance(d, dict) and d.get("url")]
+    return {
+        "rank": None,
+        "slug": product.get("slug"),
+        "name": product.get("name"),
+        "vendor": product.get("vendor"),
+        **values,
+        "lowp_label": " · ".join(lowp) or None,
+        "interconnect": interconnect,
+        "official_docs": docs,
+        "product_url": f"/product/{product.get('slug')}",
+        "hw_spec": spec,
+    }
+
+
+def hardware_ladder(c, board: str = LADDER_BOARD,
+                    products: list[dict] | None = None) -> dict:
+    """硬件天梯行（`/rankings/nv_infer` 页面与规格 API 共用的唯一数据源）。
+
+    成员：`board_tags` 含 board 且 active 的产品；排序：fp16_tflops 降序，
+    缺值最后，并列按名称升序（与旧页面口径一致）。返回 {meta, items}；
+    items 保留完整 `hw_spec` 供页面渲染，API 导出按 LADDER_API_FIELDS 投影。
+    """
+    from . import hw as hwlib
+
+    cfg = registry()["boards"].get(board, {})
+    products = all_products(c) if products is None else products
+    rows = [_ladder_row(p, _hw_spec_for(p))
+            for p in _display_members(products, board)]
+    rows.sort(key=lambda row: (row["fp16_tflops"] is None,
+                               -(row["fp16_tflops"] or 0.0),
+                               str(row.get("name") or "")))
+    for i, row in enumerate(rows, 1):
+        row["rank"] = i
+    return {
+        "meta": {
+            "generated_at": now_iso(),
+            "criteria": cfg.get("criteria") or "",
+            "total": len(rows),
+            "specs_updated_at": hwlib.updated_at(),
+            "source": "collector/hw_specs.json + MLPerf 成员",
+        },
+        "items": rows,
+    }
+
+
 def display_board_items(c, board: str, products: list[dict], latest: dict) -> dict:
     """榜单页数据层：配置化列 + 数据层排序 + 稳定名次。
 
-    返回 {rows, columns, sort_note, criteria, subtitle, snapshot_date?}。
-    不读取 rankings.rank（旧算法分口径已不在页面展示），而是按 registry
-    的 sort.keys 用原始指标重新排序。
+    硬件天梯（含 hw 列）的成员与顺序直接取 `hardware_ladder()`，与规格 API
+    同源；其余榜单仍走 registry.sort.keys。返回
+    {rows, columns, sort_note, criteria, subtitle, snapshot_date?}。
     """
     cfg = registry()["boards"].get(board, {})
     columns = [dict(c) for c in (cfg.get("columns") or [])]
-    ranked_ids = {r[0] for r in c.execute(
-        "SELECT DISTINCT product_id FROM rankings WHERE board=?", (board,))}
-    members = _display_members(products, board, ranked_ids)
-    try:
-        from . import hw as hwlib
-    except Exception:  # pragma: no cover - 规格文件损坏时仍应能出榜
-        hwlib = None
+    ladder = None
+    if _is_spec_board(cfg):
+        try:
+            ladder = hardware_ladder(c, board, products=products)
+        except Exception:  # pragma: no cover - 规格表异常时退回通用渲染
+            ladder = None
+    ladder_rank: dict[str, int] = {}
+    ladder_spec: dict[str, dict | None] = {}
+    if ladder is not None:
+        by_slug = {p["slug"]: p for p in products}
+        members = [by_slug[it["slug"]] for it in ladder["items"]
+                   if it["slug"] in by_slug]
+        ladder_rank = {it["slug"]: it["rank"] for it in ladder["items"]}
+        ladder_spec = {it["slug"]: it.get("hw_spec") for it in ladder["items"]}
+    else:
+        ranked_ids = {r[0] for r in c.execute(
+            "SELECT DISTINCT product_id FROM rankings WHERE board=?", (board,))}
+        members = _display_members(products, board, ranked_ids)
     rows: list[dict] = []
     for product in members:
         pm = latest.get(product["id"], {})
         metrics = metric_details(pm)
         metrics.update(derived_metrics(metrics))
-        spec = None
-        if hwlib is not None:
-            try:
-                spec = hwlib.by_model(str(product.get("name") or ""))
-            except Exception:
-                spec = None
+        spec = (ladder_spec.get(product["slug"]) if ladder is not None
+                else _hw_spec_for(product))
         metric_values = {k: v.get("value") for k, v in metrics.items()}
         # 硬件列的值来自规格表：并入排序值，才能按 FP16 等规格列排序。
         for col in columns:
@@ -265,11 +374,14 @@ def display_board_items(c, board: str, products: list[dict], latest: dict) -> di
         item["cells"] = {col.get("key"): _column_cell(col, product, metrics, spec)
                          for col in columns}
         rows.append(item)
-    rows = sort_items_for_board(rows, board)
+    if ladder is None:
+        rows = sort_items_for_board(rows, board)
+    else:
+        rows.sort(key=lambda it: ladder_rank[it["slug"]])
     for i, item in enumerate(rows, 1):
-        item["rank"] = i
+        item["rank"] = ladder_rank.get(item["slug"], i)
         if "rank" in item["cells"]:
-            item["cells"]["rank"] = i
+            item["cells"]["rank"] = item["rank"]
     sort_keys = board_sort_keys(board)
     primary_key = sort_keys[0].get("metric") if sort_keys else None
     primary_col = next((c for c in columns if c.get("key") == primary_key), None)

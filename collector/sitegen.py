@@ -218,13 +218,12 @@ def _product_charts(detail: dict, reg: dict) -> tuple[dict, dict, dict]:
 
 
 def _hw_updated() -> str:
-    """规格表数据更新时间（hw.load() 只返回 specs，updated_at 从 JSON 读）。"""
+    """规格表数据更新时间（解析逻辑统一在 hw.updated_at()）。"""
     try:
-        raw = json.loads(Path(hw.SPEC_PATH).read_text(encoding="utf-8"))
+        return hw.updated_at()
     except Exception:
         log.exception("[sitegen] 读取硬件规格表 updated_at 失败")
         return ""
-    return str(raw.get("updated_at") or "") if isinstance(raw, dict) else ""
 
 
 def _hw_bars(specs: list[dict], labels: dict,

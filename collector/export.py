@@ -99,6 +99,16 @@ def export_all() -> None:
                 "series": queries.history_series(c, "harness_core", 90),
             })
 
+        # ---- hardware/ladder.json（硬件天梯 · 规格口径） ----
+        # 独立于 /rankings/* 契约：成员/排序与 /rankings/nv_infer 页面同源
+        # （queries.hardware_ladder），这里只按固定字段投影，不重算。
+        ladder = queries.hardware_ladder(c)
+        _jwrite(api / "hardware" / "ladder.json", {
+            "meta": ladder["meta"],
+            "items": [{key: item.get(key) for key in queries.LADDER_API_FIELDS}
+                      for item in ladder["items"]],
+        })
+
         # ---- products/{slug}.json ----
         news_idx = queries.news_by_product(c, limit_per_product=5)
         for p in products:

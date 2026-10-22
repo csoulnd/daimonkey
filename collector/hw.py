@@ -304,6 +304,15 @@ def load() -> list[dict]:
     return specs
 
 
+def updated_at() -> str:
+    """规格表顶层 `updated_at`（YYYY-MM-DD）；读不到时返回空串，不打断调用方。"""
+    try:
+        data = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    return str(data.get("updated_at") or "") if isinstance(data, dict) else ""
+
+
 def _alias_index(specs: list[dict]) -> list[tuple[str, set[str], dict]]:
     """(归一别名, 别名分词, 规格对象)；型号、厂商+型号、系列+型号都参与匹配。"""
     index: list[tuple[str, set[str], dict]] = []
@@ -367,5 +376,6 @@ __all__ = [
     "load",
     "by_model",
     "field_labels",
+    "updated_at",
     "validate",
 ]

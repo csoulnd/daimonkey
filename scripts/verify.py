@@ -158,6 +158,7 @@ def main() -> int:
              "/api/v1/rankings/harness_core.json",
              "/api/v1/rankings/harness_eco.json",
              "/api/v1/rankings/model.json", "/api/v1/rankings/nv_infer.json",
+             "/api/v1/hardware/ladder.json",
              "/api/v1/meta.json", "/api/v1/news.json"]
     for p in paths:
         try:
@@ -410,6 +411,49 @@ def main() -> int:
         check("MLPerf 源健康可达", meta_src.get("mlperf", {}).get("reachable") == 1)
     except Exception as e:
         check(f"NV 硬件天梯检查 ({e})", False)
+
+    print("== 2e3. 硬件天梯规格 API（独立于 rankings 契约） ==")
+    try:
+        ladder = json.load(get(base + "/api/v1/hardware/ladder.json"))
+        lmeta, litems = ladder["meta"], ladder["items"]
+        page_rows = len(re.findall(r'<td class="rank(?: top)?">', nv_page))
+        check(f"硬件天梯 {len(litems)} 行与页面一致（页面 {page_rows} 行）",
+              bool(litems) and len(litems) == page_rows)
+        check(f"硬件天梯 meta.total 与行数一致（{lmeta.get('total')}）",
+              lmeta.get("total") == len(litems))
+        check(f"硬件天梯 16 行（当前 {len(litems)} 行）", len(litems) == 16)
+        fp16 = [it.get("fp16_tflops") for it in litems]
+        valid = [v for v in fp16 if v is not None]
+        check("硬件天梯首行 FP16 为最大值",
+              bool(valid) and fp16[0] == max(valid))
+        check("硬件天梯按 FP16 降序、缺值排最后",
+              fp16[:len(valid)] == sorted(valid, reverse=True)
+              and all(v is None for v in fp16[len(valid):]))
+        check("硬件天梯名次连续且从 1 开始",
+              [it.get("rank") for it in litems] == list(range(1, len(litems) + 1)))
+        check("硬件天梯含 Atlas 300I A2",
+              any(it.get("name") == "Atlas 300I A2" for it in litems))
+        check("硬件天梯 official_docs URL 以 http 开头",
+              any(it.get("official_docs") for it in litems)
+              and all(d.get("url", "").startswith("http")
+                      for it in litems for d in (it.get("official_docs") or [])))
+        numeric = ("fp16_tflops", "fp8_tflops", "int8_tops", "bf16_tflops",
+                   "hbm_gb", "hbm_bw_gbs", "interconnect_bw_gbs", "tdp_w")
+        check("硬件天梯无值字段为 null（无 0/— 占位）",
+              all(it.get(k) is None or isinstance(it.get(k), (int, float))
+                  for it in litems for k in numeric)
+              and all(it.get("lowp_label") is None or isinstance(
+                  it.get("lowp_label"), str) for it in litems))
+        gz = ROOT / "dist" / "api" / "v1" / "hardware" / "ladder.json.gz"
+        check("硬件天梯 .json.gz 预压缩存在", gz.is_file())
+        req = urllib.request.Request(
+            base + "/api/v1/hardware/ladder.json",
+            headers={"Accept-Encoding": "gzip"})
+        gzr = urllib.request.urlopen(req, timeout=10)
+        check("硬件天梯响应 Content-Encoding: gzip",
+              gzr.headers.get("Content-Encoding") == "gzip")
+    except Exception as e:
+        check(f"硬件天梯规格 API 检查 ({e})", False)
 
     print("== 2f. 方向周总结与方向周报 ==")
     for key in ("harness", "fm"):

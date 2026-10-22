@@ -12,6 +12,7 @@
     <tr><td><code>GET /api/v1/boards.json</code></td><td>榜单目录（产品数、观察区数、快照日期）</td></tr>
     <tr><td><code>GET /api/v1/rankings/{board}.json</code></td><td>某榜最新快照。board ∈ harness_core / harness_eco / model / domestic / domestic_app；<code>unified</code> 为已并入核心榜的只读兼容别名。指标带 tier / source / collected_at / raw_payload_id；meta 含配置与实际生效权重</td></tr>
     <tr><td><code>GET /api/v1/rankings/{board}/history.json</code></td><td>近 90 天榜单历史序列</td></tr>
+    <tr><td><code>GET /api/v1/hardware/ladder.json</code></td><td>硬件天梯（FP16 算力/低精度/显存/带宽/官方文档，规格口径）</td></tr>
     <tr><td><code>GET /api/v1/products/{slug}.json</code></td><td>产品详情：信息、接入适配度、指标时序（含每点的溯源 id）</td></tr>
     <tr><td><code>GET /api/v1/raw/{payload_id}.json</code></td><td>原始 HTTP 响应归档（响应体按 LRU 清理后 raw_body 为 null，元数据与 sha256 永在）</td></tr>
     <tr><td><code>GET /api/v1/insights.json</code></td><td>领域进展列表（预留）</td></tr>
