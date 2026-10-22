@@ -225,10 +225,12 @@ def main() -> int:
         check(f"/dir/{key} 本周要点卡与周总结入口",
               "本周要点" in board_html and f"/dir/{key}/digest" in board_html)
     nv = page(base + "/dir/nv")
-    check("NV 推理性能榜已上线", "推理性能榜" in nv and "建设中" not in nv)
-    check("NV 榜含 MLPerf 榜首与来源标注",
-          "NVIDIA GB300" in nv and "MLPerf" in nv and "src-tag s-mlperf" in nv)
-    check("NV 榜数字带溯源链接", bool(re.search(r'/raw/\d+', nv)))
+    check("NV 硬件天梯已上线", "硬件天梯" in nv and "建设中" not in nv)
+    check("NV 榜含 MLPerf 头部卡",
+          "NVIDIA GB300" in nv and "NVIDIA Vera Rubin" in nv)
+    check("NV 榜官方文档可点",
+          bool(re.search(r'href="https://[^"]+" target="_blank" rel="noopener">官方文档</a>',
+                         nv)))
     check("导航三方向入口", all(f'href="/dir/{k}"' in home
                                 for k in ("harness", "fm", "nv")))
     harness_html = page(base + "/dir/harness")
@@ -238,19 +240,35 @@ def main() -> int:
     print("== 2b2. 榜单列与数据层排序 ==")
     fm_channel = page(base + "/dir/fm")
     nv_channel = page(base + "/dir/nv")
-    harness_labels = ("类型", "GitHub Stars", "30 天提交", "npm 月下载",
-                      "VS Code 安装", "商店排名")
+    harness_labels = ("类型", "GitHub Stars", "30 天提交", "下载量")
     fm_labels = ("厂商", "AA 智能指数", "编码指数", "Agent 指数")
-    nv_labels = ("gpt-oss-120b Offline (Tokens/s)", "DeepSeek R1",
-                 "Llama 3.1 8B", "FP16 TFLOPS", "显存 GB", "显存带宽 GB/s",
-                 "互联", "TDP W", "官方文档")
+    nv_labels = ("加速卡", "FP16 算力 (TFLOPS)", "低精度支持", "显存 (GB)",
+                 "显存带宽 (GB/s)", "官方文档")
     check("Harness 配置化新列", all(x in harness_html for x in harness_labels))
+    check("Harness 已移除 npm/VS Code/商店列",
+          not any(f">{x}</th>" in harness_html
+                  for x in ("npm 月下载", "VS Code 安装", "商店排名")))
     check("Harness 排序规则", harness_html.count(
-        "GitHub Stars 优先；无仓库产品按 npm 下载 / 商店排名列后") >= 2)
+        "GitHub Stars 优先；无仓库产品按下载量列后") >= 2)
+    check("Harness 下载量带聚合构成 title",
+          "下载量 = npm 月下载 " in harness_html
+          and bool(re.search(r'title="下载量 = npm 月下载 [0-9,]+', harness_html)))
     check("FM 配置化新列", all(x in fm_channel for x in fm_labels))
     check("FM 评判标准", "评判标准：AA Intelligence Index" in fm_channel)
     check("NV 配置化新列", all(x in nv_channel for x in nv_labels))
-    check("NV 评判标准", "评判标准：MLPerf Inference 官方 Closed 分区，单卡离线吞吐"
+    nv_head = re.search(
+        r'<table class="tbl board-table[^"]*">\s*<thead>\s*<tr>(.*?)</tr>',
+        nv_channel, re.S)
+    nv_headers = re.findall(r"<th[^>]*>(.*?)</th>", nv_head.group(1),
+                            re.S) if nv_head else []
+    nv_headers = [re.sub(r"<[^>]+>", "", h).strip() for h in nv_headers]
+    check("NV 表头为 8 列", nv_headers == [
+        "#", "加速卡", "厂商", "FP16 算力 (TFLOPS)", "低精度支持",
+        "显存 (GB)", "显存带宽 (GB/s)", "官方文档"])
+    check("NV 不再展示 MLPerf 吞吐列",
+          not any(x in nv_channel for x in ("gpt-oss-120b Offline", "DeepSeek R1",
+                                            "Llama 3.1 8B")))
+    check("NV 评判标准", "按 FP16 稠密算力排序；低精度与规格为厂商公开数据"
           in nv_channel)
     domestic_ok = all(
         re.search(r'<table class="tbl board-table[^"]*">\s*<thead>\s*<tr>\s*<th>',
@@ -267,8 +285,8 @@ def main() -> int:
           first(harness_page) == "OpenClaw")
     check(f"FM 按 AA 智能指数排序（首行 {first(model_page)}）",
           first(model_page) == "Claude Opus 5.5 (Max)")
-    check(f"NV 按 gpt-oss 吞吐排序（首行 {first(nv_page)}）",
-          first(nv_page) == "NVIDIA GB300")
+    check(f"NV 按 FP16 算力排序（首行 {first(nv_page)}）",
+          first(nv_page) == "AMD Instinct MI355X 288GB HBM3e")
 
     print("== 2b3. 旧口径已从页面移除 ==")
     old_patterns = {
@@ -350,25 +368,25 @@ def main() -> int:
     except Exception as e:
         check(f"AA 总评分检查 ({e})", False)
 
-    print("== 2e2. NV 推理性能榜(MLPerf) ==")
+    print("== 2e2. NV 硬件天梯(MLPerf 自动入池 + 厂商手录) ==")
     try:
         nv_api = json.load(get(base + "/api/v1/rankings/nv_infer.json"))
         items = nv_api["items"]
-        check(f"NV 榜入池加速卡（{len(items)} 张）", len(items) >= 8)
-        check("NV 榜成员均为 MLPerf 自动入池",
-              all(it.get("origin") == "mlperf" and it.get("status") == "active"
-                  for it in items))
-        check("NV 榜排序口径为 gpt-oss-120b 单卡吞吐",
-              "按 gpt-oss-120b Offline 单卡吞吐从高到低排序" in nv_page)
+        check(f"NV 榜快照入池加速卡（{len(items)} 张）", len(items) >= 8)
+        check("NV 榜快照仍保留 MLPerf 自动入池卡",
+              items and all(it.get("origin") == "mlperf"
+                            and it.get("status") == "active" for it in items))
+        check("NV 榜排序口径为 FP16 稠密算力",
+              "按 FP16 稠密算力从高到低排序" in nv_page)
         primary = [it for it in items
                    if it["metrics"].get("mlperf_gptoss_120b")]
-        check("NV 榜主指标覆盖 ≥8 张卡", len(primary) >= 8)
+        check("MLPerf 吞吐仍在库/API 留档", len(primary) >= 8)
         if primary:
             top = primary[0]
-            check("NV 榜首为 GB300 且单卡吞吐 ≥10000 Tokens/s",
+            check("NV MLPerf 头部为 GB300 且吞吐 ≥10000 Tokens/s",
                   top["name"] == "NVIDIA GB300"
                   and top["metrics"]["mlperf_gptoss_120b"]["value"] >= 10000)
-            check("NV 数值带来源与溯源",
+            check("MLPerf 数值带来源与溯源",
                   all(it["metrics"]["mlperf_gptoss_120b"].get("raw_payload_id")
                       and it["metrics"]["mlperf_gptoss_120b"]["source"]["key"] == "mlperf"
                       for it in primary))
@@ -377,11 +395,21 @@ def main() -> int:
             extracted = {x["metric_key"] for x in raw["extracted"]}
             check("MLPerf raw 归档可回放", raw["raw_body"] is not None
                   and any(k.startswith("mlperf_") for k in extracted))
+        check("NV 页面含昇腾官网最新型号",
+              "Atlas 300I A2" in nv_page and "Atlas 300I Pro" in nv_page)
+        row = re.search(
+            r'<a href="/product/atlas-300i-a2">.*?</tr>', nv_page, re.S)
+        check("昇腾 A2 的 FP16/显存/带宽/低精度有值",
+              bool(row) and all(x in row.group(0)
+                                for x in ("280", "64", "1600", "560 TOPS")))
+        check("昇腾 A2 官方文档可点",
+              bool(row) and 'href="https://e.huawei.com' in row.group(0)
+              and "官方文档" in row.group(0))
         meta_src = {s["key"]: s for s in json.load(
             get(base + "/api/v1/meta.json"))["sources"]}
         check("MLPerf 源健康可达", meta_src.get("mlperf", {}).get("reachable") == 1)
     except Exception as e:
-        check(f"NV 推理榜检查 ({e})", False)
+        check(f"NV 硬件天梯检查 ({e})", False)
 
     print("== 2f. 方向周总结与方向周报 ==")
     for key in ("harness", "fm"):

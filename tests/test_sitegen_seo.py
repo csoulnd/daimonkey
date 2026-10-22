@@ -135,7 +135,7 @@ class TestSeoMeta(unittest.TestCase):
                           "path": "/dir/nv"})
         self.assertIn("硬件频道", meta["title"])
         self.assertEqual(meta["canonical"], "https://example.com/dir/nv")
-        self.assertIn("推理性能榜", meta["description"])
+        self.assertIn("硬件天梯", meta["description"])
 
         meta, jsonld = sitegen._seo_meta_for(
             "news", {**base_common(), "direction": nv, "week": "2026-W42",
@@ -227,6 +227,43 @@ class TestRenderInjection(unittest.TestCase):
         self.assertNotIn("DEFAULT-FALLBACK-DESCRIPTION", html)
         self.assertLess(len(html), 120_000, "产品页 HTML 应保持 < 120KB")
 
+    def test_nv_board_table_is_fp16_ladder(self):
+        reg = registry()
+        nv = {"key": "nv", **reg["directions"]["nv"]}
+        cols = reg["boards"]["nv_infer"]["columns"]
+        cells = {
+            "rank": 1,
+            "product": {"slug": "atlas-300i-a2", "name": "Atlas 300I A2",
+                        "vendor": "华为", "status": "active"},
+            "vendor": {"value": "华为"},
+            "fp16_tflops": {"value": 280},
+            "precision": {"parts": [
+                {"label": "INT8", "unit": "TOPS", "value": 560}]},
+            "hbm_gb": {"value": 64},
+            "hbm_bw_gbs": {"value": 1600},
+            "official_docs": {"title": "华为 Atlas 300I A2 推理卡技术规格",
+                              "url": "https://e.huawei.com/cn/x"},
+        }
+        block = {"key": "nv_infer", "name": "硬件天梯",
+                 "rows": [{"rank": 1, "cells": cells}], "columns": cols,
+                 "sort_note": reg["boards"]["nv_infer"]["sort"]["note"],
+                 "criteria": reg["boards"]["nv_infer"]["criteria"],
+                 "snapshot_date": "2026-10-22"}
+        html = sitegen._render_page(
+            self.env, base_common(), self.root, "direction.html", "dir/nv.html",
+            seo_kind="direction", seo_ctx={"path": "/dir/nv"},
+            direction=nv, direction_page=True, active_tab="board",
+            direction_tabs=sitegen.direction_tabs(nv), page_label="榜单",
+            board_blocks=[block], news_meta={"last_fetched_at": "2026-10-22T00:00:00Z"},
+            news_page=False, news_rank={})
+        for label in ("加速卡", "FP16 算力 (TFLOPS)", "低精度支持", "显存 (GB)",
+                      "显存带宽 (GB/s)", "官方文档"):
+            self.assertIn(label, html)
+        self.assertIn("INT8 560 TOPS", html)
+        self.assertIn('href="https://e.huawei.com/cn/x" target="_blank"', html)
+        self.assertNotIn("gpt-oss-120b Offline", html)
+        self.assertNotIn("DeepSeek R1", html)
+
     def test_nv_direction_page_has_spec_table_and_official_links(self):
         reg = registry()
         nv = {"key": "nv", **reg["directions"]["nv"]}
@@ -248,7 +285,7 @@ class TestRenderInjection(unittest.TestCase):
         self.assertIn("数据说明", html)
         self.assertIn("已收录", html)
         self.assertIn("—", html)       # null 数值占位
-        self.assertIn("数据更新于 2026-10-21", html)
+        self.assertIn("数据更新于 2026-10-22", html)
         self.assertIn("chart-card", html)   # hw_bars 预渲染卡片
         self.assertIn("显存带宽", html)
         self.assertIn("FP16 算力", html)

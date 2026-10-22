@@ -40,6 +40,55 @@ def metric_details(pm: dict) -> dict:
     } for k, m in pm.items()}
 
 
+def _fmt_count(value) -> str:
+    """派生指标 title 里的分项数值：整数加千分位，小数保留 1 位。"""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if f.is_integer():
+        return f"{int(f):,}"
+    return f"{f:,.1f}"
+
+
+def derived_metrics(metrics: dict) -> dict:
+    """按 registry.derived_metrics 计算展示层派生指标（不写库）。
+
+    只对可用分项求和；全部缺失时返回空 dict（模板显示 —）。
+    `downloads` = npm 月下载 + VS Code 安装 + App Store 评分人数。
+    """
+    out: dict[str, dict] = {}
+    for key, cfg in (registry().get("derived_metrics") or {}).items():
+        if not isinstance(cfg, dict):
+            continue
+        labels = cfg.get("component_labels") or {}
+        parts: list[dict] = []
+        for component in cfg.get("components") or []:
+            meta = metrics.get(component) or {}
+            value = meta.get("value")
+            if value is None:
+                continue
+            parts.append({
+                "key": component,
+                "label": labels.get(component, component),
+                "value": value,
+            })
+        if not parts:
+            continue
+        total = sum(float(p["value"]) for p in parts)
+        if total.is_integer():
+            total = int(total)
+        formula = " + ".join(
+            f"{p['label']} {_fmt_count(p['value'])}" for p in parts)
+        out[key] = {
+            "value": total,
+            "unit": cfg.get("unit") or "count",
+            "title": f"{cfg.get('label') or key} = {formula}",
+            "components": parts,
+        }
+    return out
+
+
 def board_items(c, board: str, snap_date: str, latest: dict) -> list[dict]:
     rows = c.execute(
         "SELECT r.product_id, r.rank, r.heat_score, r.momentum_score, r.delta_7d,"
@@ -140,6 +189,21 @@ def _column_cell(col: dict, product: dict, metrics: dict, spec: dict | None) -> 
                 if value else None)
     if typ == "metric":
         return metrics.get(col.get("key"))
+    if typ == "derived":
+        return metrics.get(col.get("key"))
+    if typ == "precision":
+        if not spec:
+            return None
+        parts = []
+        for part in col.get("parts") or []:
+            value = spec.get(part.get("key"))
+            if value is None:
+                continue
+            parts.append({"key": part.get("key"),
+                          "label": part.get("label") or part.get("key"),
+                          "unit": part.get("unit") or "",
+                          "value": value})
+        return {"parts": parts} if parts else None
     if typ == "hw":
         if not spec:
             return None
@@ -174,19 +238,28 @@ def display_board_items(c, board: str, products: list[dict], latest: dict) -> di
     for product in members:
         pm = latest.get(product["id"], {})
         metrics = metric_details(pm)
+        metrics.update(derived_metrics(metrics))
         spec = None
         if hwlib is not None:
             try:
                 spec = hwlib.by_model(str(product.get("name") or ""))
             except Exception:
                 spec = None
+        metric_values = {k: v.get("value") for k, v in metrics.items()}
+        # 硬件列的值来自规格表：并入排序值，才能按 FP16 等规格列排序。
+        for col in columns:
+            if col.get("type") != "hw":
+                continue
+            value = (spec or {}).get(col.get("key"))
+            if value is not None:
+                metric_values.setdefault(col.get("key"), value)
         item = {
             "slug": product.get("slug"), "name": product.get("name"),
             "vendor": product.get("vendor"), "tier": product.get("tier"),
             "category": product.get("category"), "status": product.get("status"),
             "repo": product.get("repo"),
             "metrics": metrics,
-            "metric_values": {k: v.get("value") for k, v in metrics.items()},
+            "metric_values": metric_values,
             "hw_spec": spec,
         }
         item["cells"] = {col.get("key"): _column_cell(col, product, metrics, spec)
@@ -204,7 +277,12 @@ def display_board_items(c, board: str, products: list[dict], latest: dict) -> di
         item["primary_key"] = primary_key
         item["primary_label"] = (cfg.get("primary_label")
                                  or (primary_col or {}).get("label") or "")
-        item["primary"] = item["metrics"].get(primary_key)
+        primary = item["metrics"].get(primary_key)
+        if primary is None and primary_key and item.get("hw_spec"):
+            value = item["hw_spec"].get(primary_key)
+            if value is not None:
+                primary = {"value": value}
+        item["primary"] = primary
     return {
         "key": board,
         "rows": rows,

@@ -11,6 +11,10 @@
 <span class="chip">{{ c.label }}</span>
 {%- elif col.type == 'metric' -%}
 {{ m.mval(c) }}
+{%- elif col.type == 'derived' -%}
+{{ m.dval(c) }}
+{%- elif col.type == 'precision' -%}
+{% for part in c.parts %}{{ part.label }} {{ part.value | hw_num }}{% if part.unit %} {{ part.unit }}{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}
 {%- elif col.type == 'hw' -%}
 {{ m.score(c.value, 'spec') }}
 {%- elif col.type == 'text' -%}

@@ -69,6 +69,9 @@ NULLABLE_NUMERIC_FIELDS = (
 OFFICIAL_DOC_HOSTS = (
     "nvidia.com",
     "nvidia.cn",
+    "amd.com",
+    "intel.com",
+    "intel.cn",
     "cambricon.com",
     "huawei.com",
     "hiascend.com",

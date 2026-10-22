@@ -49,7 +49,8 @@ class TestLoad(HwDataCase):
         counts = {}
         for spec in self.specs:
             counts[spec["vendor"]] = counts.get(spec["vendor"], 0) + 1
-        self.assertEqual({"NVIDIA", "寒武纪", "平头哥", "华为"}, set(counts))
+        self.assertEqual({"NVIDIA", "AMD", "Intel", "寒武纪", "平头哥", "华为"},
+                         set(counts))
         for vendor, count in counts.items():
             self.assertGreaterEqual(count, 2, f"{vendor} 型号不足两个")
 
@@ -57,6 +58,22 @@ class TestLoad(HwDataCase):
         for i, spec in enumerate(self.specs):
             for field in hw.REQUIRED_FIELDS:
                 self.assertIn(field, spec, f"specs[{i}] 缺少 {field}")
+
+    def test_new_mlperf_and_ascend_models_are_specced(self):
+        by_model = {spec["model"]: spec for spec in self.specs}
+        for model in ("GB300", "GB200", "B300",
+                      "RTX PRO 6000 Blackwell Server Edition",
+                      "RTX PRO 4500 Blackwell", "Vera Rubin", "VR200",
+                      "Instinct MI355X", "Instinct MI350X", "Instinct MI350P",
+                      "Instinct MI300X", "Arc Pro B70",
+                      "Atlas 300I A2", "Atlas 300I Pro"):
+            self.assertIn(model, by_model)
+            self.assertTrue(by_model[model]["official_docs"], model)
+            self.assertTrue(by_model[model]["sources_note"], model)
+        # 未披露算力的卡保持 null，不用第三方估值补齐
+        self.assertIsNone(by_model["RTX PRO 4500 Blackwell"]["fp16_tflops"])
+        self.assertIsNone(by_model["Vera Rubin"]["fp16_tflops"])
+        self.assertIsNone(by_model["VR200"]["fp16_tflops"])
 
     def test_every_model_has_official_doc(self):
         for spec in self.specs:
@@ -157,6 +174,34 @@ class TestByModel(HwDataCase):
         # 同时命中两张卡且得分相同 → 不做猜测
         self.assertIsNone(hw.by_model("H100 H200"))
 
+    def test_mlperf_member_names_resolve(self):
+        cases = {
+            "NVIDIA GB300": "GB300",
+            "NVIDIA GB200": "GB200",
+            "AMD Instinct MI355X 288GB HBM3e": "Instinct MI355X",
+            "NVIDIA B300-SXM-270GB": "B300",
+            "AMD Instinct MI350X 288GB HBM3e": "Instinct MI350X",
+            "NVIDIA B200-SXM-180GB": "B200",
+            "AMD Instinct MI350P": "Instinct MI350P",
+            "AMD Instinct MI300X 192GB HBM3": "Instinct MI300X",
+            "NVIDIA RTX PRO 6000 Blackwell Server Edition":
+                "RTX PRO 6000 Blackwell Server Edition",
+            "Intel Arc(TM) Pro B70": "Arc Pro B70",
+            "NVIDIA H200-SXM-141GB": "H200 SXM",
+            "NVIDIA RTX PRO 4500 Blackwell": "RTX PRO 4500 Blackwell",
+            "NVIDIA Vera Rubin": "Vera Rubin",
+            "NVIDIA VR200": "VR200",
+        }
+        for name, model in cases.items():
+            hit = hw.by_model(name)
+            self.assertIsNotNone(hit, name)
+            self.assertEqual(hit["model"], model, name)
+
+    def test_ascend_official_models_resolve(self):
+        self.assertEqual(hw.by_model("Atlas 300I A2")["model"], "Atlas 300I A2")
+        self.assertEqual(hw.by_model("华为 Atlas 300I Pro")["model"],
+                         "Atlas 300I Pro")
+
     def test_returns_spec_dict(self):
         hit = hw.by_model("MLU370-S4")
         self.assertIsInstance(hit, dict)
@@ -175,11 +220,20 @@ class TestFieldLabels(HwDataCase):
     def test_units(self):
         labels = hw.field_labels()
         self.assertEqual(labels["fp16_tflops"]["unit"], "TFLOPS")
+        self.assertEqual(labels["bf16_tflops"]["unit"], "TFLOPS")
+        self.assertEqual(labels["fp8_tflops"]["unit"], "TFLOPS")
         self.assertEqual(labels["int8_tops"]["unit"], "TOPS")
         self.assertEqual(labels["hbm_gb"]["unit"], "GB")
         self.assertEqual(labels["hbm_bw_gbs"]["unit"], "GB/s")
         self.assertEqual(labels["tdp_w"]["unit"], "W")
         self.assertEqual(labels["vendor"]["label"], "厂商")
+
+    def test_precision_columns_have_chinese_labels(self):
+        labels = hw.field_labels()
+        self.assertEqual(labels["fp16_tflops"]["label"], "FP16 算力")
+        self.assertEqual(labels["bf16_tflops"]["label"], "BF16 算力")
+        self.assertEqual(labels["fp8_tflops"]["label"], "FP8 算力")
+        self.assertEqual(labels["int8_tops"]["label"], "INT8 算力")
 
     def test_returns_copy(self):
         labels = hw.field_labels()
@@ -229,12 +283,17 @@ class TestValidate(HwDataCase):
         self.assert_has_error(errors, "型号")
 
     def test_too_few_models(self):
-        errors = self.errors_after(lambda specs: specs.__delitem__(slice(0, 3)))
+        def mutate(specs):
+            specs[:] = specs[:3]
+        errors = self.errors_after(mutate)
         self.assert_has_error(errors, "至少")
 
     def test_vendor_needs_two_models(self):
-        errors = self.errors_after(
-            lambda specs: specs.__delitem__(slice(9, 10)))  # 仅剩 1 个华为型号
+        def mutate(specs):
+            huawei = [s for s in specs if s["vendor"] == "华为"]
+            for spec in huawei[1:]:
+                specs.remove(spec)
+        errors = self.errors_after(mutate)
         self.assert_has_error(errors, "华为")
 
     def test_null_number_needs_sources_note(self):

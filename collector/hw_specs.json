@@ -1,11 +1,13 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-10-21",
+  "updated_at": "2026-10-22",
   "vendor_note": {
     "PPU": "『PPU』按公开资料与出货量最主流的口径，指平头哥（T-Head，阿里巴巴）自研并行处理器（Parallel Processing Unit）『真武』系列；后摩智能等厂商也用 PPU 指代各自的存算一体架构，本表不混收，只收平头哥真武 810E / M890 / V900。三者官方均未披露算力、功耗与制程，相关字段为 null，勿按媒体估算补齐。",
-    "NVIDIA": "NVIDIA 官方产品页中带 * 的 Tensor Core 数值为稀疏（sparsity）口径；本表统一折算为 dense 值（官方稀疏值 ÷ 2），并在每条 sources_note 标注官方原始数字，便于与寒武纪/华为的标称值横向比较。",
+    "NVIDIA": "NVIDIA 官方产品页中带 * 的 Tensor Core 数值为稀疏（sparsity）口径；本表统一折算为 dense 值（官方稀疏值 ÷ 2），并在每条 sources_note 标注官方原始数字。GB300/GB200 的整机数值按 72 GPU 折算单卡，B300/GB300 的 INT8 口径异常处为 null。",
     "寒武纪": "数值取自寒武纪官网对应产品页（MLU370-X8 / MLU370-S4/S8），均为官方标称峰值；官方规格页未列 FP8，按 null 处理，不引用第三方补值。",
-    "华为": "华为官方只公开整机与单卡混合口径（Atlas 800T/800I A3、Atlas 900 A3 SuperPoD、Atlas 300I Duo）；910C 为业界通用型号，官方页面写作『昇腾910』。单卡算力按官方整机 8 卡数值折算者，均在 sources_note 说明。"
+    "华为": "华为官方只公开整机与单卡混合口径（Atlas 800T/800I A3、Atlas 900 A3 SuperPoD、Atlas 300I Duo / 300I A2 / 300I Pro）；910C 为业界通用型号，官方页面写作『昇腾910』。单卡算力按官方整卡或整机 8 卡数值折算者，均在 sources_note 说明。",
+    "AMD": "数值取自 AMD 官网对应产品页的 Peak Matrix Performance；本表采用官方 dense 口径，页面另列的 with Structured Sparsity 值不采用。MI350 系列 288GB HBM3E / 8TB/s，MI350P 为 144GB / 4TB/s 的 PCIe 卡。",
+    "Intel": "数值取自 Intel 官网（intel.cn）产品规格页；官方只披露 FP32 TFLOPS 与 INT8 峰值 TOPS，未披露 FP16/FP8/BF16 算力，相关字段为 null，不引用第三方补值。"
   },
   "specs": [
     {
@@ -69,7 +71,8 @@
         "H200 SXM5",
         "H200 141GB HBM3e",
         "NVIDIA H200 141GB HBM3e",
-        "H200"
+        "H200",
+        "NVIDIA H200-SXM-141GB"
       ],
       "release_year": 2024,
       "process": "TSMC 4N",
@@ -121,7 +124,8 @@
         "B200 SXM",
         "NVIDIA B200 192GB HBM3e",
         "B200 192GB HBM3e",
-        "Blackwell B200"
+        "Blackwell B200",
+        "NVIDIA B200-SXM-180GB"
       ],
       "release_year": 2024,
       "process": "TSMC 4NP",
@@ -492,6 +496,630 @@
         }
       ],
       "sources_note": "华为官方 Atlas 800T A3 / 800I A3 页面写『昇腾910』（业界型号 910C），给出整机 8 卡 6.0 PFLOPS FP16 / 12.0 POPS INT8、8×128GB、3.2TB/s、D2D 784GB/s；本表单卡 750 TFLOPS / 1,500 TOPS 按 8 卡折算。制程、功耗、FP8 官方未披露，填 null。"
+    },
+    {
+      "release_year": 2025,
+      "process": "TSMC 4NP",
+      "fp16_tflops": 2500,
+      "bf16_tflops": 2500,
+      "fp8_tflops": 5000,
+      "int8_tops": null,
+      "hbm_gb": 288,
+      "hbm_bw_gbs": 8000,
+      "interconnect_bw_gbs": 1800,
+      "tdp_w": null,
+      "servers": [
+        {
+          "model": "NVIDIA GB300 NVL72",
+          "status": "已收录",
+          "note": "72×GB300 + 36×Grace CPU，20TB HBM3E / 576TB/s",
+          "url": "https://www.nvidia.com/en-us/data-center/gb300-nvl72/"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "NVIDIA GB300 NVL72",
+          "status": "已收录",
+          "interconnect": "NVLink 5 / NVLink Switch",
+          "note": "72 GPU 全互联机柜级超节点",
+          "url": "https://www.nvidia.com/en-us/data-center/gb300-nvl72/"
+        }
+      ],
+      "vendor": "NVIDIA",
+      "series": "Blackwell Ultra",
+      "model": "GB300",
+      "aliases": [
+        "NVIDIA GB300",
+        "GB300 NVL72 单 GPU",
+        "Blackwell Ultra GB300",
+        "NVIDIA GB300 NVL72"
+      ],
+      "interconnect": "NVLink 5",
+      "form_factor": "SXM（GB300 NVL72 机柜级部署）",
+      "official_docs": [
+        {
+          "title": "NVIDIA GB300 NVL72 官方规格",
+          "url": "https://www.nvidia.com/en-us/data-center/gb300-nvl72/"
+        }
+      ],
+      "sources_note": "官方 GB300 NVL72 规格页：整机 72 GPU 的 FP16/BF16 360 PFLOPS、FP8/FP6 720 PFLOPS 为稀疏口径，本表 ÷2 折算 dense 并 ÷72 得单卡 FP16/BF16 2,500 TFLOPS、FP8 5,000 TFLOPS；显存 20TB、带宽 576TB/s ÷72 得约 288GB / 8TB/s（标称 288GB）；NVLink 130TB/s ÷72 ≈ 1.8TB/s。官方 INT8 写 24 POPS（整机），与同页 FP8 720 PFLOPS 口径明显不一致，未折算单卡，按 null 处理；单卡 TDP 官方未披露，null。"
+    },
+    {
+      "release_year": 2024,
+      "process": "TSMC 4NP",
+      "fp16_tflops": 2500,
+      "bf16_tflops": 2500,
+      "fp8_tflops": 5000,
+      "int8_tops": 5000,
+      "hbm_gb": 192,
+      "hbm_bw_gbs": 8000,
+      "interconnect_bw_gbs": 1800,
+      "tdp_w": null,
+      "servers": [
+        {
+          "model": "NVIDIA GB200 NVL72",
+          "status": "已收录",
+          "note": "72×Blackwell GPU + 36×Grace CPU，13.4TB HBM3E / 576TB/s",
+          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "NVIDIA GB200 NVL72",
+          "status": "已收录",
+          "interconnect": "NVLink 5 / NVLink Switch",
+          "note": "72 GPU 全互联机柜级超节点",
+          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/"
+        }
+      ],
+      "vendor": "NVIDIA",
+      "series": "Blackwell",
+      "model": "GB200",
+      "aliases": [
+        "NVIDIA GB200",
+        "GB200 NVL72 单 GPU",
+        "Blackwell GB200",
+        "NVIDIA GB200 NVL72"
+      ],
+      "interconnect": "NVLink 5",
+      "form_factor": "SXM（GB200 NVL72 机柜级部署）",
+      "official_docs": [
+        {
+          "title": "NVIDIA GB200 NVL72 官方规格",
+          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/"
+        }
+      ],
+      "sources_note": "官方 GB200 NVL72 规格页：整机 72 GPU 的 FP16/BF16 360 PFLOPS、FP8/FP6 720 PFLOPS、INT8 720 POPS 为稀疏口径，本表 ÷2 折算 dense 再 ÷72：FP16/BF16 2,500 TFLOPS、FP8 5,000 TFLOPS、INT8 5,000 TOPS；显存 13.4TB / 带宽 576TB/s ÷72 ≈ 186GB / 8TB/s（标称 192GB）；NVLink 130TB/s ÷72 ≈ 1.8TB/s。单卡 TDP 官方未披露，null。"
+    },
+    {
+      "release_year": 2025,
+      "process": "TSMC 4NP",
+      "fp16_tflops": 2500,
+      "bf16_tflops": 2500,
+      "fp8_tflops": 5000,
+      "int8_tops": null,
+      "hbm_gb": 288,
+      "hbm_bw_gbs": 8000,
+      "interconnect_bw_gbs": 1800,
+      "tdp_w": null,
+      "servers": [
+        {
+          "model": "NVIDIA GB300 NVL72（B300 GPU）",
+          "status": "已收录",
+          "note": "MLPerf 命名 B300-SXM-270GB；270GB 为可用容量口径",
+          "url": "https://www.nvidia.com/en-us/data-center/gb300-nvl72/"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "NVIDIA GB300 NVL72",
+          "status": "已收录",
+          "interconnect": "NVLink 5 / NVLink Switch",
+          "note": "72 GPU 机柜级超节点",
+          "url": "https://www.nvidia.com/en-us/data-center/gb300-nvl72/"
+        }
+      ],
+      "vendor": "NVIDIA",
+      "series": "Blackwell Ultra",
+      "model": "B300",
+      "aliases": [
+        "NVIDIA B300",
+        "NVIDIA B300-SXM-270GB",
+        "B300 SXM",
+        "Blackwell Ultra B300"
+      ],
+      "interconnect": "NVLink 5",
+      "form_factor": "SXM",
+      "official_docs": [
+        {
+          "title": "NVIDIA GB300 NVL72 官方规格（B300 GPU）",
+          "url": "https://www.nvidia.com/en-us/data-center/gb300-nvl72/"
+        }
+      ],
+      "sources_note": "Blackwell Ultra 单 GPU 规格取自官方 GB300 NVL72 页：整机 FP16/BF16 360 PFLOPS、FP8/FP6 720 PFLOPS 为稀疏值，÷2 再 ÷72 得单卡 FP16/BF16 2,500 TFLOPS、FP8 5,000 TFLOPS；显存 20TB / 576TB/s ÷72 约 288GB / 8TB/s。MLPerf 命名 B300-SXM-270GB 的 270GB 为可用容量口径。INT8 官方整机 24 POPS 口径异常，null；单卡 TDP 未披露。"
+    },
+    {
+      "release_year": 2025,
+      "process": null,
+      "fp16_tflops": 1000,
+      "bf16_tflops": 1000,
+      "fp8_tflops": 2000,
+      "int8_tops": null,
+      "hbm_gb": 96,
+      "hbm_bw_gbs": 1597,
+      "interconnect_bw_gbs": null,
+      "tdp_w": 600,
+      "servers": [
+        {
+          "model": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+          "status": "已收录",
+          "note": "96GB GDDR7，最高 600W（可配置）",
+          "url": "https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/"
+        }
+      ],
+      "clusters": [],
+      "vendor": "NVIDIA",
+      "series": "Blackwell",
+      "model": "RTX PRO 6000 Blackwell Server Edition",
+      "aliases": [
+        "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+        "RTX PRO 6000 Blackwell",
+        "RTX PRO 6000 Server Edition"
+      ],
+      "interconnect": "PCIe 5.0 x16",
+      "form_factor": "双槽全高全长（风冷）/ 单槽全高加长（液冷）",
+      "official_docs": [
+        {
+          "title": "NVIDIA RTX PRO 6000 Blackwell Server Edition 官方规格",
+          "url": "https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/"
+        }
+      ],
+      "sources_note": "官方服务器版规格页：FP4 4 PFLOPS、FP8 2 PFLOPS、FP16/BF16 1 PFLOP（页面未注明稀疏口径，按官方原值记录）、96GB GDDR7 / 1,597GB/s、最高 600W、双槽全高全长或单槽液冷。官方未单列 INT8，按 null；制程官方未披露。"
+    },
+    {
+      "release_year": 2025,
+      "process": null,
+      "fp16_tflops": null,
+      "bf16_tflops": null,
+      "fp8_tflops": null,
+      "int8_tops": null,
+      "hbm_gb": 32,
+      "hbm_bw_gbs": 896,
+      "interconnect_bw_gbs": null,
+      "tdp_w": 200,
+      "servers": [
+        {
+          "model": "NVIDIA RTX PRO 4500 Blackwell Workstation Edition",
+          "status": "已收录",
+          "note": "32GB GDDR7 ECC，200W",
+          "url": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-4500/"
+        }
+      ],
+      "clusters": [],
+      "vendor": "NVIDIA",
+      "series": "Blackwell",
+      "model": "RTX PRO 4500 Blackwell",
+      "aliases": [
+        "NVIDIA RTX PRO 4500 Blackwell",
+        "RTX PRO 4500 Blackwell Workstation Edition",
+        "RTX PRO 4500"
+      ],
+      "interconnect": "PCIe 5.0 x16",
+      "form_factor": "双槽全高全长（4.4\" x 10.5\"）",
+      "official_docs": [
+        {
+          "title": "NVIDIA RTX PRO 4500 Blackwell 官方规格",
+          "url": "https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-4500/"
+        },
+        {
+          "title": "NVIDIA RTX PRO 4500 Blackwell Datasheet（PDF）",
+          "url": "https://www.nvidia.com/content/dam/en-zz/Solutions/data-center/rtx-pro-4500-blackwell/workstation-datasheet-blackwell-rtx-pro-4500-we-nvidia-us-5108623-web.pdf"
+        }
+      ],
+      "sources_note": "官方产品页与 Datasheet：32GB GDDR7 ECC、896GB/s、200W、双槽全高全长、PCIe 5.0 x16；AI 性能仅披露 1,617 AI TOPS（FP4 稀疏有效值）与 FP32 51 TFLOPS，未披露 FP16/FP8/INT8 稠密值，相关字段为 null；制程未披露。"
+    },
+    {
+      "release_year": 2026,
+      "process": null,
+      "fp16_tflops": null,
+      "bf16_tflops": null,
+      "fp8_tflops": null,
+      "int8_tops": null,
+      "hbm_gb": 288,
+      "hbm_bw_gbs": 22000,
+      "interconnect_bw_gbs": 3600,
+      "tdp_w": null,
+      "servers": [
+        {
+          "model": "NVIDIA Vera Rubin NVL72",
+          "status": "已收录",
+          "note": "机柜级 NVL72，单 GPU 288GB HBM4 / 22TB/s",
+          "url": "https://docs.nvidia.com/aicr/integrator-guide/rke-2-vr-200-setup/"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "NVIDIA Vera Rubin NVL72",
+          "status": "已收录",
+          "interconnect": "NVLink 6 / NVLink Switch",
+          "note": "72 GPU 机柜级超节点",
+          "url": "https://docs.nvidia.com/aicr/integrator-guide/rke-2-vr-200-setup/"
+        }
+      ],
+      "vendor": "NVIDIA",
+      "series": "Rubin",
+      "model": "Vera Rubin",
+      "aliases": [
+        "NVIDIA Vera Rubin",
+        "Vera Rubin NVL72 单 GPU",
+        "Rubin GPU"
+      ],
+      "interconnect": "NVLink 6",
+      "form_factor": "NVL72 机柜级（单 GPU 规格）",
+      "official_docs": [
+        {
+          "title": "NVIDIA Rubin GPU 架构官方技术博客",
+          "url": "https://developer.nvidia.com/blog/inside-nvidia-rubin-gpu-architecture-powering-the-era-of-agentic-ai/"
+        }
+      ],
+      "sources_note": "官方 NVIDIA 技术博客：Rubin GPU 单卡 288GB HBM4、22TB/s、NVFP4 50 PFLOPS、NVLink 6 3.6TB/s；未披露 FP16/BF16/FP8/INT8 与 TDP，相关字段为 null。"
+    },
+    {
+      "release_year": 2026,
+      "process": null,
+      "fp16_tflops": null,
+      "bf16_tflops": null,
+      "fp8_tflops": null,
+      "int8_tops": null,
+      "hbm_gb": 288,
+      "hbm_bw_gbs": 22000,
+      "interconnect_bw_gbs": 3600,
+      "tdp_w": null,
+      "servers": [
+        {
+          "model": "NVIDIA VR200 NVL72",
+          "status": "已收录",
+          "note": "NVIDIA AICR 文档中的 Vera Rubin NVL72 系统命名",
+          "url": "https://docs.nvidia.com/aicr/integrator-guide/rke-2-vr-200-setup/"
+        }
+      ],
+      "clusters": [
+        {
+          "name": "NVIDIA VR200 NVL72",
+          "status": "已收录",
+          "interconnect": "NVLink 6 / NVLink Switch",
+          "note": "机柜级 NVL72",
+          "url": "https://docs.nvidia.com/aicr/integrator-guide/rke-2-vr-200-setup/"
+        }
+      ],
+      "vendor": "NVIDIA",
+      "series": "Rubin",
+      "model": "VR200",
+      "aliases": [
+        "NVIDIA VR200",
+        "VR200 NVL72",
+        "Vera Rubin VR200"
+      ],
+      "interconnect": "NVLink 6",
+      "form_factor": "NVL72 机柜级系统（单 GPU 规格）",
+      "official_docs": [
+        {
+          "title": "NVIDIA AICR：VR200（Vera Rubin）NVL72 部署文档",
+          "url": "https://docs.nvidia.com/aicr/integrator-guide/rke-2-vr-200-setup/"
+        },
+        {
+          "title": "NVIDIA Rubin GPU 架构官方技术博客",
+          "url": "https://developer.nvidia.com/blog/inside-nvidia-rubin-gpu-architecture-powering-the-era-of-agentic-ai/"
+        }
+      ],
+      "sources_note": "MLPerf 条目 NVIDIA VR200 对应 Vera Rubin NVL72 系统（NVIDIA AICR 文档）；单 GPU 规格同 Vera Rubin：288GB HBM4、22TB/s、NVLink 6 3.6TB/s；FP16/FP8/INT8 与 TDP 官方未披露，null。"
+    },
+    {
+      "release_year": 2025,
+      "process": "3nm（计算 die）+ 6nm（I/O die）",
+      "fp16_tflops": 2500,
+      "bf16_tflops": 2500,
+      "fp8_tflops": 5000,
+      "int8_tops": 5000,
+      "hbm_gb": 288,
+      "hbm_bw_gbs": 8000,
+      "interconnect_bw_gbs": 1071,
+      "tdp_w": 1400,
+      "servers": [
+        {
+          "model": "AMD Instinct MI355X OAM 平台",
+          "status": "已收录",
+          "note": "288GB HBM3E，8TB/s，TBP 1,400W",
+          "url": "https://www.amd.com/en/products/accelerators/instinct/mi350/mi355x.html"
+        }
+      ],
+      "clusters": [],
+      "vendor": "AMD",
+      "series": "Instinct MI350",
+      "model": "Instinct MI355X",
+      "aliases": [
+        "AMD Instinct MI355X 288GB HBM3e",
+        "AMD Instinct MI355X",
+        "MI355X",
+        "Instinct MI355X"
+      ],
+      "interconnect": "Infinity Fabric（7 links）",
+      "form_factor": "OAM 模块",
+      "official_docs": [
+        {
+          "title": "AMD Instinct MI355X 官方规格",
+          "url": "https://www.amd.com/en/products/accelerators/instinct/mi350/mi355x.html"
+        }
+      ],
+      "sources_note": "AMD 官网规格页（Peak Matrix Performance）：FP16/BF16 2.5 PFLOPS、FP8 5 PFLOPS、INT8 5 POPS（均为 dense 口径，页面另列 Structured Sparsity 值本表不采用）；288GB HBM3E / 8TB/s、TBP 1,400W、OAM、PCIe 5.0 x16；7 条 Infinity Fabric 链路 ×153GB/s≈1,071GB/s。"
+    },
+    {
+      "release_year": 2025,
+      "process": "3nm（计算 die）+ 6nm（I/O die）",
+      "fp16_tflops": 2300,
+      "bf16_tflops": 2300,
+      "fp8_tflops": 4600,
+      "int8_tops": 4600,
+      "hbm_gb": 288,
+      "hbm_bw_gbs": 8000,
+      "interconnect_bw_gbs": 1071,
+      "tdp_w": 1000,
+      "servers": [
+        {
+          "model": "AMD Instinct MI350X OAM 平台",
+          "status": "已收录",
+          "note": "288GB HBM3E，8TB/s，TBP 1,000W",
+          "url": "https://www.amd.com/en/products/accelerators/instinct/mi350/mi350x.html"
+        }
+      ],
+      "clusters": [],
+      "vendor": "AMD",
+      "series": "Instinct MI350",
+      "model": "Instinct MI350X",
+      "aliases": [
+        "AMD Instinct MI350X 288GB HBM3e",
+        "AMD Instinct MI350X",
+        "MI350X",
+        "Instinct MI350X"
+      ],
+      "interconnect": "Infinity Fabric（7 links）",
+      "form_factor": "OAM 模块",
+      "official_docs": [
+        {
+          "title": "AMD Instinct MI350X 官方规格",
+          "url": "https://www.amd.com/en/products/accelerators/instinct/mi350/mi350x.html"
+        }
+      ],
+      "sources_note": "AMD 官网规格页（Peak Matrix Performance）：FP16/BF16 2.3 PFLOPS、FP8 4.6 PFLOPS、INT8 4.6 POPS（均为 dense 口径，页面另列 Structured Sparsity 值本表不采用）；288GB HBM3E / 8TB/s、TBP 1,000W、OAM、PCIe 5.0 x16；7 条 Infinity Fabric 链路 ×153GB/s≈1,071GB/s。"
+    },
+    {
+      "release_year": 2025,
+      "process": "3nm（计算 die）+ 6nm（I/O die）",
+      "fp16_tflops": 1150,
+      "bf16_tflops": 1150,
+      "fp8_tflops": 2300,
+      "int8_tops": 2300,
+      "hbm_gb": 144,
+      "hbm_bw_gbs": 4000,
+      "interconnect_bw_gbs": null,
+      "tdp_w": 600,
+      "servers": [
+        {
+          "model": "AMD Instinct MI350P PCIe 平台",
+          "status": "已收录",
+          "note": "144GB HBM3E，4TB/s；600W TBP（450W 可配置）",
+          "url": "https://www.amd.com/en/products/accelerators/instinct/mi350/mi350p.html"
+        }
+      ],
+      "clusters": [],
+      "vendor": "AMD",
+      "series": "Instinct MI350",
+      "model": "Instinct MI350P",
+      "aliases": [
+        "AMD Instinct MI350P",
+        "MI350P",
+        "Instinct MI350P"
+      ],
+      "interconnect": "PCIe 5.0 x16",
+      "form_factor": "双槽 PCIe 附加卡（全高、10.5 英寸）",
+      "official_docs": [
+        {
+          "title": "AMD Instinct MI350P 官方规格",
+          "url": "https://www.amd.com/en/products/accelerators/instinct/mi350/mi350p.html"
+        }
+      ],
+      "sources_note": "AMD 官网规格页：FP16/BF16 1.15 PFLOPS、FP8 2.3 PFLOPS、INT8 2.3 POPS（dense 口径）；144GB HBM3E / 4TB/s、600W TBP（450W 可配置）、双槽全高 10.5 英寸 PCIe 附加卡、PCIe 5.0 x16。"
+    },
+    {
+      "release_year": 2023,
+      "process": "5nm（计算 die）+ 6nm（I/O die）",
+      "fp16_tflops": 1300,
+      "bf16_tflops": 1300,
+      "fp8_tflops": 2610,
+      "int8_tops": 2600,
+      "hbm_gb": 192,
+      "hbm_bw_gbs": 5300,
+      "interconnect_bw_gbs": 1024,
+      "tdp_w": 750,
+      "servers": [
+        {
+          "model": "AMD Instinct MI300X OAM 平台",
+          "status": "已收录",
+          "note": "192GB HBM3，5.3TB/s，750W",
+          "url": "https://www.amd.com/en/products/accelerators/instinct/mi300/mi300x.html"
+        }
+      ],
+      "clusters": [],
+      "vendor": "AMD",
+      "series": "Instinct MI300",
+      "model": "Instinct MI300X",
+      "aliases": [
+        "AMD Instinct MI300X 192GB HBM3",
+        "AMD Instinct MI300X",
+        "MI300X",
+        "Instinct MI300X"
+      ],
+      "interconnect": "Infinity Fabric（8 links）",
+      "form_factor": "OAM 模块",
+      "official_docs": [
+        {
+          "title": "AMD Instinct MI300X 官方规格",
+          "url": "https://www.amd.com/en/products/accelerators/instinct/mi300/mi300x.html"
+        }
+      ],
+      "sources_note": "AMD 官网规格页：FP16/BF16 1.3 PFLOPS、FP8 2.61 PFLOPS、INT8 2.6 POPS（dense 口径）；192GB HBM3 / 5.3TB/s、750W、OAM、PCIe 5.0 x16；8 条 Infinity Fabric 链路 ×128GB/s=1,024GB/s。"
+    },
+    {
+      "release_year": 2026,
+      "process": "TSMC N5",
+      "fp16_tflops": null,
+      "bf16_tflops": null,
+      "fp8_tflops": null,
+      "int8_tops": 367,
+      "hbm_gb": 32,
+      "hbm_bw_gbs": 608,
+      "interconnect_bw_gbs": null,
+      "tdp_w": 230,
+      "servers": [
+        {
+          "model": "Intel Arc Pro B70 参考卡",
+          "status": "已收录",
+          "note": "32GB GDDR6，TBP 230W（160-290W 可配置）",
+          "url": "https://www.intel.cn/content/www/cn/zh/products/sku/245797/intel-arc-pro-b70-graphics/specifications.html"
+        }
+      ],
+      "clusters": [],
+      "vendor": "Intel",
+      "series": "Arc Pro B-Series",
+      "model": "Arc Pro B70",
+      "aliases": [
+        "Intel Arc(TM) Pro B70",
+        "Intel Arc Pro B70",
+        "Arc Pro B70"
+      ],
+      "interconnect": "PCIe 5.0 x16",
+      "form_factor": "双槽 PCIe 卡（10.5\" x 3.9\"）",
+      "official_docs": [
+        {
+          "title": "Intel Arc Pro B70 官方规格",
+          "url": "https://www.intel.cn/content/www/cn/zh/products/sku/245797/intel-arc-pro-b70-graphics/specifications.html"
+        }
+      ],
+      "sources_note": "Intel 官网（intel.cn）规格：32GB GDDR6 / 608GB/s、INT8 峰值 367 TOPS、TBP 230W（160-290W）、PCIe 5.0 x16、TSMC N5、双槽 10.5×3.9 英寸；官方未披露 FP16/FP8/BF16，相关字段为 null。"
+    },
+    {
+      "release_year": 2025,
+      "process": "TSMC N5",
+      "fp16_tflops": null,
+      "bf16_tflops": null,
+      "fp8_tflops": null,
+      "int8_tops": 197,
+      "hbm_gb": 24,
+      "hbm_bw_gbs": 456,
+      "interconnect_bw_gbs": null,
+      "tdp_w": 200,
+      "servers": [
+        {
+          "model": "Intel Arc Pro B60 参考卡",
+          "status": "已收录",
+          "note": "24GB GDDR6，TBP 200W（120-200W 可配置）",
+          "url": "https://www.intel.cn/content/www/cn/zh/products/sku/243916/intel-arc-pro-b60-graphics/specifications.html"
+        }
+      ],
+      "clusters": [],
+      "vendor": "Intel",
+      "series": "Arc Pro B-Series",
+      "model": "Arc Pro B60",
+      "aliases": [
+        "Intel Arc Pro B60",
+        "Arc Pro B60"
+      ],
+      "interconnect": "PCIe 5.0 x8",
+      "form_factor": "双槽 PCIe 卡",
+      "official_docs": [
+        {
+          "title": "Intel Arc Pro B60 官方规格",
+          "url": "https://www.intel.cn/content/www/cn/zh/products/sku/243916/intel-arc-pro-b60-graphics/specifications.html"
+        }
+      ],
+      "sources_note": "Intel 官网（intel.cn）规格：24GB GDDR6 / 456GB/s、INT8 峰值 197 TOPS、TBP 200W（120-200W）、PCIe 5.0 x8、TSMC N5；官方未披露 FP16/FP8/BF16，相关字段为 null。"
+    },
+    {
+      "release_year": null,
+      "process": null,
+      "fp16_tflops": 280,
+      "bf16_tflops": null,
+      "fp8_tflops": null,
+      "int8_tops": 560,
+      "hbm_gb": 64,
+      "hbm_bw_gbs": 1600,
+      "interconnect_bw_gbs": null,
+      "tdp_w": 350,
+      "servers": [
+        {
+          "model": "Atlas 800I A2 推理服务器",
+          "status": "已收录",
+          "note": "昇腾官网在列的推理服务器",
+          "url": "https://e.huawei.com/cn/products/computing/ascend/atlas-800i-a2"
+        }
+      ],
+      "clusters": [],
+      "vendor": "华为",
+      "series": "Atlas",
+      "model": "Atlas 300I A2",
+      "aliases": [
+        "华为 Atlas 300I A2",
+        "Huawei Atlas 300I A2",
+        "Atlas 300I A2 推理卡",
+        "300I A2"
+      ],
+      "interconnect": "PCIe 5.0 x16",
+      "form_factor": "双槽全高全长 PCIe 卡",
+      "official_docs": [
+        {
+          "title": "华为 Atlas 300I A2 推理卡技术规格",
+          "url": "https://e.huawei.com/cn/products/computing/ascend/atlas-300i-a2"
+        }
+      ],
+      "sources_note": "华为官网技术规格：560 TOPS INT8、280 TFLOPS FP16、32GB/64GB 片上内存（0.8/1.6TB/s）、PCIe 5.0、最大 350W、双槽全高全长；本表取 64GB 配置。BF16/FP8、制程与发布年份官方未披露，null。"
+    },
+    {
+      "release_year": null,
+      "process": null,
+      "fp16_tflops": 70,
+      "bf16_tflops": null,
+      "fp8_tflops": null,
+      "int8_tops": 140,
+      "hbm_gb": 24,
+      "hbm_bw_gbs": 204.8,
+      "interconnect_bw_gbs": null,
+      "tdp_w": 72,
+      "servers": [
+        {
+          "model": "Atlas 800 推理服务器（型号 3000）",
+          "status": "已收录",
+          "url": "https://e.huawei.com/cn/products/computing/ascend/atlas-800-inference-3000"
+        }
+      ],
+      "clusters": [],
+      "vendor": "华为",
+      "series": "Atlas",
+      "model": "Atlas 300I Pro",
+      "aliases": [
+        "华为 Atlas 300I Pro",
+        "Huawei Atlas 300I Pro",
+        "Atlas 300I Pro 推理卡",
+        "300I Pro"
+      ],
+      "interconnect": "PCIe 4.0 x16",
+      "form_factor": "半高半长 PCIe 卡",
+      "official_docs": [
+        {
+          "title": "华为 Atlas 300I Pro 推理卡技术规格",
+          "url": "https://e.huawei.com/cn/products/computing/ascend/atlas-300-ai"
+        }
+      ],
+      "sources_note": "华为官网技术规格：140 TOPS INT8、70 TFLOPS FP16、LPDDR4X 24GB / 204.8GB/s、最大 72W、PCIe 4.0 x16、半高半长；BF16/FP8、制程与发布年份官方未披露，null。"
     }
   ]
 }

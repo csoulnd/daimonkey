@@ -54,8 +54,8 @@ directions:
     name: 硬件
     short: NV
     icon: i-chip
-    tagline: MLPerf 推理性能 · 季度
-    description: 一张卡能跑多快：按 MLPerf 推理基准排序，辅以算力、显存带宽与互联规格。
+    tagline: FP16 算力天梯 · 官方规格
+    description: 一张卡能跑多快：按 FP16 稠密算力排序，横比低精度支持、显存容量与显存带宽。
     boards: [nv_infer]
     news_tag: nv
     news_categories: [infra]
@@ -83,7 +83,7 @@ directions:
       - tdp_w
       - form_factor
     spec_detail_fields: [aliases, servers, clusters, official_docs, sources_note]
-    spec_vendors: [NVIDIA, 寒武纪, 平头哥, 华为]
+    spec_vendors: [NVIDIA, AMD, Intel, 寒武纪, 平头哥, 华为]
 
 # ---- 历史数据 LRU 保留窗口（天）。0 = 永久保留。每次更新后执行清理 ----
 retention:
@@ -156,6 +156,19 @@ derived_growth:
   vscode_installs_growth_30d: vscode_installs
   appstore_rating_growth_30d: appstore_rating_count
 
+# 展示层派生指标：不写库，由 collector/queries.py 按 components 求和。
+# 只收可用分项（三者全缺 -> —），单元格 title 列出各分项数值，便于核对聚合口径。
+derived_metrics:
+  downloads:
+    label: 下载量
+    unit: count
+    direction: higher
+    components: [npm_monthly_downloads, vscode_installs, appstore_rating_count]
+    component_labels:
+      npm_monthly_downloads: npm 月下载
+      vscode_installs: VS Code 安装
+      appstore_rating_count: App Store 评分人数
+
 # =============================================================================
 # 榜单与权重（权重改动必须递增 methodology.version）
 # =============================================================================
@@ -175,15 +188,13 @@ boards:
       - {key: tier, label: 类型, type: tier, labels: {core: 核心, eco: 生态}}
       - {key: github_stars, label: GitHub Stars, type: metric}
       - {key: github_commits_30d, label: 30 天提交, type: metric}
-      - {key: npm_monthly_downloads, label: npm 月下载, type: metric}
-      - {key: vscode_installs, label: VS Code 安装, type: metric}
-      - {key: appstore_rank, label: 商店排名, type: metric}
+      # 下载量 = npm 月下载 + VS Code 安装 + App Store 评分人数（可用项求和）
+      - {key: downloads, label: 下载量, type: derived}
     sort: &harness_sort
       keys:
         - {metric: github_stars, direction: desc}
-        - {metric: npm_monthly_downloads, direction: desc}
-        - {metric: appstore_rank, direction: asc}
-      note: "GitHub Stars 优先；无仓库产品按 npm 下载 / 商店排名列后"
+        - {metric: downloads, direction: desc}
+      note: "GitHub Stars 优先；无仓库产品按下载量列后"
   harness_eco:
     name: 生态项目榜
     folded: true                # 频道页折叠区，不占主表
@@ -229,32 +240,32 @@ boards:
     momentum:
       aa_intelligence: 1.0
   nv_infer:
-    name: 推理性能榜
+    name: 硬件天梯
     overlay: true               # 独立硬件榜，不并入 Harness
-    # 成员由 MLPerf 源自动同步（origin=mlperf、status=active）。
-    # 主口径：gpt-oss-120b Offline 单卡吞吐（Tokens/s per 卡）；另外两列为展示列。
-    select: {origin: mlperf, status: active}
-    display_metrics: [mlperf_gptoss_120b, mlperf_deepseek_r1, mlperf_llama3_8b]
-    subtitle: 一张卡能跑多快：按 MLPerf 推理基准排序，辅以算力、显存带宽与互联规格。
-    primary_label: 单卡 Tokens/s
+    # 成员按 board_tags 归属（不再限定 origin）：MLPerf 自动入池卡与手工收录的
+    # 昇腾等厂商卡同为 nv_infer 成员，规格由 collector/hw_specs.json 提供。
+    # 展示口径为 FP16 稠密算力天梯；MLPerf 吞吐仍采集留档，但不在本榜展示。
+    subtitle: 一张卡能跑多快：按 FP16 稠密算力排序，横比低精度支持、显存容量与显存带宽。
     columns:
       - {key: rank, label: "#", type: rank}
       - {key: product, label: 加速卡, type: product}
       - {key: vendor, label: 厂商, type: vendor}
-      - {key: mlperf_gptoss_120b, label: "gpt-oss-120b Offline (Tokens/s)", type: metric}
-      - {key: mlperf_deepseek_r1, label: "DeepSeek R1", type: metric}
-      - {key: mlperf_llama3_8b, label: "Llama 3.1 8B", type: metric}
-      - {key: fp16_tflops, label: "FP16 TFLOPS", type: hw}
-      - {key: hbm_gb, label: "显存 GB", type: hw}
-      - {key: hbm_bw_gbs, label: "显存带宽 GB/s", type: hw}
-      - {key: interconnect, label: "互联", type: text}
-      - {key: tdp_w, label: "TDP W", type: hw}
-      - {key: official_docs, label: "官方文档", type: doc}
+      - {key: fp16_tflops, label: "FP16 算力 (TFLOPS)", type: hw}
+      - key: precision
+        label: 低精度支持
+        type: precision
+        parts:
+          - {key: fp8_tflops, label: FP8, unit: ""}
+          - {key: int8_tops, label: INT8, unit: TOPS}
+          - {key: bf16_tflops, label: BF16, unit: ""}
+      - {key: hbm_gb, label: "显存 (GB)", type: hw}
+      - {key: hbm_bw_gbs, label: "显存带宽 (GB/s)", type: hw}
+      - {key: official_docs, label: 官方文档, type: doc}
     sort:
       keys:
-        - {metric: mlperf_gptoss_120b, direction: desc}
-      note: "按 gpt-oss-120b Offline 单卡吞吐从高到低排序；其余吞吐与规格为参考列。"
-    criteria: "评判标准：MLPerf Inference 官方 Closed 分区，单卡离线吞吐；规格为厂商公开数据"
+        - {metric: fp16_tflops, direction: desc}
+      note: "按 FP16 稠密算力从高到低排序；缺值型号列后。"
+    criteria: "按 FP16 稠密算力排序；低精度与规格为厂商公开数据，— 表示未披露"
     heat:
       mlperf_gptoss_120b: 1.0
     momentum: {}
@@ -920,6 +931,22 @@ products:
     npm_package: ai
     license: Apache-2.0
     integration: {has_api: 1, install_difficulty: easy}
+
+  # ---------- nv（硬件天梯：手工收录的厂商加速卡；MLPerf 卡由源自动入池） ----------
+  - slug: atlas-300i-a2
+    name: Atlas 300I A2
+    vendor: 华为
+    category: nv
+    board_tags: [nv_infer]
+    status: active
+    notes: 昇腾官网当前在列的最新型推理卡（560 TOPS INT8 / 280 TFLOPS FP16）。
+  - slug: atlas-300i-pro
+    name: Atlas 300I Pro
+    vendor: 华为
+    category: nv
+    board_tags: [nv_infer]
+    status: active
+    notes: 昇腾官网在列的推理卡（140 TOPS INT8 / 70 TFLOPS FP16）。
 
   # ---------- office（榜单未启用，仅登记；接入数据源后自动参与） ----------
   - slug: workbuddy

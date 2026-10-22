@@ -35,6 +35,7 @@ METRIC_NAMES = {
     "github_contributors": "贡献者",
     "github_commits_30d": "30天提交",
     "github_releases_30d": "30天发布",
+    "downloads": "下载量",
     "github_stars_growth_30d": "Stars 增长",
     "npm_monthly_downloads": "npm 月下载",
     "npm_downloads_growth_30d": "npm 增长",
@@ -403,7 +404,7 @@ def _top_metrics(board_key: str, reg: dict) -> list[str]:
     if configured:
         return list(configured)
     if board_key == "harness_core":
-        return ["github_stars", "npm_monthly_downloads", "vscode_installs"]
+        return ["github_stars", "github_commits_30d", "downloads"]
     heat = reg["boards"].get(board_key, {}).get("heat", {})
     return [k for k, _ in sorted(heat.items(), key=lambda kv: -kv[1])[:3]]
 

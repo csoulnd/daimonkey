@@ -5,6 +5,12 @@
 </span>
 {%- endmacro %}
 
+{# 派生指标（如「下载量」）：值由多个指标求和，无单一原始响应可链；
+   title 列出各分项数值，供读者核对聚合口径。 #}
+{% macro dval(m) -%}
+{% if m is none or m.value is none %}<span class="dim">—</span>{% else %}<span class="sv"><span class="sv-v" title="{{ m.title }}">{{ m.value | num }}</span></span>{% endif %}
+{%- endmacro %}
+
 {% macro score(v, kind='num', bar=False) -%}
 {% if v is none %}<span class="dim">—</span>{% elif v is string %}<span class="score {{ kind }}">{{ v }}</span>{% else %}<span class="score {{ kind }}">{{ v | int if v == (v | int) else '%.1f' | format(v) }}</span>{% endif %}
 {%- endmacro %}

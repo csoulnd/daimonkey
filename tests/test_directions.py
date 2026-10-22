@@ -63,6 +63,10 @@ class TestDirectionsConfig(unittest.TestCase):
         self.assertFalse(nv.get("placeholder"))
         self.assertEqual(nv.get("boards"), ["nv_infer"])
         self.assertIn("nv_infer", self.reg["boards"])
+        board = self.reg["boards"]["nv_infer"]
+        self.assertEqual(board.get("name"), "硬件天梯")
+        self.assertNotIn("select", board)
+        self.assertNotIn("display_metrics", board)
         self.assertEqual(nv.get("news_categories"), ["infra"])
         source_keys = {s["key"] for s in self.reg["sources"]}
         self.assertIn("mlperf", source_keys)
@@ -70,6 +74,18 @@ class TestDirectionsConfig(unittest.TestCase):
         for src in nv["planned_sources"]:
             self.assertIn("name", src)
             self.assertIn("status", src)
+
+    def test_nv_board_is_a_fp16_ladder_without_mlperf_columns(self):
+        board = self.reg["boards"]["nv_infer"]
+        keys = [c["key"] for c in board["columns"]]
+        self.assertEqual(keys, [
+            "rank", "product", "vendor", "fp16_tflops", "precision",
+            "hbm_gb", "hbm_bw_gbs", "official_docs"])
+        self.assertEqual([k["metric"] for k in board["sort"]["keys"]],
+                         ["fp16_tflops"])
+        self.assertNotIn("mlperf", board.get("criteria", "").lower())
+        self.assertNotIn("primary_label", board)
+        self.assertIn("FP16", board["criteria"])
 
     def test_channel_descriptions_avoid_old_metrics_and_negation(self):
         forbidden = ("数据来源", "后续接入", "不做", "永不", "热度", "动量", "覆盖率")

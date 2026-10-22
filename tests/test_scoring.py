@@ -82,23 +82,45 @@ class TestComputeBoard(unittest.TestCase):
 
 
 class TestDisplaySort(unittest.TestCase):
-    """榜单展示排序：配置驱动、缺失值列后、商店排名越小越靠前。"""
+    """榜单展示排序：配置驱动、缺失值列后。"""
 
     def _item(self, name, **metrics):
         return {"name": name, "metric_values": metrics}
 
-    def test_harness_stars_first_then_npm_and_store_rank(self):
+    def test_harness_stars_first_then_downloads(self):
         items = [
-            self._item("no-repo-store", appstore_rank=4),
+            self._item("no-repo-small", downloads=10),
             self._item("stars-low", github_stars=10),
-            self._item("no-repo-npm", npm_monthly_downloads=500),
+            self._item("no-repo-big", downloads=500),
             self._item("stars-high", github_stars=100),
             self._item("no-data"),
         ]
         got = [x["name"] for x in queries.sort_items_for_board(
             items, "harness_core")]
-        self.assertEqual(got, ["stars-high", "stars-low", "no-repo-npm",
-                               "no-repo-store", "no-data"])
+        self.assertEqual(got, ["stars-high", "stars-low", "no-repo-big",
+                               "no-repo-small", "no-data"])
+
+    def test_downloads_aggregates_available_components(self):
+        metrics = {
+            "npm_monthly_downloads": {"value": 1000, "unit": "count"},
+            "vscode_installs": {"value": 250, "unit": "count"},
+            "appstore_rank": {"value": 4, "unit": "rank"},
+        }
+        derived = queries.derived_metrics(metrics)
+        self.assertEqual(derived["downloads"]["value"], 1250)
+        self.assertNotIn("appstore_rank", derived["downloads"]["title"])
+        self.assertIn("npm 月下载 1,000", derived["downloads"]["title"])
+        self.assertIn("VS Code 安装 250", derived["downloads"]["title"])
+
+    def test_downloads_can_use_store_rating_count_only(self):
+        derived = queries.derived_metrics({
+            "appstore_rating_count": {"value": 336689, "unit": "count"}})
+        self.assertEqual(derived["downloads"]["value"], 336689)
+        self.assertIn("App Store 评分人数 336,689", derived["downloads"]["title"])
+
+    def test_downloads_all_missing_is_absent(self):
+        self.assertEqual(queries.derived_metrics(
+            {"appstore_rank": {"value": 4, "unit": "rank"}}), {})
 
     def test_model_sorts_by_aa_intelligence(self):
         items = [
@@ -109,10 +131,10 @@ class TestDisplaySort(unittest.TestCase):
         got = [x["name"] for x in queries.sort_items_for_board(items, "model")]
         self.assertEqual(got, ["high", "low", "missing"])
 
-    def test_nv_sorts_by_gptoss_offline_throughput(self):
+    def test_nv_sorts_by_fp16_tflops(self):
         items = [
-            self._item("slow", mlperf_gptoss_120b=1000),
-            self._item("fast", mlperf_gptoss_120b=2000),
+            self._item("slow", fp16_tflops=1000),
+            self._item("fast", fp16_tflops=2000),
             self._item("missing"),
         ]
         got = [x["name"] for x in queries.sort_items_for_board(items, "nv_infer")]
