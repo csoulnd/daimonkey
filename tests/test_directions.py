@@ -71,6 +71,26 @@ class TestDirectionsConfig(unittest.TestCase):
             self.assertIn("name", src)
             self.assertIn("status", src)
 
+    def test_channel_descriptions_avoid_old_metrics_and_negation(self):
+        forbidden = ("数据来源", "后续接入", "不做", "永不", "热度", "动量", "覆盖率")
+        for key, d in self.dirs.items():
+            text = d.get("description") or ""
+            self.assertTrue(text, key)
+            for word in forbidden:
+                self.assertNotIn(word, text, f"{key} 描述不应出现 {word}")
+
+    def test_visible_boards_have_config_driven_columns_and_sort(self):
+        for key, cfg in self.reg["boards"].items():
+            if not cfg.get("enabled", True) or cfg.get("hidden"):
+                continue
+            self.assertTrue(cfg.get("columns"), key)
+            self.assertTrue(cfg.get("sort", {}).get("keys"), key)
+            self.assertTrue(cfg.get("subtitle") or cfg.get("criteria"), key)
+            self.assertTrue(cfg.get("criteria") or cfg.get("sort", {}).get("note"),
+                            key)
+        for key in ("harness_core", "harness_eco", "model", "nv_infer"):
+            self.assertTrue(self.reg["boards"][key].get("subtitle"), key)
+
 
 class TestDirectionQueries(unittest.TestCase):
     def setUp(self):
@@ -246,13 +266,15 @@ class TestDirectionPageRender(unittest.TestCase):
             "direction_digest": None,
             "direction_digest_link": None,
             "direction_digest_weeks": [],
+            "weekly": None,
         }
 
-    def _render(self, direction, tab):
+    def _render(self, direction, tab, extra=None):
         spec = next(s for s in sitegen.direction_page_specs(direction)
                     if s["tab"] == tab)
         ctx = self._common()
         ctx.update(sitegen.direction_page_context(direction, tab))
+        ctx.update(extra or {})
         return self.env.get_template(spec["template"]).render(**ctx)
 
     def test_nav_marks_only_current_page(self):
@@ -285,6 +307,43 @@ class TestDirectionPageRender(unittest.TestCase):
                                          f"{d['key']}/{tab} 不应包含 {other_tab}")
                 for needle in extra_absent[tab]:
                     self.assertNotIn(needle, html, f"{d['key']}/{tab} 不应包含 {needle}")
+
+    def test_board_page_renders_weekly_points_card(self):
+        d = self.directions[0]
+        weekly = {"week": "2026-W43", "current": True,
+                  "excerpt": "本周核心产品竞争集中在编码与编排。第二句。",
+                  "link": "/dir/harness/digest/2026-W43.html",
+                  "created_at": "2026-10-21T00:00:00Z"}
+        html = self._render(d, "board", {"weekly": weekly})
+        self.assertIn("本周要点", html)
+        self.assertIn("2026-W43", html)
+        self.assertIn("本周核心产品竞争集中在编码与编排。", html)
+        self.assertIn('href="/dir/harness/digest/2026-W43.html"', html)
+
+    def test_board_table_uses_configured_columns(self):
+        reg = self.reg
+        cols = reg["boards"]["harness_core"]["columns"]
+        product = {"slug": "demo", "name": "Demo", "vendor": "Acme",
+                   "status": "active"}
+        cells = {"rank": 1, "product": product,
+                 "tier": {"value": "core", "label": "核心"},
+                 "github_stars": {"value": 1000, "unit": "count",
+                                  "source": {"key": "github", "name": "GitHub"},
+                                  "collected_at": "2026-10-21T00:00:00Z",
+                                  "raw_payload_id": 1}}
+        block = {"key": "harness_core", "name": "核心产品榜",
+                 "rows": [{"rank": 1, "cells": cells}], "columns": cols,
+                 "sort_note": reg["boards"]["harness_core"]["sort"]["note"],
+                 "criteria": "", "snapshot_date": "2026-10-21"}
+        html = self._render(self.directions[0], "board",
+                            {"board_blocks": [block]})
+        for col in cols:
+            self.assertIn(col["label"], html)
+        self.assertIn("排序规则", html)
+        self.assertNotIn("热度分", html)
+        self.assertNotIn("动量分", html)
+        self.assertNotIn("覆盖率", html)
+        self.assertNotIn("观察区", html)
 
     def test_titles_and_descriptions_are_distinct(self):
         titles, descs = [], []

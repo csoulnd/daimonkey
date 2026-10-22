@@ -1,7 +1,9 @@
 {% extends "base.html" %}
+{% import "_macros.html" as m %}
 {% block title %}{% if seo_meta is defined and seo_meta and seo_meta.title %}{{ seo_meta.title }}{% else %}{{ direction.name }} · {{ page_label }} · {{ site.name }}{% endif %}{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/assets/direction.css?v={{ assets_v }}">
+<link rel="stylesheet" href="/assets/boards.css?v={{ assets_v }}">
 <div class="dir-layout">
   {% include "_direction_tabs.html" %}
   <div class="dir-body">
@@ -14,6 +16,8 @@
         {% if direction.news_categories %}<span>新闻范围：{{ direction.news_categories | join(' / ') }}</span>{% endif %}
       </div>
     </section>
+
+    {{ m.weekly_card(weekly) }}
 
     {% if direction.placeholder %}
     <div class="note-box">{{ direction.placeholder_note }}</div>
@@ -36,13 +40,15 @@
     <section class="dir-section" id="dir-boards">
       <div class="sec-head">
         <h2>{{ page_label }}</h2>
-        <span class="dim">数据随全量更新刷新 · 每个数字可溯源</span>
+        <span class="dim">名次与原始指标</span>
       </div>
       {% for blk in board_blocks %}
         {% if blk.rows and blk.folded %}
         <details class="obs-fold">
           <summary>{{ blk.name }}（{{ blk.rows | length }} 条，折叠展示）</summary>
           <div class="metric-card dir-board">
+            {% if blk.subtitle %}<p class="board-subtitle">{{ blk.subtitle }}</p>{% endif %}
+            <p class="dim">数据截至 {{ blk.snapshot_date or '—' }} · <a href="/rankings/{{ blk.key }}">完整榜单 →</a></p>
             {% include "_direction_board_table.html" %}
           </div>
         </details>
@@ -50,10 +56,10 @@
         <div class="metric-card dir-board">
           <div class="sec-head">
             <h3>{{ blk.name }}</h3>
-            <span class="dim">数据截至 {{ blk.snapshot_date or '—' }} · <a href="/rankings/{{ blk.key }}">完整榜单 →</a></span>
+            <span class="dim">{{ blk.subtitle }}</span>
           </div>
+          <p class="dim">数据截至 {{ blk.snapshot_date or '—' }} · <a href="/rankings/{{ blk.key }}">完整榜单 →</a></p>
           {% include "_direction_board_table.html" %}
-          {% if blk.obs %}<p class="dim">另有 {{ blk.obs }} 个产品因数据不足进入观察区。</p>{% endif %}
         </div>
         {% else %}
         <div class="empty-state">{{ blk.name }} 数据接入中。{% if blk.snapshot_date %}数据截至 {{ blk.snapshot_date }}。{% endif %}</div>
@@ -62,7 +68,7 @@
       <div class="empty-state">该方向榜单数据接入中。</div>
       {% endfor %}
 
-      {% if direction.planned_sources %}
+      {% if direction.placeholder and direction.planned_sources %}
       <div class="planned-box">
         <h3>规划中的数据源</h3>
         <ul class="planned-list">
@@ -70,7 +76,6 @@
           <li><span class="pname">{{ s.name }}</span><span class="dim">{{ s.note }}</span><span class="chip">{{ s.status }}</span></li>
           {% endfor %}
         </ul>
-        <p class="dim">接入后自动进入上方榜单与新闻管线，并保留原始响应溯源。</p>
       </div>
       {% endif %}
     </section>
@@ -81,3 +86,4 @@
   </div>
 </div>
 {% endblock %}
+

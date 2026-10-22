@@ -1,80 +1,21 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m %}
-{% import "_chart.html" as ch %}
 {% block title %}{% if seo_meta is defined and seo_meta and seo_meta.title %}{{ seo_meta.title }}{% else %}{{ name }}{% endif %}{% endblock %}
 {% block crumb %}{{ name }}{% endblock %}
 {% block content %}
+<link rel="stylesheet" href="/assets/boards.css?v={{ assets_v }}">
 <div class="sec-head">
   <h1>{{ name }}{% if board == 'harness_core' %} <span class="pill">核心产品</span>{% elif board == 'harness_eco' %} <span class="pill">生态项目</span>{% endif %}</h1>
-  {% if board != 'model' %}
-  <div class="view-toggle">
-    <button class="tg active" data-view="heat" type="button">热度视图</button>
-    <button class="tg" data-view="mom" type="button">动量视图</button>
-  </div>
-  {% endif %}
 </div>
-<p class="dim">数据截至 {{ snapshot_date }} · <a href="/#methodology">评分说明</a></p>
+{% if block and block.subtitle %}<p class="board-subtitle">{{ block.subtitle }}</p>{% endif %}
+<p class="dim">数据截至 {{ snapshot_date }} · <a href="/#methodology">评判标准</a></p>
 
-{% if history_chart %}
-{{ ch.chart_card(history_chart, "近 90 天热度走势（当前 Top 5）",
-                 subtitle="多日快照对比 · 悬停查看当日数值",
-                 unit="score",
-                 source_name="站内榜单快照",
-                 source_url="/sources",
-                 note="构建期渲染；每个数字可在下表与产品页溯源") }}
-{% endif %}
+{{ m.weekly_card(weekly) }}
 
-{% macro rows(items) -%}
-{% for it in items %}
-<tr>
-  <td class="rank{% if it.rank <= 3 %} top{% endif %}">{{ it.rank }}</td>
-  <td class="pname"><a href="/product/{{ it.slug }}">{{ it.name }}</a>
-    {% if board == 'harness_core' %}{{ m.badge(it.board, board_names) }}{% endif %}
-    {% if it.status == 'stale' %}<span class="stale-tag" title="仓库超过 90 天无推送">停滞</span>{% endif %}
-    <span class="vendor">{{ it.vendor }}</span></td>
-  <td>{{ m.score(it.heat_score, 'heat', bar=True) }}</td>
-  <td>{{ m.delta(it.delta_7d) }}</td>
-  {% if board != 'model' %}<td>{{ m.score(it.momentum_score, 'mom') }}</td>{% endif %}
-  <td>{{ m.cov(it.coverage) }}</td>
-  <td>{{ m.ai_cell(it) }}</td>
-  {% for mk in top_metrics %}{% set mm = it.metrics.get(mk) %}
-  <td>{% if mm %}{{ m.mval(mm) }}{% else %}<span class="dim">—</span>{% endif %}</td>
-  {% endfor %}
-</tr>
-{% endfor %}
-{%- endmacro %}
-
-<table class="tbl" id="tbl-heat">
-  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th>{% if board != 'model' %}<th>动量分</th>{% endif %}<th>覆盖率</th><th>AI</th>
-  {% for mk in top_metrics %}<th>{{ metric_names.get(mk, mk) }}</th>{% endfor %}</tr></thead>
-  <tbody>{{ rows(items) }}</tbody>
-</table>
-<table class="tbl hidden" id="tbl-mom">
-  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th>{% if board != 'model' %}<th>动量分</th>{% endif %}<th>覆盖率</th><th>AI</th>
-  {% for mk in top_metrics %}<th>{{ metric_names.get(mk, mk) }}</th>{% endfor %}</tr></thead>
-  <tbody>{{ rows(momentum_items) }}</tbody>
-</table>
-{% if board != 'model' %}<p class="dim">可切换按"热度"或"近期增长"排序;AI 列为 AI 复评(悬停查看理由)。</p>{% endif %}
-
-{% if board == 'model' %}
-<p class="dim">按 Artificial Analysis Intelligence Index 总评分排序（同系列取最高分版本，前 40 自动入池）；编码/智能体指数仅作参考列，不参与排序。旧中文月报口径已停用，历史数据仅存档；每格数值可点入原始响应。</p>
-{% endif %}
-
-{% if observation %}
-<details class="obs-fold">
-<summary>观察区 {{ observation | length }} 个（数据不足,暂不排名）</summary>
-<table class="tbl obs">
-  <thead><tr><th>产品</th><th>覆盖率</th><th>已有指标</th></tr></thead>
-  <tbody>
-  {% for o in observation %}
-  <tr>
-    <td><a href="/product/{{ o.slug }}">{{ o.name }}</a><span class="vendor">{{ o.vendor }}</span></td>
-    <td>{{ m.cov(o.coverage or 0) }}</td>
-    <td>{% for k in o.available %}<span class="chip">{{ metric_names.get(k, k) }}</span> {% endfor %}{% if not o.available %}<span class="dim">暂无任何指标（等待数据源接入）</span>{% endif %}</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-</details>
+{% if block %}
+  {% set blk = block %}
+  {% include "_direction_board_table.html" %}
+{% else %}
+<p class="dim">榜单数据待生成。</p>
 {% endif %}
 {% endblock %}

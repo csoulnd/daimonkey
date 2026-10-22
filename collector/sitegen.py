@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -77,7 +78,7 @@ METRIC_UNITS = {
 }
 
 # base.html 在缺少 seo_meta 时使用的兜底描述（用于测试“不是默认描述”）。
-DEFAULT_META_DESCRIPTION = ("以推理技术为重心,聚合智能体热度榜单、AI 新闻、报告厅"
+DEFAULT_META_DESCRIPTION = ("以推理技术为重心,聚合智能体、模型、硬件三方向榜单、AI 新闻、报告厅"
                             "与个人知识库的可溯源技术观察站。")
 
 # 硬件规格对比图：字段由 hw.field_labels() 提供中文名与单位。
@@ -485,21 +486,35 @@ def _assets_version() -> str:
     return h.hexdigest()[:8]
 
 
-def _core_display(items: list[dict], ai_weight: float) -> list[dict]:
-    """核心榜展示层变换(原联合榜 v1.5):剔除停滞 → 算法/AI 加权 → 重排名 → 前 10。
+def _digest_excerpt(text: str | None, max_sentences: int = 2,
+                    max_chars: int = 220) -> str:
+    """本周要点卡：取摘要前 1–2 句（中英文句末标点），再按长度兜底截断。"""
+    raw = " ".join(str(text or "").split())
+    if not raw:
+        return ""
+    parts = re.split(r"(?<=[。！？!?])", raw)
+    picked = "".join(parts[:max_sentences]).strip()
+    if not picked:
+        picked = raw
+    if len(picked) > max_chars:
+        picked = picked[:max_chars].rstrip("，、；;,:： ") + "…"
+    return picked
 
-    只影响页面呈现;export 的 /api/v1/rankings/*.json 契约冻结,仍为算法分全量。
-    """
-    rows = [dict(it) for it in items if it.get("status") != "stale"]
-    for it in rows:
-        base, ai_s = it.get("heat_score"), it.get("ai_score")
-        it["final_score"] = (round(base * (1 - ai_weight) + ai_s * ai_weight, 1)
-                             if ai_weight > 0 and base is not None and ai_s is not None
-                             else base)
-    rows.sort(key=lambda x: (x["final_score"] is None, -(x["final_score"] or 0)))
-    for i, it in enumerate(rows, 1):
-        it["rank"] = i
-    return rows[:10]
+
+def _weekly_context(c, direction: dict, digest: dict | None,
+                    digest_link: str | None) -> dict:
+    """榜单页顶部「本周要点」卡的数据（无摘要时也返回占位上下文）。"""
+    link = digest_link or f"/dir/{direction['key']}/digest"
+    if not digest:
+        return {"week": None, "current": False, "excerpt": "",
+                "link": link, "created_at": None}
+    return {
+        "week": digest.get("week"),
+        "current": bool(digest.get("current")),
+        "excerpt": _digest_excerpt(digest.get("summary")),
+        "link": link,
+        "created_at": digest.get("created_at"),
+    }
 
 
 def build() -> None:
@@ -516,16 +531,22 @@ def build() -> None:
         # 本次实际渲染的榜单页集合（导航只含可见且有快照的 board）。
         rendered_boards = [b for b in order if b in snaps]
         meta = queries.meta_info(c)
-        bitems = {b: queries.board_items(c, b, snaps[b], latest)
-                  for b in order if b in snaps}
-        bobs = {b: queries.observation_items(c, b, snaps[b], latest, products)
-                for b in order if b in snaps}
+        # 展示层数据：列由 registry.boards.<key>.columns 驱动，名次在数据层重排。
+        board_blocks = {b: queries.display_board_items(c, b, products, latest)
+                        for b in order if b in snaps}
         # 产品当前名次（主榜口径），新闻条目与频道页共用
         rank_of: dict[str, dict] = {}
+        display_ranks: dict[str, dict[str, dict]] = {}
         for b in order:
-            for it in bitems.get(b, []):
+            for it in board_blocks.get(b, {}).get("rows", []):
                 rank_of.setdefault(it["slug"], {
-                    "board": it["board"], "rank": it["rank"], "name": it["name"]})
+                    "board": b, "rank": it["rank"], "name": it["name"]})
+                display_ranks.setdefault(it["slug"], {})[b] = {
+                    "board": b, "rank": it["rank"],
+                    "snapshot_date": snaps.get(b),
+                    "primary_label": it.get("primary_label"),
+                    "primary": it.get("primary"),
+                }
         directions = [{"key": k, **v} for k, v in reg.get("directions", {}).items()]
 
         common = {
@@ -568,28 +589,23 @@ def build() -> None:
             "SELECT substr(published_at, 1, 10) d, COUNT(*) n FROM news_items"
             " WHERE published_at IS NOT NULL GROUP BY d ORDER BY d DESC LIMIT 1"
         ).fetchone()
-        ai_weight = float(ai_mod.cfg()["scoring"].get("ai_weight", 0.0))
-        core_display = _core_display(bitems.get("harness_core", []), ai_weight)
-        model_items = bitems.get("model", [])
 
         # ---- 三方向频道页（每方向三子页：榜单 / 新闻 / 每周总结，共用导航切换）----
         def direction_block(bkey: str) -> dict:
-            rows = bitems.get(bkey, [])
-            if bkey == "harness_core":
-                rows = _core_display(rows, ai_weight)
-            return {
+            blk = dict(board_blocks.get(bkey) or {})
+            blk.update({
                 "key": bkey,
                 "name": reg["boards"].get(bkey, {}).get("name", bkey),
-                "rows": rows[:10],
-                "obs": len(bobs.get(bkey, [])),
+                "rows": list(blk.get("rows") or []),
                 "snapshot_date": snaps.get(bkey),
                 "folded": bool(reg["boards"].get(bkey, {}).get("folded")),
-                "top_metrics": _top_metrics(bkey, reg),
-            }
+            })
+            return blk
 
         direction_cards = []
         nmeta = queries.news_meta(c)   # 方向页顶栏需展示新闻截至时间
         direction_outputs: set[str] = set()
+        weekly_by_board: dict[str, dict] = {}
         for d in directions:
             blocks = [direction_block(b) for b in (d.get("boards") or [])]
             cats = d.get("news_categories") or []
@@ -601,6 +617,9 @@ def build() -> None:
             digest_link = (f"/dir/{d['key']}/digest/{digest['week']}.html"
                            if digest and any(w["week"] == digest["week"]
                                              for w in digest_weeks) else None)
+            weekly = _weekly_context(c, d, digest, digest_link)
+            for b in d.get("boards") or []:
+                weekly_by_board[b] = weekly
             # 三页共用：导航/当前态/SEO 由 direction_page_context 生成；
             # 各页只携带自己的板块数据（榜单 / 新闻 / 周总结）。
             direction_news = queries.news_for_categories(c, cats, 12)
@@ -614,6 +633,7 @@ def build() -> None:
                    **direction_page_context(d, "board"),
                    **hw_ctx,
                    board_blocks=blocks,
+                   weekly=weekly,
                    news_meta=nmeta, news_page=False,
                    news_rank=rank_of)
             render(pages["news"]["template"], pages["news"]["output"],
@@ -652,45 +672,23 @@ def build() -> None:
         render("index.html", "index.html",
                seo_kind="home",
                seo_ctx={"path": "/", "counts": meta.get("counts") or {}},
-               unified=core_display,
-               model_top=model_items[:5],
                direction_cards=direction_cards,
-               ai_board=ai_mod.summary_of(c, "board"),
-               ai_weight_pct=round(ai_weight * 100),
-               unified_total=len(bitems.get("harness_core", [])),
-               eco_total=len(bitems.get("harness_eco", [])),
-               model_total=len(bitems.get("model", [])),
+               unified_total=len(board_blocks.get("harness_core", {}).get("rows", [])),
+               eco_total=len(board_blocks.get("harness_eco", {}).get("rows", [])),
+               model_total=len(board_blocks.get("model", {}).get("rows", [])),
                kpi_sources=src_ok, kpi_sources_enabled=src_enabled,
                kpi_news_count=(nday["n"] if nday else 0),
-               kpi_news_date=(nday["d"] if nday else "—"),
-               obs_total=sum(len(v) for k, v in bobs.items()))
+               kpi_news_date=(nday["d"] if nday else "—"))
 
         # ---- 榜单页 ----
         for b in rendered_boards:
-            if b == "harness_core":
-                items = _core_display(bitems[b], ai_weight)
-            elif b == "model":
-                items = bitems[b]   # AA Top 40 全量展示
-            else:
-                items = bitems[b][:15]   # 各赛道页统一前 15,页面长短一致
-            mom = sorted((i for i in items if i["momentum_score"] is not None),
-                         key=lambda x: -x["momentum_score"])
-            hist = queries.history_series(c, b, 90)
-            dates = [h["date"] for h in hist]
-            by_slug = {h["date"]: {x["slug"]: x["heat_score"] for x in h["items"]}
-                       for h in hist}
-            series = {it["name"]: [by_slug.get(d, {}).get(it["slug"]) for d in dates]
-                      for it in items[:5]}
-            history_chart = svgchart.multi_line_chart(
-                dates, series, unit="score", hover=True, max_points=120,
-                title=f"{reg['boards'][b]['name']}近 90 天热度走势")
+            blk = board_blocks[b]
             render("rankings.html", f"rankings/{b}.html",
                    seo_kind="ranking",
                    seo_ctx={"path": f"/rankings/{b}"},
                    board=b, name=reg["boards"][b]["name"],
-                   snapshot_date=snaps[b], items=items, momentum_items=mom,
-                   observation=bobs[b], top_metrics=_top_metrics(b, reg),
-                   history_chart=history_chart)
+                   snapshot_date=snaps[b], items=blk["rows"],
+                   block=blk, weekly=weekly_by_board.get(b))
 
         # 清理旧构建残留的榜单页（hidden 源榜 / 旧 board_key），连带 .html.gz
         try:
@@ -704,9 +702,12 @@ def build() -> None:
         news_idx = queries.news_by_product(c, limit_per_product=8)
         for p in products:
             d = queries.product_detail(c, p["slug"])
-            d["latest_ranks"] = {}
-            for r in d["ranks"]:
-                d["latest_ranks"].setdefault(r["board"], r)
+            # 产品页只展示名次与原始指标：名次取当前展示榜，热度/动量/AI 分不再渲染。
+            d["latest_ranks"] = {
+                b: dict(r) for b, r in (display_ranks.get(p["slug"]) or {}).items()
+                if b in rendered_boards}
+            for r in d["latest_ranks"].values():
+                r["href"] = f"/rankings/{r['board']}"
             d["news"] = news_idx.get(p["id"], [])
             charts, chart_units, chart_sources = _product_charts(d, reg)
             render("product.html", f"product/{p['slug']}.html",

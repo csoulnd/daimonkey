@@ -167,8 +167,9 @@
 
   function metaLine(item) {
     if (item.type === "product") {
-      var bits = [item.board_name || item.board || "产品"];
-      if (item.heat !== null && item.heat !== undefined) bits.push("热度 " + item.heat);
+      var bits = [];
+      var label = item.board_name || item.subtitle;
+      if (label) bits.push(label);
       if (item.tier) bits.push(item.tier);
       return bits.filter(Boolean).join(" · ");
     }
@@ -372,13 +373,13 @@
     overlay.innerHTML =
       '<div class="ss-dialog" role="dialog" aria-modal="true" aria-label="站内搜索">' +
         '<div class="ss-head">' +
-          '<span class="ss-icon" aria-hidden="true">⌕</span>' +
+          '<span class="ss-icon" aria-hidden="true"><svg class="ic"><use href="#i-search"/></svg></span>' +
           '<input class="ss-input" type="search" id="ss-input" role="combobox" ' +
             'aria-expanded="false" aria-controls="ss-results" aria-autocomplete="list" ' +
             'placeholder="搜索产品、榜单、方向频道与新闻…" autocomplete="off" ' +
             'autocapitalize="off" spellcheck="false">' +
           '<span class="ss-kbd"><kbd>Esc</kbd></span>' +
-          '<button class="ss-close" type="button" aria-label="关闭搜索">关闭</button>' +
+          '<button class="ss-close" type="button" aria-label="关闭搜索"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg> 关闭</button>' +
         '</div>' +
         '<div class="ss-status" id="ss-status" aria-live="polite"></div>' +
         '<div class="ss-results" id="ss-results" role="listbox" aria-label="搜索结果"></div>' +

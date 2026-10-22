@@ -318,6 +318,18 @@ class TestProductCharts(unittest.TestCase):
         self.assertEqual(sitegen._metric_unit("unknown_metric", reg), "")
 
 
+class TestWeeklyPoints(unittest.TestCase):
+    def test_digest_excerpt_keeps_first_two_sentences(self):
+        text = "第一句。第二句！第三句。"
+        self.assertEqual(sitegen._digest_excerpt(text), "第一句。第二句！")
+
+    def test_digest_excerpt_truncates_long_sentence(self):
+        text = "很长" * 200 + "。第二句。"
+        got = sitegen._digest_excerpt(text)
+        self.assertLessEqual(len(got), 221)
+        self.assertTrue(got.endswith("…"))
+
+
 class TestRankingsCleanup(unittest.TestCase):
     def test_stale_rankings_removed_with_gz(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -5,26 +5,13 @@
 </span>
 {%- endmacro %}
 
-{% macro cov(v) -%}
-<span class="cov" title="数据覆盖率（按权重）"><i style="width: {{ ((v or 0) * 100) | round(0) | int }}%"></i><em>{{ ((v or 0) * 100) | round(0) | int }}%</em></span>
-{%- endmacro %}
-
-{% macro delta(d) -%}
-{% if d is none %}<span class="dim">—</span>{% elif d > 0 %}<span class="up" title="名次上升">▲{{ d }}</span>{% elif d < 0 %}<span class="down" title="名次下降">▼{{ -d }}</span>{% else %}<span class="dim">—</span>{% endif %}
-{%- endmacro %}
-
-{% macro score(v, kind='heat', bar=False) -%}
-{% if v is none %}<span class="dim" title="历史数据累积中（需约30天）">—</span>{% else %}<span class="score {{ kind }}">{{ '%.1f' | format(v) }}</span>{% if bar %}<i class="hbar" style="width: {{ (v * 0.9) | round(0) | int }}px"></i>{% endif %}{% endif %}
+{% macro score(v, kind='num', bar=False) -%}
+{% if v is none %}<span class="dim">—</span>{% elif v is string %}<span class="score {{ kind }}">{{ v }}</span>{% else %}<span class="score {{ kind }}">{{ v | int if v == (v | int) else '%.1f' | format(v) }}</span>{% endif %}
 {%- endmacro %}
 
 {# pages=None 表示调用方未提供「有榜单页的 board 集合」，保持旧行为（可点）。 #}
 {% macro badge(board, names, pages=None) -%}
 {% if pages is none or board in pages %}<a class="badge b-{{ board }}" href="/rankings/{{ board }}">{{ names.get(board, board) }}</a>{% else %}<span class="badge b-{{ board }}">{{ names.get(board, board) }}</span>{% endif %}
-{%- endmacro %}
-
-{# AI 分析分单元格（v1.4）：悬停显示一句话理由；未生成时显 — #}
-{% macro ai_cell(it) -%}
-{% if it.ai_score is not none %}<span class="ai-score" title="AI 分析分：{{ it.ai_rationale or '基于规则分与指标的分析' }}（不影响排序）">{{ it.ai_score | round | int }}</span>{% else %}<span class="dim" title="AI 分析分（随下一次全量更新生成）">—</span>{% endif %}
 {%- endmacro %}
 
 {# 板块顶部 AI 摘要卡片（三页统一格式）：显著标注 AI 生成与非确定性 #}
@@ -34,6 +21,28 @@
   <div class="ai-summary-head"><span class="ai-badge"><svg class="mk" aria-hidden="true"><use href="#i-monkey"/></svg>马猴说</span><span class="ai-tag">AI 摘要 · 本期要点</span></div>
   <p class="ai-summary-body">{{ summary.content }}</p>
   <div class="ai-summary-foot dim">AI 摘要 · 更新于 {{ summary.created_at | dt }}</div>
+</section>
+{% endif %}
+{%- endmacro %}
+
+{# 榜单页顶部「本周要点」卡：周次 + 摘要前 1–2 句 + 完整周总结入口。 #}
+{% macro weekly_card(weekly) -%}
+{% if weekly %}
+<section class="ai-summary weekly-points" aria-label="本周要点">
+  <div class="ai-summary-head">
+    <span class="ai-badge">本周要点</span>
+    <span class="ai-tag">{% if weekly.week %}{{ weekly.week }}{% endif %}{% if weekly.current %} · 本周{% endif %}</span>
+  </div>
+  {% if weekly.excerpt %}
+  <p class="ai-summary-body">{{ weekly.excerpt }}</p>
+  <div class="ai-summary-foot dim">
+    {% if weekly.link %}<a href="{{ weekly.link }}">查看完整周总结 →</a>{% endif %}
+    {% if weekly.created_at %}<span> · 更新于 {{ weekly.created_at | dt }}</span>{% endif %}
+  </div>
+  {% else %}
+  <p class="ai-summary-body dim">本周总结待生成。</p>
+  <div class="ai-summary-foot dim">{% if weekly.link %}<a href="{{ weekly.link }}">查看每周总结 →</a>{% endif %}</div>
+  {% endif %}
 </section>
 {% endif %}
 {%- endmacro %}

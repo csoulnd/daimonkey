@@ -13,7 +13,7 @@ status: active
 | `static/assets/daimonkey.svg` | 单色 mark(currentColor 着色,导航/按钮/宠物) |
 | `static/assets/daimonkey-color.svg` | 炫彩渐变版(强调场景) |
 | `static/assets/favicon.svg` | 站点 favicon(深底炫彩) |
-| `static/assets/daimonkey/{表情名}.svg` | 表情集单文件版(17 个,含两批评审修订;站内用 base.html 内联 symbol `#i-monkey-*`) |
+| `static/assets/daimonkey/{表情名}.svg` | 表情集单文件版(17 个,含两批评审修订;站内 inline sprite 只保留 4 张:`#i-monkey` / `#i-monkey-thinking` / `#i-monkey-happy` / `#i-monkey-angry`) |
 
 规范:mark 使用 `currentColor` 继承文字色;炫彩版仅用于 favicon、加载态等强调场景,不在正文重复出现;眼睛为负空间色(`--bg`)。
 
@@ -33,6 +33,8 @@ status: active
 | `#i-monkey-wow` | 惊讶(圈眼+O嘴) | 突发大新闻/异常波动 | 后弹 dm-pop |
 | `#i-monkey-error` | 出错(X 眼) | 请求失败/网络中断 | 摇头 dm-no |
 
+> 2026-10-22 图标系统 v2:站内 inline sprite 只保留 4 张脸(`i-monkey` / `i-monkey-thinking` / `i-monkey-happy` / `i-monkey-angry`);上表的 loading / sleepy / calm / wow / error 与下文第二批 9 张表情、2 个帽子头像已从 sprite 移除(单文件 SVG 资产保留在 `static/assets/daimonkey/`)。错误态统一用 `i-monkey-angry`,数据过期横幅改用 `i-warning` 功能图标。
+
 第二批图鉴扩展(2026-10-17,共 9 个,暂未接线动效,应用为下一步;同日评审修订见括注):
 
 **情绪专属色规范(2026-10-17 评审定)**:头型与主五官保持 `currentColor` 跟随主题;情绪签名单独用固定色——怒火渐变 `#ffd24d→#ff6b4a`(sprite 内 `dm-fire`)、爱心 `#ff6b9d`、腮红 `#ff8fa8`、彩纸四色 `#7c8cff/#4fd6c4/#f0b429/#ff6b9d`、木鱼 `#c98a4b`+`#8a5a33`。loading 双眼为 3/4 圆弧 + SMIL 自转(1.1s/圈,独立文件同样生效)。
@@ -49,18 +51,18 @@ status: active
 | `#i-monkey-dizzy` | 头晕(波浪眼+星星) | 刷新中/重载 |
 | `#i-monkey-party` | 庆祝(尖帽+彩纸) | 里程碑/上线 |
 
-已接线:assistant.js `petFace(name)` 在 startRun(→thinking)、成功(→happy)、失败/网络中断(→error)时切换宠物与面板标题图标。
+已接线:assistant.js `petFace(name)` 在 startRun(→thinking)、成功(→happy)、失败/网络中断(→angry)时切换宠物与面板标题图标;abort 回平静脸。
 
 ## 静态位应用(2026-10-17 扩展)
 
 | 位置 | 表情/形式 | 模板 |
 |---|---|---|
 | AI 摘要卡徽标「马猴说」 | 平静 mark(16px,--acc 着色) | `_macros.html`(榜单/新闻/产品三页)、`news_digest.html` |
-| 数据过期横幅 | 惊讶 wow(替代 ⚠) | `base.html` stale-banner |
+| 数据过期横幅 | 警告图标 `i-warning`(替代 ⚠ / 旧 wow 脸) | `base.html` stale-banner |
 | 页脚署名「大马猴 · 方法论 · 数据源」 | 平静 mark(15px) | `base.html` footer |
-| 登录卡欢迎位 | 冷静 calm(76px,呼吸动效) | `login.html` |
-| 顶栏用户头像 | 炫彩猴圆标:平静/开心/生气/戴帽子(`#i-ava-*`,深底 #0a0a10+品牌渐变,与 favicon 同视觉) | `base.html` sprite + `assistant.js` |
+| 登录卡欢迎位 | 平静猴 `#i-monkey`(76px,静态;calm 已并入) | `login.html` |
+| 顶栏用户头像 | 炫彩猴圆标:平静/开心/生气三张脸(`#i-ava-*`,深底 #0a0a10+品牌渐变,与 favicon 同视觉) | `base.html` sprite + `assistant.js` |
 
-头像规范:默认平静;菜单「换个表情」按 平静→开心→生气→戴帽子 轮换,存 `localStorage.dm-avatar`;防闪烁内联脚本(base.html)用白名单读同一键。五官为负空间 #0a0a10(与圆底同色,天然镂空)。
+头像规范:默认平静;菜单并排单选 平静/开心/生气 三张脸(不再有「戴帽子」项),存 `localStorage.dm-avatar`;防闪烁内联脚本(base.html)用同一白名单读同一键。五官为浅色 `#f6f2ff`,开心/生气各用独立渐变(`dm-ava-happy` / `dm-ava-angry`),深色脸洞上仍可辨识。
 
-规范:静态位一律用内联 symbol(不加载独立 svg 文件);负空间五官(.eye/.mf/.ms)由所在容器的 CSS 注入背景色;表情动效仅用于状态反馈,静态品牌位不加动效(登录页呼吸除外)。
+规范:静态位一律用内联 symbol(不加载独立 svg 文件);负空间五官(.eye/.mf/.ms)由所在容器的 CSS 注入背景色;表情动效仅用于状态反馈,静态品牌位不加动效(登录页为静态平静脸)。

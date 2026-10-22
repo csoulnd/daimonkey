@@ -1,6 +1,9 @@
-/* 手动更新按钮 + 热度/动量视图切换 + 侧栏开合（无框架，原生 JS） */
+/* 手动更新按钮 + 榜单视图切换 + 侧栏开合（无框架，原生 JS） */
 (function () {
   "use strict";
+
+  /* 刷新图标：更新中/恢复按钮都用 innerHTML 保留图标 */
+  var IC_REFRESH = '<svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>';
 
   /* ---- 左侧侧栏：开合 + 记忆 + 当前页高亮 ---- */
   var SIDE_KEY = "side";
@@ -120,7 +123,7 @@
       if (++ticks > 360) {   // ~15 分钟仍 running:放弃轮询,提示人工查看
         clearInterval(timer);
         btn.disabled = false;
-        btn.textContent = orig;
+        btn.innerHTML = orig;
         alert("更新耗时异常(超过15分钟仍在运行)。\n可查看 data/logs/ 下最新日志,或刷新页面查看状态。");
         return;
       }
@@ -128,7 +131,7 @@
         .then(function (r) { return r.json(); })
         .then(function (s) {
           if (s.state === "running") {
-            btn.textContent = "⟳ 更新中…";
+            btn.innerHTML = IC_REFRESH + " 更新中…";
             return;
           }
           clearInterval(timer);
@@ -136,7 +139,7 @@
             location.reload();
           } else {
             btn.disabled = false;
-            btn.textContent = orig;
+            btn.innerHTML = orig;
             var detail = s.build_error || s.error;
             alert("更新结束：" + s.state + (detail ? "\n" + detail : "\n详见 data/logs/"));
           }
@@ -146,7 +149,7 @@
   }
 
   function trigger(btn, endpoint) {
-    var orig = btn.textContent;
+    var orig = btn.innerHTML;
     fetch(endpoint, { method: "POST", credentials: "same-origin" })
       .then(function (res) {
         if (res.status === 401) {
@@ -173,7 +176,7 @@
         .then(function (r) { return r.json(); })
         .then(function (st) {
           if (st.state === "running") {
-            poll(btn, btn.textContent);
+            poll(btn, btn.innerHTML);
             return;
           }
           sessionAuthed().then(function (authed) {

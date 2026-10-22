@@ -1,0 +1,68 @@
+/* 榜单页专用轻量样式：只补充可滚动表格与本周期要点卡，不改全局设计令牌。 */
+.board-subtitle {
+  margin: 0 0 var(--sp-2);
+  color: var(--ink);
+  font-size: var(--fs-base);
+}
+
+.board-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 6px 0 10px;
+}
+
+.board-table {
+  margin: 0;
+  min-width: 760px;
+}
+
+.board-table.cols-8 {
+  min-width: 960px;
+}
+
+.board-table.cols-12 {
+  min-width: 1260px;
+}
+
+.board-table .chip,
+.board-table .stale-tag {
+  white-space: nowrap;
+}
+
+.board-table th,
+.board-table td {
+  vertical-align: middle;
+}
+
+.board-table thead th {
+  text-transform: none;
+}
+
+.board-table th.num,
+.board-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.board-table td.num .sv {
+  display: inline-flex;
+  justify-content: flex-end;
+}
+
+.board-sort-note {
+  margin: 4px 0 2px;
+}
+
+.board-criteria {
+  margin: -2px 0 var(--sp-4);
+}
+
+.weekly-points .ai-summary-body {
+  margin-bottom: var(--sp-2);
+}
+
+@media (max-width: 880px) {
+  .board-table {
+    min-width: 680px;
+  }
+}

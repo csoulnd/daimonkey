@@ -73,3 +73,4 @@ curl -s http://127.0.0.1:8080/api/v1/rankings/nv_infer.json | head
   产品同步范式；组合卡折算不可比，直接跳过。
 
 - 2026-10-21(硬件规格数据层)：规格表从模板手写改为数据层——`collector/hw_specs.json` 存规格、`collector/hw.py` 提供 `load/by_model/field_labels/validate`；厂商固定 NVIDIA / 寒武纪 / 平头哥 PPU / 华为，官方未披露的字段填 `null`（页面显示 —，不猜值），方向页只按 registry 的 `spec_fields/spec_vendors` 取列，新增硬件方向无需改模板。
+- 2026-10-22(NV 榜列重定)：展示列 = MLPerf 三项测试（gpt-oss-120b 主序，DeepSeek-R1/Llama3.1-8B 为展示列，均为单卡离线吞吐）+ FP16 算力/显存/带宽/互联/TDP/官方文档；表下标注 MLPerf Inference 官方 **Closed** 分区口径（单卡 = `Result / total_accelerators`），并说明不可跨分区、跨模型横比。规格取自 `collector/hw_specs.json`，未收录型号显示 —；后续补型号只改 JSON，不动模板与采集。

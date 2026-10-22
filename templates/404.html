@@ -42,6 +42,15 @@
 </style>
 </head>
 <body>
+<svg xmlns="http://www.w3.org/2000/svg" class="sprite-defs" aria-hidden="true" focusable="false">
+  <symbol id="i-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19.5 12H4.8M10.5 5.8 4.3 12l6.2 6.2"/>
+  </symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="10.6" cy="10.6" r="6.2"/>
+    <path d="M15.2 15.2 20 20"/>
+  </symbol>
+</svg>
 <main class="nf-wrap">
   <a class="nf-brand" href="/" aria-label="{{ site.name|default('InferTech 观察站', true) }} · 返回首页">
     <img src="/assets/daimonkey-color.svg" alt="" width="34" height="34">
@@ -54,9 +63,9 @@
     也可以直接搜索产品、榜单、方向频道与新闻。
   </p>
   <div class="nf-actions">
-    <a class="nf-btn primary" href="/">← 返回首页</a>
-    <button class="nf-btn" id="search-open" type="button" aria-haspopup="dialog">
-      ⌕ 搜索本站
+    <a class="nf-btn primary" href="/"><svg class="ic" aria-hidden="true"><use href="#i-arrow-left"/></svg> 返回首页</a>
+    <button class="nf-btn" id="search-open" type="button" aria-haspopup="dialog" aria-label="搜索本站">
+      <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg> 搜索本站
     </button>
   </div>
   <p class="nf-kbd"><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>K</kbd> 随时唤起搜索</p>

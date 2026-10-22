@@ -229,7 +229,7 @@ def _has_table(name: str) -> bool:
 
 
 def _num(v, fmt: str = ".0f", dash: str = "—") -> str:
-    """安全数字格式化：None（如新品无动量历史）显示占位符。"""
+    """安全数字格式化：None（如指标缺失）显示占位符。"""
     try:
         return format(float(v), fmt)
     except (TypeError, ValueError):
@@ -260,9 +260,8 @@ def _pair_sums(values: list[int]) -> set[int]:
 def _board_scope(c, board: str = "harness_core") -> dict:
     """某榜单最新快照的"板块口径"（与页面渲染同一套查询）。
 
-    口径规则：条数只数该 board 最新快照内的 rankings 行，绝不使用
-    products 全站计数（那会把 AA 模型、MLPerf 卡等其他板块算进来）。
-    harness_core / harness_eco / model / nv_infer 各自独立口径。
+    口径规则：total = 榜单收录成员数（与页面/KPI 一致）；ranked = 最新快照
+    已入榜条数。绝不使用 products 全站计数（那会把 AA 模型、MLPerf 卡等算进来）。
     """
     boards = registry().get("boards") or {}
     if board not in boards:
@@ -273,37 +272,81 @@ def _board_scope(c, board: str = "harness_core") -> dict:
     if not snap:
         raise assistant.AssistantError(f"{name}暂无榜单数据")
     latest = load_latest_metrics(c, today_utc())
-    items = queries.board_items(c, board, snap, latest)
+    display = queries.display_board_items(
+        c, board, queries.all_products(c), latest)
+    items = display["rows"]
     if not items:
         raise assistant.AssistantError(f"{name}最新快照为空")
-    observation = queries.observation_items(
-        c, board, snap, latest, queries.all_products(c))
+    ranked = c.execute(
+        "SELECT COUNT(*) n FROM rankings WHERE board=? AND snapshot_date=?",
+        (board, snap)).fetchone()["n"]
     sources = {m["source"]["key"] for it in items
                for m in it.get("metrics", {}).values()
                if (m.get("source") or {}).get("key")}
+    columns = display.get("columns") or [dict(col) for col in
+                                         (boards[board].get("columns") or [])]
     return {"key": board, "name": name, "snapshot": snap, "items": items,
-            "total": len(items), "observation": len(observation),
-            "sources": sources}
+            "total": len(items), "ranked": ranked, "sources": sources,
+            "columns": columns}
 
 
 def _scope_line(scope: dict) -> str:
     """提示词里的显式口径行，防止模型把别的板块也算进来。"""
     return (f"榜单口径：{scope['key']}（{scope['name']}），快照 {scope['snapshot']}，"
-            f"共 {scope['total']} 条（不含其他板块）")
+            f"收录 {scope['total']} 个、入榜 {scope['ranked']} 条（不含其他板块）")
 
 
 def _base_allowed() -> set[int]:
-    """数量对账的公共合法数字：0 在"个/条/名"语境下恒可解释（观察区 0 个、
-    缺口 0 条等），不能因为本板块某个计数恰好非 0 就把它判成幻觉。"""
+    """数量对账的公共合法数字：0 在"个/条/名"语境下恒可解释。"""
     return {0}
 
 
-def _summary_allowed(scope: dict, top_n: int) -> set[int]:
-    """本板块内可解释的数字集合：条数、观察区、TOP N、数据源数、已有名次。"""
-    allowed = _base_allowed() | {
-        scope["total"], scope["observation"], top_n, len(scope["sources"])}
+def _summary_allowed(scope: dict, top_n: int,
+                     rows: list[dict] | None = None) -> set[int]:
+    """本板块内可解释的数字集合：条数、TOP N、数据源数、已有名次与原始指标。"""
+    allowed = _base_allowed() | {scope["total"], scope["ranked"], top_n,
+                                 len(scope["sources"])}
     allowed |= set(range(1, scope["total"] + 1))   # 第 N 名必须是该榜真实名次
+    for it in (rows if rows is not None else scope["items"]):
+        for value in (it.get("metric_values") or {}).values():
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                allowed.add(int(round(value)))
     return allowed
+
+
+def _prompt_metric_columns(scope: dict) -> list[dict]:
+    return [c for c in (scope.get("columns") or [])
+            if c.get("type") == "metric"]
+
+
+def _prompt_metric_value(col: dict, value) -> str:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        key = str(col.get("key") or "")
+        fmt = ",.1f" if key.startswith(("aa_", "mlperf_")) else ",.0f"
+        return _num(value, fmt)
+    return _num(value)
+
+
+def _prompt_row(it: dict, cols: list[dict]) -> str:
+    bits = []
+    values = it.get("metric_values") or {}
+    for col in cols:
+        value = values.get(col.get("key"))
+        if value is None:
+            continue
+        bits.append(f"{col.get('label')} {_prompt_metric_value(col, value)}")
+    tail = " ".join(bits) if bits else "指标待采集"
+    return f"{it['rank']}. {it['name']}（{it.get('vendor') or '—'}）{tail}"
+
+
+def _prompt_brief(it: dict, cols: list[dict]) -> str:
+    values = it.get("metric_values") or {}
+    for col in cols:
+        value = values.get(col.get("key"))
+        if value is not None:
+            return (f"{it['name']}（{col.get('label')} "
+                    f"{_prompt_metric_value(col, value)}）")
+    return str(it.get("name") or "")
 
 
 def _page_summary_data(c, page: str, board: str | None = None) -> dict:
@@ -313,49 +356,20 @@ def _page_summary_data(c, page: str, board: str | None = None) -> dict:
         top_n = 10 if page == "home" else 15
         scope = _board_scope(c, key)
         rows = scope["items"][:top_n]
-        allowed = _summary_allowed(scope, top_n)
-        if page == "home":
-            lines = [
-                f"{r['rank']}. {r['name']}（{r['vendor']}）热度{_num(r['heat_score'])}"
-                f" 动量{_num(r['momentum_score'])}"
-                + (f" 7日{_num(r['delta_7d'], '+.1f')}"
-                   if r['delta_7d'] is not None else "")
-                for r in rows]
-            data = (f"{_scope_line(scope)}；本次列出前 {len(rows)} 条"
-                    f"，观察区 {scope['observation']} 个"
-                    f"，本榜数据源 {len(scope['sources'])} 个：\n"
-                    + "\n".join(lines))
-            shown = rows[:5]
-            allowed.add(len(shown))
-            template = (
-                f"{scope['name']}（{scope['key']}）最新快照 {scope['snapshot']} "
-                f"共 {scope['total']} 条（不含其他板块），观察区 {scope['observation']} 个。"
-                f"前 {len(shown)} 名："
-                + "、".join(f"{r['name']}（热度{_num(r['heat_score'])}）"
-                            for r in shown)
-                + "。")
-        else:
-            lines = [
-                f"{r['rank']}. {r['name']}（{r['vendor']}）算法{_num(r['heat_score'])}"
-                f" 动量{_num(r['momentum_score'])}"
-                + (f" 7日{_num(r['delta_7d'], '+.1f')}"
-                   if r['delta_7d'] is not None else "")
-                + (f" AI复评{_num(r.get('ai_score'), 'd')}:{r.get('ai_rationale')}"
-                   if r.get("ai_score") is not None else " 无AI复评")
-                for r in rows]
-            data = (f"{_scope_line(scope)}；本次列出前 {len(rows)} 条"
-                    f"，观察区 {scope['observation']} 个"
-                    f"，本榜数据源 {len(scope['sources'])} 个：\n"
-                    + "\n".join(lines))
-            shown = rows[:5]
-            allowed.add(len(shown))
-            template = (
-                f"{scope['name']}（{scope['key']}）最新快照 {scope['snapshot']} "
-                f"共 {scope['total']} 条（不含其他板块），观察区 {scope['observation']} 个。"
-                f"前 {len(shown)} 名："
-                + "、".join(f"{r['name']}（算法{_num(r['heat_score'])}）"
-                            for r in shown)
-                + "。")
+        cols = _prompt_metric_columns(scope)
+        allowed = _summary_allowed(scope, top_n, rows)
+        lines = [_prompt_row(r, cols) for r in rows]
+        data = (f"{_scope_line(scope)}；本次列出前 {len(rows)} 条"
+                f"，本榜数据源 {len(scope['sources'])} 个：\n"
+                + "\n".join(lines))
+        shown = rows[:5]
+        allowed.add(len(shown))
+        template = (
+            f"{scope['name']}（{scope['key']}）最新快照 {scope['snapshot']} "
+            f"收录 {scope['total']} 个、入榜 {scope['ranked']} 条（不含其他板块）。"
+            f"前 {len(shown)} 名："
+            + "、".join(_prompt_brief(r, cols) for r in shown)
+            + "。")
         return {"data": data, "allowed": allowed, "template": template,
                 "allowed_dates": {scope["snapshot"]}}
 
@@ -436,7 +450,7 @@ def _page_summary_task(payload: dict) -> str:
     return (
         "以下是本站数据页面的当周概况。\n" + ctx["data"]
         + "\n\n请用中文写一段 150-200 字的页面摘要，面向初次访问的读者："
-          "先说这个板块是什么，再概括当前的重点信息与变化趋势；"
+          "先说这个板块是什么，再概括当前的重点信息与位置；"
           "涉及数量时只能引用上文给出的板块口径数字，不要估算、不要累加其他板块；"
           "只输出摘要正文，不要标题、不要解释、不要 Markdown 语法。")
 
@@ -485,7 +499,7 @@ def _board_scores_task(payload: dict) -> str:
     if not rows:
         raise assistant.AssistantError(f"榜单 {board} 当日无数据")
     lines = [f"{r['rank']}. slug={r['slug']} {r['name']}（{r['vendor']}，"
-             f"{r['category']}）规则热度{_num(r['heat_score'])}"
+             f"{r['category']}）公开采纳指标{_num(r['heat_score'])}"
              f" 动量{_num(r['momentum_score'])}"
              + (f" 7日变化{_num(r['delta_7d'], '+.1f')}"
                 if r['delta_7d'] is not None else "")

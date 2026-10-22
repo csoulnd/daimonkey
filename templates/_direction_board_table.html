@@ -1,20 +1,54 @@
 {% import "_macros.html" as m %}
-<table class="tbl">
-  <thead><tr><th>#</th><th>产品</th><th>热度分</th><th>7d</th><th>动量分</th><th>覆盖率</th>
-  {% for mk in blk.top_metrics %}<th>{{ metric_names.get(mk, mk) }}</th>{% endfor %}</tr></thead>
-  <tbody>
-  {% for it in blk.rows %}
-  <tr>
-    <td class="rank{% if it.rank <= 3 %} top{% endif %}">{{ it.rank }}</td>
-    <td class="pname"><a href="/product/{{ it.slug }}">{{ it.name }}</a><span class="vendor">{{ it.vendor }}</span></td>
-    <td>{{ m.score(it.heat_score, 'heat', bar=True) }}</td>
-    <td>{{ m.delta(it.delta_7d) }}</td>
-    <td>{{ m.score(it.momentum_score, 'mom') }}</td>
-    <td>{{ m.cov(it.coverage) }}</td>
-    {% for mk in blk.top_metrics %}{% set mm = it.metrics.get(mk) %}
-    <td>{% if mm %}{{ m.mval(mm) }}{% else %}<span class="dim">—</span>{% endif %}</td>
+{# 榜单表：列定义全部来自 registry.boards.<key>.columns，模板只按 type 渲染。 #}
+{% macro bcell(c, col) -%}
+{% if c is none or (c.value is defined and c.value is none) -%}
+<span class="dim">—</span>
+{%- elif col.type == 'product' -%}
+<a href="/product/{{ c.slug }}">{{ c.name }}</a>{% if c.status == 'stale' %}<span class="stale-tag" title="超过 90 天无推送">停滞</span>{% endif %}
+{%- elif col.type == 'vendor' -%}
+{{ c.value }}
+{%- elif col.type == 'tier' -%}
+<span class="chip">{{ c.label }}</span>
+{%- elif col.type == 'metric' -%}
+{{ m.mval(c) }}
+{%- elif col.type == 'hw' -%}
+{{ m.score(c.value, 'spec') }}
+{%- elif col.type == 'text' -%}
+{{ c.value }}
+{%- elif col.type == 'doc' -%}
+<a href="{{ c.url }}" target="_blank" rel="noopener">官方文档</a>
+{%- else -%}
+<span class="dim">—</span>
+{%- endif %}
+{%- endmacro %}
+
+{% if blk.sort_note %}<p class="dim board-sort-note">排序规则：{{ blk.sort_note }}</p>{% endif %}
+<div class="tbl-scroll board-table-wrap" role="region"
+     aria-label="{{ blk.name }}榜单（可横向滚动）" tabindex="0">
+  <table class="tbl board-table cols-{{ blk.columns | length }}">
+    <thead>
+      <tr>
+        {% for col in blk.columns %}
+        <th{% if col.type in ('metric', 'hw') %} class="num"{% endif %}>{{ col.label }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+    {% for it in blk.rows %}
+      <tr>
+        {% for col in blk.columns %}
+        {% set c = it.cells.get(col.key) %}
+        {% if col.type == 'rank' %}
+        <td class="rank{% if it.rank <= 3 %} top{% endif %}">{{ it.rank }}</td>
+        {% elif col.type in ('metric', 'hw') %}
+        <td class="num">{{ bcell(c, col) }}</td>
+        {% else %}
+        <td>{{ bcell(c, col) }}</td>
+        {% endif %}
+        {% endfor %}
+      </tr>
     {% endfor %}
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
+    </tbody>
+  </table>
+</div>
+{% if blk.criteria %}<p class="dim board-criteria">{{ blk.criteria }}</p>{% endif %}

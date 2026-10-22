@@ -4,7 +4,7 @@
 {% block content %}
 <section class="hero">
   <div>
-    <h1 class="hero-h">看清 AI 世界的<span class="grad">真实热度</span></h1>
+    <h1 class="hero-h">看清 AI 世界的<span class="grad">真实位置</span></h1>
     <p class="hero-sub">智能体、模型、硬件,三个方向一处看全</p>
   </div>
   <span class="meta-chip"><i></i>数据截至 {{ meta.last_collected_at | dt }}</span>
@@ -30,7 +30,7 @@
     {% endif %}
     {% elif d.top %}
     <ol class="plist">
-      {% for it in d.top %}<li><span class="pname">{{ it.name }}</span><span class="score heat">{{ '%.1f' | format(it.final_score or it.heat_score) }}</span></li>{% endfor %}
+      {% for it in d.top %}<li><span class="pname">#{{ it.rank }} {{ it.name }}</span>{% if it.primary %}<span class="dim">{{ it.primary_label }} {{ it.primary.value | num }}</span>{% endif %}</li>{% endfor %}
     </ol>
     {% else %}
     <p class="dim">榜单数据接入中。</p>
@@ -52,11 +52,11 @@
 <details id="methodology" class="method-fold">
   <summary>评分说明</summary>
   <div class="method-body dim">
-    <p><strong>三方向频道</strong>:智能体、模型、硬件三个方向各自提供新闻流、榜单与每周总结;方向顺序、关联榜单与新闻范围全部由配置定义,可按讨论演进调整。</p>
-    <p><strong>智能体核心榜</strong>:只收能自主干活的产品——面向用户可用、具备自主执行/多步编排、且有公开使用数据。汇总 GitHub、npm、PyPI、应用商店等公开数据算出热度与动量,再叠加 AI 复评;长期未更新的产品不展示。</p>
-    <p><strong>生态项目榜</strong>:协议(MCP)、库/框架(LangChain)、编排工具(n8n)等按生态维度单独评分,与核心榜平行展示、互不混排。两榜的收录口径见智能体频道「收录说明」。</p>
-    <p><strong>模型评测</strong>:以 Artificial Analysis Intelligence Index 总评分为准,自动收录当前主流模型(同系列取最高分版本,前 40);AA 编码/智能体指数作参考列,每格数值可溯源。旧中文月报口径已停用,历史数据仅存档。</p>
-    <p>覆盖率不足的产品放入观察区,不参与排名,避免数据少被误判为热度低。</p>
+    <p><strong>三方向频道</strong>：智能体、模型、硬件三个方向各自提供新闻流、榜单与每周总结；方向顺序、关联榜单与新闻范围全部由配置定义，可按讨论演进调整。</p>
+    <p><strong>智能体核心榜</strong>：只收面向用户可用、具备自主执行或多步编排的产品。按 GitHub Stars 优先排序，无仓库产品按 npm 月下载与商店排名列后，所有数字可在产品页回查原始响应。</p>
+    <p><strong>生态项目榜</strong>：协议（MCP）、库/框架（LangChain）、编排工具（n8n）等按生态维度单独成榜，与核心产品榜平行展示，使用同一套公开采纳指标。</p>
+    <p><strong>模型榜</strong>：以 Artificial Analysis Intelligence Index 从高到低排序，自动收录当前主流模型（同系列取最高分版本，前 40）；编码指数与 Agent 指数作为细分能力参考列。</p>
+    <p><strong>硬件榜</strong>：按 MLPerf Inference 官方 Closed 分区的单卡离线吞吐排序，辅以厂商公开的算力、显存、互联与功耗规格；厂商未披露的数值以“—”表示。</p>
   </div>
 </details>
 {% endblock %}

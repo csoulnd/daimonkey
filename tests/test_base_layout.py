@@ -14,7 +14,7 @@ from jinja2 import Environment, FileSystemLoader
 from collector import seo
 from collector.config import TEMPLATES_DIR
 
-DEFAULT_DESC = ("以推理技术为重心,聚合智能体热度榜单、AI 新闻、报告厅"
+DEFAULT_DESC = ("以推理技术为重心,聚合智能体、模型、硬件三方向榜单、AI 新闻、报告厅"
                 "与个人知识库的可溯源技术观察站。")
 
 # 私有页上下文：reports/knowledge/clipboard/notes 四种页面标志。

@@ -12,9 +12,6 @@
    颜色一律使用 style.css 的 :root 设计令牌，不写裸色值。
    ========================================================================== */
 
-/* 额外的表情 symbol 容器（i-monkey-hat），零尺寸隐藏，不影响布局 */
-.asst-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
-
 /* ---- 悬浮宠物入口 ---- */
 #asst-pet {
   position: fixed;
@@ -235,7 +232,6 @@ html.authed #asst-pet.hide { display: none; }
   font-size: var(--fs-xs);
 }
 #asst-panel[data-mode="ops"] .asst-mode-hint { color: var(--heat); }
-#asst-panel[data-mode="ops"] .asst-mode-hint::before { content: "⚙ "; }
 #asst-panel .asst-mobile-sessions {
   display: none;
   align-items: center;
@@ -424,10 +420,16 @@ html.authed #asst-pet.hide { display: none; }
   flex: none;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.8;
+  stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* v2 图标：面板头部 16px，审批 14px，会话行/新建 12px（与设计稿一致） */
+#asst-panel .asst-panel-actions button.icon .ic { width: 16px; height: 16px; }
+#asst-panel .asst-approval-head .ic { width: 14px; height: 14px; margin-right: 4px; }
+#asst-panel .asst-s-acts .ic { width: 12px; height: 12px; }
+#asst-panel #asst-new .ic { width: 12px; height: 12px; }
+#asst-panel .asst-mobile-sessions .ic { width: 14px; height: 14px; }
 #asst-panel .asst-experts-count { color: var(--dim); }
 #asst-panel .asst-experts-count:not(:empty)::before { content: "· "; }
 #asst-panel .asst-experts-list {
@@ -588,4 +590,68 @@ html.authed #asst-pet.hide { display: none; }
 /* 触屏设备没有 hover：会话项的重命名/删除按钮常显 */
 @media (hover: none) {
   #asst-panel .asst-s-acts { display: inline-flex; }
+}
+
+/* ---- 顶栏头像：三张脸选择器（平静 / 开心 / 生气，取代旧的循环切换） ----
+   style.css 里的 .avatar-menu 只负责菜单外框；这里加宽并排下三张 44px 圆脸。
+   放在 assistant.css（style.css 之后加载），用 #account-box 提高特异性覆盖。 */
+#account-box .avatar-menu {
+  min-width: 0;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  padding: 8px;
+}
+#account-box .avatar-name { padding: 4px 4px 8px; margin-bottom: 6px; }
+.avatar-face-picker { min-width: 0; }
+.avatar-face-cap { padding: 0 4px 8px; color: var(--dim); font-size: 0.75em; }
+.avatar-face-row { display: flex; gap: 10px; padding: 0 4px 2px; }
+.avatar-face-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+.avatar-face {
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: inherit;
+  line-height: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.avatar-face svg { width: 40px; height: 40px; display: block; border-radius: 50%; }
+.avatar-face:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+.avatar-face:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.avatar-face.on {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--acc) 30%, transparent);
+}
+.avatar-face-name {
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.avatar-face-item.on .avatar-face-name { color: var(--ink); }
+
+/* 换脸时短促 scale：顶栏头像 + 悬浮宠物 + 面板标题同时「弹」一下 */
+@keyframes dm-avatar-pop {
+  0% { transform: scale(0.78); }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+#account-box .avatar svg.avatar-pop,
+#asst-pet .pet-icon.avatar-pop,
+#asst-panel-title .pet-icon.avatar-pop {
+  transform-origin: center;
+  animation: dm-avatar-pop 0.3s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  #account-box .avatar svg.avatar-pop,
+  #asst-pet .pet-icon.avatar-pop,
+  #asst-panel-title .pet-icon.avatar-pop { animation: none; }
 }

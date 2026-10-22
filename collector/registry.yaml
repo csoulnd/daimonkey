@@ -1,5 +1,5 @@
 # =============================================================================
-# 智能体热度指数 - 运维核心配置
+# InferTech 观察站 - 运维核心配置
 # 新增产品 / 榜单 / 数据源开关：改本文件即可，不需要改代码。
 # 新增"数据源类型"才需要写新采集器模块（collector/sources/ 一源一模块）。
 # =============================================================================
@@ -29,7 +29,7 @@ directions:
     short: Harness
     icon: i-index
     tagline: 核心产品 + 生态项目分层
-    description: 关注能自主执行、多步编排的智能体产品；核心产品与生态项目平行展示，永不混排。
+    description: 谁在真正被使用：核心产品与生态项目分层呈现，用公开采纳数据说明每个项目的真实位置。
     boards: [harness_core, harness_eco]
     news_tag: harness
     news_categories: [coding, framework]
@@ -46,7 +46,7 @@ directions:
     short: FM
     icon: i-method
     tagline: AA 总评分 · 周更
-    description: 以 Artificial Analysis Intelligence Index 总评分为准，自动收录当前主流模型（同系列取最高分版本）；SuperCLUE 已停用，历史数据仅作存档。
+    description: 主流模型的综合能力横评：以行业通用智能指数为序，附编码与 Agent 细分能力。
     boards: [model]
     news_tag: fm
     news_categories: [models, research]
@@ -55,7 +55,7 @@ directions:
     short: NV
     icon: i-chip
     tagline: MLPerf 推理性能 · 季度
-    description: 以 MLPerf Inference 官方结果为准，按加速卡单卡推理吞吐排名（gpt-oss-120b Offline，Tokens/s per 卡）；厂商规格与云定价后续接入。
+    description: 一张卡能跑多快：按 MLPerf 推理基准排序，辅以算力、显存带宽与互联规格。
     boards: [nv_infer]
     news_tag: nv
     news_categories: [infra]
@@ -168,10 +168,29 @@ boards:
     derived: true
     derived_from: [coding, general, claw]
     tier: core
+    subtitle: 谁在真正被使用：核心产品按公开采纳指标排序，展示每个项目的真实位置。
+    columns: &harness_columns
+      - {key: rank, label: "#", type: rank}
+      - {key: product, label: 产品, type: product}
+      - {key: tier, label: 类型, type: tier, labels: {core: 核心, eco: 生态}}
+      - {key: github_stars, label: GitHub Stars, type: metric}
+      - {key: github_commits_30d, label: 30 天提交, type: metric}
+      - {key: npm_monthly_downloads, label: npm 月下载, type: metric}
+      - {key: vscode_installs, label: VS Code 安装, type: metric}
+      - {key: appstore_rank, label: 商店排名, type: metric}
+    sort: &harness_sort
+      keys:
+        - {metric: github_stars, direction: desc}
+        - {metric: npm_monthly_downloads, direction: desc}
+        - {metric: appstore_rank, direction: asc}
+      note: "GitHub Stars 优先；无仓库产品按 npm 下载 / 商店排名列后"
   harness_eco:
     name: 生态项目榜
     folded: true                # 频道页折叠区，不占主表
     select: {tier: eco}
+    subtitle: 生态项目按公开采纳指标排序，用 Stars、提交与分发数据说明每个项目的真实位置。
+    columns: *harness_columns
+    sort: *harness_sort
     heat:
       github_stars: 0.30
       pypi_monthly_downloads: 0.25
@@ -190,6 +209,21 @@ boards:
     # 成员由 AA 源自动同步（origin=aa、status=active，同系列去重取最高分版本，前 40）。
     select: {origin: aa, status: active}
     display_metrics: [aa_intelligence, aa_coding, aa_agentic]
+    subtitle: 主流模型的综合能力横评：以 AA 智能指数为序，附编码与 Agent 细分能力。
+    columns:
+      - {key: rank, label: "#", type: rank}
+      - {key: product, label: 模型, type: product}
+      - {key: vendor, label: 厂商, type: vendor}
+      - {key: aa_intelligence, label: AA 智能指数, type: metric}
+      - {key: aa_coding, label: 编码指数, type: metric}
+      - {key: aa_agentic, label: Agent 指数, type: metric}
+    sort:
+      keys:
+        - {metric: aa_intelligence, direction: desc}
+        - {metric: aa_coding, direction: desc}
+        - {metric: aa_agentic, direction: desc}
+      note: "以 AA 智能指数从高到低排序；编码指数与 Agent 指数仅作参考列。"
+    criteria: "评判标准：AA Intelligence Index（Artificial Analysis Intelligence Index）。"
     heat:
       aa_intelligence: 1.0
     momentum:
@@ -201,10 +235,75 @@ boards:
     # 主口径：gpt-oss-120b Offline 单卡吞吐（Tokens/s per 卡）；另外两列为展示列。
     select: {origin: mlperf, status: active}
     display_metrics: [mlperf_gptoss_120b, mlperf_deepseek_r1, mlperf_llama3_8b]
+    subtitle: 一张卡能跑多快：按 MLPerf 推理基准排序，辅以算力、显存带宽与互联规格。
+    primary_label: 单卡 Tokens/s
+    columns:
+      - {key: rank, label: "#", type: rank}
+      - {key: product, label: 加速卡, type: product}
+      - {key: vendor, label: 厂商, type: vendor}
+      - {key: mlperf_gptoss_120b, label: "gpt-oss-120b Offline (Tokens/s)", type: metric}
+      - {key: mlperf_deepseek_r1, label: "DeepSeek R1", type: metric}
+      - {key: mlperf_llama3_8b, label: "Llama 3.1 8B", type: metric}
+      - {key: fp16_tflops, label: "FP16 TFLOPS", type: hw}
+      - {key: hbm_gb, label: "显存 GB", type: hw}
+      - {key: hbm_bw_gbs, label: "显存带宽 GB/s", type: hw}
+      - {key: interconnect, label: "互联", type: text}
+      - {key: tdp_w, label: "TDP W", type: hw}
+      - {key: official_docs, label: "官方文档", type: doc}
+    sort:
+      keys:
+        - {metric: mlperf_gptoss_120b, direction: desc}
+      note: "按 gpt-oss-120b Offline 单卡吞吐从高到低排序；其余吞吐与规格为参考列。"
+    criteria: "评判标准：MLPerf Inference 官方 Closed 分区，单卡离线吞吐；规格为厂商公开数据"
     heat:
       mlperf_gptoss_120b: 1.0
     momentum: {}
-  # 分类源榜：仅用于派生核心榜、观察区与产品页溯源，不单独进导航/门户
+  # 地域专题榜：独立 overlay，沿用同一套配置化列与数据层排序。
+  domestic:
+    name: 国产开源榜
+    overlay: true               # 地域专题榜；不参与 Harness 核心榜派生，避免重复入榜
+    subtitle: 国产开源项目的采纳度横评：按 GitHub Stars 排序，附 Fork 与近 30 天提交。
+    columns:
+      - {key: rank, label: "#", type: rank}
+      - {key: product, label: 项目, type: product}
+      - {key: vendor, label: 厂商, type: vendor}
+      - {key: github_stars, label: GitHub Stars, type: metric}
+      - {key: github_forks, label: GitHub Forks, type: metric}
+      - {key: github_commits_30d, label: 30 天提交, type: metric}
+    sort:
+      keys:
+        - {metric: github_stars, direction: desc}
+        - {metric: github_forks, direction: desc}
+        - {metric: github_commits_30d, direction: desc}
+      note: "按 GitHub Stars 从高到低排序；Fork 与近 30 天提交为参考列。"
+    heat:
+      github_stars: 0.65
+      github_forks: 0.35
+    momentum:
+      github_commits_30d: 0.50
+      github_stars_growth_30d: 0.50
+  domestic_app:
+    name: 国产应用榜
+    overlay: true
+    subtitle: 国产应用商店表现横评：按评分人数排序，辅以免费总榜名次。
+    primary_label: 商店排名
+    columns:
+      - {key: rank, label: "#", type: rank}
+      - {key: product, label: 应用, type: product}
+      - {key: vendor, label: 厂商, type: vendor}
+      - {key: appstore_rating_count, label: App Store 评分人数, type: metric}
+      - {key: appstore_rank, label: 商店排名, type: metric}
+    sort:
+      keys:
+        - {metric: appstore_rating_count, direction: desc}
+        - {metric: appstore_rank, direction: asc}
+      note: "按 App Store 评分人数从高到低排序；商店排名为参考列。"
+    heat:
+      appstore_rating_count: 0.55
+      appstore_rank: 0.45
+    momentum:
+      appstore_rating_growth_30d: 1.00
+  # 分类源榜：仅用于派生核心榜与产品页溯源，不单独进导航/门户
   coding:
     name: 编码智能体（源榜）
     hidden: true
@@ -242,23 +341,6 @@ boards:
       github_commits_30d: 0.50
       github_stars_growth_30d: 0.30
       npm_downloads_growth_30d: 0.20
-  domestic:
-    name: 国产开源榜
-    overlay: true               # 地域专题榜；不参与 Harness 核心榜派生，避免重复入榜
-    heat:
-      github_stars: 0.65
-      github_forks: 0.35
-    momentum:
-      github_commits_30d: 0.50
-      github_stars_growth_30d: 0.50
-  domestic_app:
-    name: 国产应用榜
-    overlay: true
-    heat:
-      appstore_rating_count: 0.55
-      appstore_rank: 0.45
-    momentum:
-      appstore_rating_growth_30d: 1.00
   office:
     name: 办公智能体
     enabled: false             # 暂无可用数据源（多为闭源），Phase 2 接入
@@ -469,7 +551,7 @@ news:
 
 # =============================================================================
 # 产品清单（种子来自开发规范 15.1，2026-09-23 验证存在）
-# integration 字段为初始人工录入（保守填写），接入适配度详情见 /methodology
+# integration 字段为初始人工录入（保守填写），接入适配度详情见首页评分说明（/#methodology）
 # =============================================================================
 products:
   # ---------- coding ----------

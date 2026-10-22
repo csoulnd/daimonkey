@@ -70,6 +70,151 @@ def board_items(c, board: str, snap_date: str, latest: dict) -> list[dict]:
     return items
 
 
+def _display_members(products: list[dict], board: str,
+                     ranked_ids: set[int] | None = None) -> list[dict]:
+    """榜单展示成员：包含尚无快照行的在榜产品（不再用观察区收纳）。"""
+    cfg = registry()["boards"].get(board, {})
+    ranked_ids = ranked_ids or set()
+    if cfg.get("derived"):
+        cats = set(cfg.get("derived_from") or [])
+        tier = cfg.get("tier")
+        out = []
+        for p in products:
+            if p.get("status") != "active" or p.get("category") not in cats:
+                continue
+            if tier and p.get("tier") != tier:
+                continue
+            # 派生榜成员：源分类标签命中，或已出现在该派生榜快照中。
+            if (set(p.get("boards") or []) & cats) or p.get("id") in ranked_ids:
+                out.append(p)
+        return out
+    select = cfg.get("select") or {}
+    if select:
+        return [p for p in products
+                if p.get("status") == "active"
+                and all(p.get(k) == v for k, v in select.items())]
+    return [p for p in products
+            if p.get("status") == "active" and board in p.get("boards", [])]
+
+
+def board_sort_keys(board: str) -> list[dict]:
+    cfg = registry()["boards"].get(board, {})
+    return list((cfg.get("sort") or {}).get("keys") or [])
+
+
+def _sort_key(item: dict, keys: list[dict]) -> tuple:
+    """缺失值排最后；direction=asc 用于商店排名这类“越小越好”的指标。"""
+    parts: list[tuple] = []
+    values = item.get("metric_values") or {}
+    for spec in keys:
+        value = values.get(spec.get("metric"))
+        if value is None:
+            parts.append((1, 0.0))
+        elif spec.get("direction") == "asc":
+            parts.append((0, float(value)))
+        else:
+            parts.append((0, -float(value)))
+    parts.append((0, str(item.get("name") or "")))
+    return tuple(parts)
+
+
+def sort_items_for_board(items: list[dict], board: str) -> list[dict]:
+    """按 registry.boards.<key>.sort.keys 排序（数据层完成，模板不做排序）。"""
+    keys = board_sort_keys(board)
+    if not keys:
+        return sorted(items, key=lambda it: str(it.get("name") or ""))
+    return sorted(items, key=lambda it: _sort_key(it, keys))
+
+
+def _column_cell(col: dict, product: dict, metrics: dict, spec: dict | None) -> dict | None:
+    typ = col.get("type")
+    if typ == "product":
+        return {"slug": product.get("slug"), "name": product.get("name"),
+                "vendor": product.get("vendor"), "status": product.get("status")}
+    if typ == "vendor":
+        return {"value": product.get("vendor") or None}
+    if typ == "tier":
+        value = product.get("tier")
+        labels = col.get("labels") or {}
+        return ({"value": value, "label": labels.get(value, value)}
+                if value else None)
+    if typ == "metric":
+        return metrics.get(col.get("key"))
+    if typ == "hw":
+        if not spec:
+            return None
+        value = spec.get(col.get("key"))
+        return {"value": value} if value is not None else None
+    if typ == "doc":
+        docs = (spec or {}).get("official_docs") or []
+        return dict(docs[0]) if docs else None
+    if typ == "text":
+        value = (spec or {}).get(col.get("key"))
+        return {"value": value} if value not in (None, "") else None
+    return None
+
+
+def display_board_items(c, board: str, products: list[dict], latest: dict) -> dict:
+    """榜单页数据层：配置化列 + 数据层排序 + 稳定名次。
+
+    返回 {rows, columns, sort_note, criteria, subtitle, snapshot_date?}。
+    不读取 rankings.rank（旧算法分口径已不在页面展示），而是按 registry
+    的 sort.keys 用原始指标重新排序。
+    """
+    cfg = registry()["boards"].get(board, {})
+    columns = [dict(c) for c in (cfg.get("columns") or [])]
+    ranked_ids = {r[0] for r in c.execute(
+        "SELECT DISTINCT product_id FROM rankings WHERE board=?", (board,))}
+    members = _display_members(products, board, ranked_ids)
+    try:
+        from . import hw as hwlib
+    except Exception:  # pragma: no cover - 规格文件损坏时仍应能出榜
+        hwlib = None
+    rows: list[dict] = []
+    for product in members:
+        pm = latest.get(product["id"], {})
+        metrics = metric_details(pm)
+        spec = None
+        if hwlib is not None:
+            try:
+                spec = hwlib.by_model(str(product.get("name") or ""))
+            except Exception:
+                spec = None
+        item = {
+            "slug": product.get("slug"), "name": product.get("name"),
+            "vendor": product.get("vendor"), "tier": product.get("tier"),
+            "category": product.get("category"), "status": product.get("status"),
+            "repo": product.get("repo"),
+            "metrics": metrics,
+            "metric_values": {k: v.get("value") for k, v in metrics.items()},
+            "hw_spec": spec,
+        }
+        item["cells"] = {col.get("key"): _column_cell(col, product, metrics, spec)
+                         for col in columns}
+        rows.append(item)
+    rows = sort_items_for_board(rows, board)
+    for i, item in enumerate(rows, 1):
+        item["rank"] = i
+        if "rank" in item["cells"]:
+            item["cells"]["rank"] = i
+    sort_keys = board_sort_keys(board)
+    primary_key = sort_keys[0].get("metric") if sort_keys else None
+    primary_col = next((c for c in columns if c.get("key") == primary_key), None)
+    for item in rows:
+        item["primary_key"] = primary_key
+        item["primary_label"] = (cfg.get("primary_label")
+                                 or (primary_col or {}).get("label") or "")
+        item["primary"] = item["metrics"].get(primary_key)
+    return {
+        "key": board,
+        "rows": rows,
+        "columns": columns,
+        "sort_note": (cfg.get("sort") or {}).get("note") or "",
+        "criteria": cfg.get("criteria") or "",
+        "subtitle": cfg.get("subtitle") or "",
+    }
+
+
 def observation_items(c, board: str, snap_date: str, latest: dict,
                       products: list[dict]) -> list[dict]:
     cfg = registry()["boards"].get(board, {})

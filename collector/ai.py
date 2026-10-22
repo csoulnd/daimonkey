@@ -30,6 +30,11 @@ AI_DEFAULTS: dict = {
     "direction_digests": {"enabled": True, "publish": True, "max_tokens": 1200},
 }
 
+# 摘要提示词版本盐：口径变更时递增，使旧指纹自然失效并强制重生成。
+# v2.0：从“热度/动量/覆盖率”改为采纳指标、AA 智能指数与 MLPerf 吞吐。
+# v2.1：口径拆分为“收录 N 个 / 入榜 M 条”，与页面 KPI 对齐。
+SUMMARY_PROMPT_VERSION = "summary-v2.1-adoption-scope"
+
 
 def cfg() -> dict:
     conf = assistant.cfg().get("ai") or {}
@@ -56,17 +61,19 @@ def data_signature(c, page: str) -> str | None:
             "SELECT snapshot_date, COUNT(*) n FROM rankings"
             " WHERE board = 'harness_core' GROUP BY snapshot_date"
             " ORDER BY snapshot_date DESC LIMIT 1").fetchone()
-        return f"{row['snapshot_date']}:{row['n']}" if row else None
+        return (f"{SUMMARY_PROMPT_VERSION}:{row['snapshot_date']}:{row['n']}"
+                if row else None)
     if page == "news":
         row = c.execute("SELECT MAX(fetched_at) t, COUNT(*) n FROM news_items"
                         ).fetchone()
-        return f"{row['t']}:{row['n']}" if row and row["t"] else None
+        return (f"{SUMMARY_PROMPT_VERSION}:{row['t']}:{row['n']}"
+                if row and row["t"] else None)
     if page == "knowledge":
         from .knowledge import load_notes
         meta, notes = load_notes()
         if not meta.get("commit"):
             return None
-        return f"{meta['commit']}:{len(notes)}"
+        return f"{SUMMARY_PROMPT_VERSION}:{meta['commit']}:{len(notes)}"
     if page == "board":
         # 联合榜单总结的指纹:最新快照日前 15 名次 + 对应 AI 分集合
         row = c.execute(
@@ -85,7 +92,7 @@ def data_signature(c, page: str) -> str | None:
             "SELECT COUNT(*) n FROM ai_scores WHERE board='harness_core'"
             " AND snapshot_date=?", (row["snapshot_date"],)).fetchone()["n"]
         digest = ",".join(f"{r['rank']}{r['slug']}:{_n(r['heat_score'])}" for r in top)
-        return f"{row['snapshot_date']}:{digest}:ai{ai_n}"
+        return f"{SUMMARY_PROMPT_VERSION}:{row['snapshot_date']}:{digest}:ai{ai_n}"
     return None
 
 

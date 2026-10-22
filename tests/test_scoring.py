@@ -1,6 +1,7 @@
 """评分算法测试：分位数（含并列/方向/缺失）、缺失值填充、覆盖率门控、整榜缺失降级。"""
 import unittest
 
+from collector import queries
 from collector.scoring import compute_board, percentile_ranks, weighted_coverage
 
 
@@ -78,6 +79,44 @@ class TestComputeBoard(unittest.TestCase):
         pm = {"a": {"value": 1.0}}
         self.assertEqual(weighted_coverage(self.cfg["heat"], pm), 0.6)
         self.assertEqual(weighted_coverage(self.cfg["heat"], {}), 0.0)
+
+
+class TestDisplaySort(unittest.TestCase):
+    """榜单展示排序：配置驱动、缺失值列后、商店排名越小越靠前。"""
+
+    def _item(self, name, **metrics):
+        return {"name": name, "metric_values": metrics}
+
+    def test_harness_stars_first_then_npm_and_store_rank(self):
+        items = [
+            self._item("no-repo-store", appstore_rank=4),
+            self._item("stars-low", github_stars=10),
+            self._item("no-repo-npm", npm_monthly_downloads=500),
+            self._item("stars-high", github_stars=100),
+            self._item("no-data"),
+        ]
+        got = [x["name"] for x in queries.sort_items_for_board(
+            items, "harness_core")]
+        self.assertEqual(got, ["stars-high", "stars-low", "no-repo-npm",
+                               "no-repo-store", "no-data"])
+
+    def test_model_sorts_by_aa_intelligence(self):
+        items = [
+            self._item("low", aa_intelligence=10.0),
+            self._item("high", aa_intelligence=20.0),
+            self._item("missing"),
+        ]
+        got = [x["name"] for x in queries.sort_items_for_board(items, "model")]
+        self.assertEqual(got, ["high", "low", "missing"])
+
+    def test_nv_sorts_by_gptoss_offline_throughput(self):
+        items = [
+            self._item("slow", mlperf_gptoss_120b=1000),
+            self._item("fast", mlperf_gptoss_120b=2000),
+            self._item("missing"),
+        ]
+        got = [x["name"] for x in queries.sort_items_for_board(items, "nv_infer")]
+        self.assertEqual(got, ["fast", "slow", "missing"])
 
 
 if __name__ == "__main__":

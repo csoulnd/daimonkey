@@ -15,6 +15,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -52,7 +53,15 @@ def news_redirect_ok(base: str) -> bool:
 
 
 def get(url: str, timeout: int = 10):
-    return urllib.request.urlopen(url, timeout=timeout)
+    # 站内限流是 120 次/分；验收脚本短时间连打时对 429 做短暂退避重试。
+    for attempt in range(4):
+        try:
+            return urllib.request.urlopen(url, timeout=timeout)
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or attempt == 3:
+                raise
+            time.sleep(3 * (attempt + 1))
+    raise RuntimeError("unreachable")
 
 
 def page(url: str) -> str:
@@ -140,12 +149,15 @@ def main() -> int:
     paths = ["/", "/dir/harness", "/dir/harness/news", "/dir/harness/digest",
              "/dir/fm", "/dir/fm/news", "/dir/fm/digest",
              "/dir/nv", "/dir/nv/news", "/dir/nv/digest",
-             "/rankings/unified", "/rankings/coding", "/rankings/harness_core",
-             "/rankings/harness_eco", "/product/claude-code",
+             "/rankings/harness_core", "/rankings/harness_eco",
+             "/rankings/model", "/rankings/nv_infer",
+             "/rankings/domestic", "/rankings/domestic_app",
+             "/product/claude-code", "/product/codex-cli",
              "/sources", "/api.html",
              "/api/v1/boards.json", "/api/v1/rankings/unified.json",
              "/api/v1/rankings/harness_core.json",
              "/api/v1/rankings/harness_eco.json",
+             "/api/v1/rankings/model.json", "/api/v1/rankings/nv_infer.json",
              "/api/v1/meta.json", "/api/v1/news.json"]
     for p in paths:
         try:
@@ -180,16 +192,21 @@ def main() -> int:
     uni = page(base + "/dir/harness")
     harness_news = page(base + "/dir/harness/news")
     model_page = page(base + "/rankings/model")
+    nv_page = page(base + "/rankings/nv_infer")
     harness_page = page(base + "/rankings/harness_core")
     for name, pat, html in [
         ("更新按钮", r'id="btn-update"', home),
         ("数据截至时间", r'id="asof"', home),
         ("来源标签", r'class="src-tag s-', uni),
-        ("覆盖率条", r'class="cov"', uni),
+        ("原始指标溯源", r'class="sv-v"', uni),
         ("榜单徽章", r'class="badge b-', harness_news),
-        ("热度/动量切换", r'data-view="mom"', harness_page),
+        ("本周要点卡", r'class="ai-summary weekly-points"', harness_page),
     ]:
         check(name, bool(re.search(pat, html)))
+    check("旧热度/动量视图已移除",
+          'data-view="mom"' not in harness_page
+          and "热度视图" not in harness_page
+          and "动量视图" not in harness_page)
     meta = json.load(get(base + "/api/v1/meta.json"))
     check(f"数据新鲜度存在（截至 {meta.get('last_collected_at')}）",
           bool(meta.get("last_collected_at")))
@@ -204,6 +221,9 @@ def main() -> int:
         ]
         for label, html, pat in pages:
             check(f"/dir/{key} {label}", bool(re.search(pat, html)))
+        board_html = page(base + f"/dir/{key}")
+        check(f"/dir/{key} 本周要点卡与周总结入口",
+              "本周要点" in board_html and f"/dir/{key}/digest" in board_html)
     nv = page(base + "/dir/nv")
     check("NV 推理性能榜已上线", "推理性能榜" in nv and "建设中" not in nv)
     check("NV 榜含 MLPerf 榜首与来源标注",
@@ -214,6 +234,67 @@ def main() -> int:
     harness_html = page(base + "/dir/harness")
     check("Harness 收录三问", "收录说明（核心榜三问）" in harness_html
           and harness_html.count("<li>") >= 3)
+
+    print("== 2b2. 榜单列与数据层排序 ==")
+    fm_channel = page(base + "/dir/fm")
+    nv_channel = page(base + "/dir/nv")
+    harness_labels = ("类型", "GitHub Stars", "30 天提交", "npm 月下载",
+                      "VS Code 安装", "商店排名")
+    fm_labels = ("厂商", "AA 智能指数", "编码指数", "Agent 指数")
+    nv_labels = ("gpt-oss-120b Offline (Tokens/s)", "DeepSeek R1",
+                 "Llama 3.1 8B", "FP16 TFLOPS", "显存 GB", "显存带宽 GB/s",
+                 "互联", "TDP W", "官方文档")
+    check("Harness 配置化新列", all(x in harness_html for x in harness_labels))
+    check("Harness 排序规则", harness_html.count(
+        "GitHub Stars 优先；无仓库产品按 npm 下载 / 商店排名列后") >= 2)
+    check("FM 配置化新列", all(x in fm_channel for x in fm_labels))
+    check("FM 评判标准", "评判标准：AA Intelligence Index" in fm_channel)
+    check("NV 配置化新列", all(x in nv_channel for x in nv_labels))
+    check("NV 评判标准", "评判标准：MLPerf Inference 官方 Closed 分区，单卡离线吞吐"
+          in nv_channel)
+    domestic_ok = all(
+        re.search(r'<table class="tbl board-table[^"]*">\s*<thead>\s*<tr>\s*<th>',
+                  page(base + f"/rankings/{b}"))
+        for b in ("domestic", "domestic_app"))
+    check("地域专题榜列定义非空", domestic_ok)
+
+    def first(html: str) -> str:
+        m = re.search(
+            r'<table class="tbl board-table[^"]*">.*?<a href="/product/[^"]+">([^<]+)</a>',
+            html, re.S)
+        return m.group(1) if m else ""
+    check(f"Harness 按 Stars 排序（首行 {first(harness_page)}）",
+          first(harness_page) == "OpenClaw")
+    check(f"FM 按 AA 智能指数排序（首行 {first(model_page)}）",
+          first(model_page) == "Claude Opus 5.5 (Max)")
+    check(f"NV 按 gpt-oss 吞吐排序（首行 {first(nv_page)}）",
+          first(nv_page) == "NVIDIA GB300")
+
+    print("== 2b3. 旧口径已从页面移除 ==")
+    old_patterns = {
+        "热度分": r"热度分", "7d": r"(?<![0-9A-Za-z])7d(?![0-9A-Za-z])",
+        "动量分": r"动量分", "覆盖率": r"覆盖率", "观察区": r"观察区",
+        "AI 分析分": r"AI 分析分", "热度视图": r"热度视图",
+    }
+    pages_to_check = {
+        "/": home, "/dir/harness": harness_html, "/dir/fm": fm_channel,
+        "/dir/nv": nv_channel, "/rankings/model": model_page,
+        "/rankings/nv_infer": nv_page, "/product/codex-cli":
+            page(base + "/product/codex-cli"),
+    }
+    bad_pages = {}
+    for path, html in pages_to_check.items():
+        hits = [label for label, pat in old_patterns.items()
+                if re.search(pat, html)]
+        if hits:
+            bad_pages[path] = hits
+    check("旧口径字段已从页面移除" + (f"（命中 {bad_pages}）" if bad_pages else ""),
+          not bad_pages)
+    prod = page(base + "/product/codex-cli")
+    check("产品页只保留名次与原始指标",
+          "最新排名" in prod and 'class="rcard"' in prod
+          and "指标时序" in prod and 'class="sv-v"' in prod)
+
 
     print("== 2d. Harness 分层不混排 ==")
     try:
@@ -244,8 +325,8 @@ def main() -> int:
         check("模型榜成员均为 AA 自动入池",
               aa_items and all(it.get("origin") == "aa" and it.get("status") == "active"
                                for it in model["items"]))
-        check("模型榜 heat 口径为 AA 总评分",
-              model["meta"].get("weights", {}).get("heat") == {"aa_intelligence": 1.0})
+        check("模型榜排序口径为 AA 智能指数",
+              "以 AA 智能指数从高到低排序" in model_page)
         check("AA 数值带来源与溯源",
               aa_items and all(it["metrics"]["aa_intelligence"].get("raw_payload_id")
                                and it["metrics"]["aa_intelligence"]["source"]["key"] == "aa"
@@ -277,9 +358,8 @@ def main() -> int:
         check("NV 榜成员均为 MLPerf 自动入池",
               all(it.get("origin") == "mlperf" and it.get("status") == "active"
                   for it in items))
-        check("NV 榜 heat 口径为 gpt-oss-120b 单卡吞吐",
-              nv_api["meta"].get("weights", {}).get("heat")
-              == {"mlperf_gptoss_120b": 1.0})
+        check("NV 榜排序口径为 gpt-oss-120b 单卡吞吐",
+              "按 gpt-oss-120b Offline 单卡吞吐从高到低排序" in nv_page)
         primary = [it for it in items
                    if it["metrics"].get("mlperf_gptoss_120b")]
         check("NV 榜主指标覆盖 ≥8 张卡", len(primary) >= 8)
@@ -315,17 +395,30 @@ def main() -> int:
         if links:
             r = get(base + links[0])
             check(f"方向周报页 {links[0]} -> {r.status}", r.status == 200)
+    ranking_weekly_bad = []
+    for board in ("harness_core", "model", "nv_infer"):
+        html = page(base + f"/rankings/{board}")
+        if not ("本周要点" in html
+                and ("查看完整周总结" in html or "查看每周总结" in html)):
+            ranking_weekly_bad.append(board)
+    check("榜单页均有本周要点卡", not ranking_weekly_bad)
 
     print("== 2c. 旧路由 301 ==")
     class _NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             return None
     opener = urllib.request.build_opener(_NoRedirect)
-    try:
-        opener.open(base + "/rankings/unified", timeout=10)
-        code, location = 200, None
-    except urllib.error.HTTPError as e:
-        code, location = e.code, e.headers.get("Location")
+    code, location = 200, None
+    for attempt in range(4):
+        try:
+            opener.open(base + "/rankings/unified", timeout=10)
+            code, location = 200, None
+            break
+        except urllib.error.HTTPError as e:
+            code, location = e.code, e.headers.get("Location")
+            if code != 429 or attempt == 3:
+                break
+            time.sleep(3 * (attempt + 1))
     check("/rankings/unified -> 301 /dir/harness",
           code == 301 and location == "/dir/harness")
 
@@ -334,8 +427,17 @@ def main() -> int:
     # 不属于“数字两跳溯源”的检查对象。
     ids = sorted(set(int(m) for m in re.findall(
         r'class="sv-v" href="/raw/(\d+)"', uni)))
+    # raw API 只导出近 14 天；更早条目的溯源页仍可访问（trace_url），
+    # 因此两跳 JSON 抽查只在已导出的 id 内抽样，避免把保留策略当成坏链。
+    try:
+        raw_index = json.load(get(base + "/api/v1/raw/index.json"))
+        exported = {int(it["id"]) for it in raw_index.get("items", [])}
+    except Exception:
+        exported = set()
+    linked_n = len(ids)
+    ids = [rid for rid in ids if rid in exported] if exported else ids
     sample = random.sample(ids, min(args.n, len(ids))) if ids else []
-    check(f"榜单页含溯源链接（{len(ids)} 个）", len(ids) > 0)
+    check(f"榜单页含可导出溯源链接（{len(ids)}/{linked_n} 个）", len(ids) > 0)
     full = 0
     pages_ok = 0
     for rid in sample:

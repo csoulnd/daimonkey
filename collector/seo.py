@@ -279,7 +279,7 @@ def page_meta(kind: str, ctx: dict | None = None) -> dict:
 
     if kind == "home":
         title = _clean(_ctx_get(ctx, "title", default=
-                       f"{site_name} · 智能体/模型/硬件三方向热度榜与 AI 新闻"), 90)
+                       f"{site_name} · 智能体/模型/硬件三方向榜单与 AI 新闻"), 90)
         desc = _home_description(ctx, site)
         path = ctx.get("path") or "/"
         canonical = _abs_url(path, base)
@@ -418,7 +418,7 @@ def _product_meta(ctx, site_name, base, lang):
     lead = f"{name}"
     if vendor:
         lead += f"（{vendor}）"
-    bits = [lead + "热度与排名"]
+    bits = [lead + "指标、排名与采用度"]
     if metrics:
         bits.append("、".join(metrics[:2]))
     if rank_phrase:
@@ -426,7 +426,7 @@ def _product_meta(ctx, site_name, base, lang):
     desc = _clean("：".join([bits[0], "，".join(bits[1:])]) if len(bits) > 1 else bits[0], 160)
     if len(desc) < 40:
         desc = _clean(f"{desc}。汇总公开可溯源指标、指标时序与相关新闻，数据来自第三方公开渠道。", 160)
-    title = _clean(f"{name}{' · ' + vendor if vendor else ''} 热度、排名与指标 | {site_name}", 90)
+    title = _clean(f"{name}{' · ' + vendor if vendor else ''} 指标、排名与采用度 | {site_name}", 90)
 
     application_category = "AI Agent"
     if category == "model":
@@ -507,10 +507,13 @@ def _ranking_meta(ctx, site_name, base, lang):
         item_name = _clean(it.get("name") or "", 40)
         if not item_name:
             continue
-        heat = it.get("heat_score")
-        if heat is None:
-            heat = it.get("final_score")
-        top.append(f"第 {i} 名 {item_name}" + (f"（热度 {_fmt_num(heat)}）" if heat is not None else ""))
+        primary = it.get("primary") if isinstance(it.get("primary"), dict) else {}
+        value = primary.get("value")
+        label = _clean(it.get("primary_label") or "", 30)
+        suffix = ""
+        if value is not None:
+            suffix = f"（{label + ' ' if label else ''}{_fmt_num(value)}）"
+        top.append(f"第 {i} 名 {item_name}{suffix}")
     total = len(items)
     desc = lead + ("、".join(top) if top else "按公开可溯源指标计算排名") + (
         f"。本期共 {total} 个条目，数据截至 {snapshot}。" if snapshot else "。")

@@ -65,3 +65,4 @@ systemctl restart daimonkey                    # 仅当 serve.py 改动
 - 2026-10-21(M6)：NV 从占位页升级为可用频道。`directions.nv` 挂 `nv_infer` 榜并接入 `infra` 新闻分类，占位标记移除；榜单成员、指标与排序全部来自 `sources.mlperf` 自动同步，模板仍不硬编码方向名。NV 数据源细节归 `skills/nv-hardware`。
 
 - 2026-10-21(方向页拆三子页)：方向频道由单页拆为 `/dir/{d}`（榜单）、`/dir/{d}/news`、`/dir/{d}/digest` 三页，右侧 rail + 顶部 tabs 共用 `_direction_tabs.html`；serve 对无扩展名路径回退命中扁平 `.html`（`/dir/{d}` → `dir/{d}.html`），所以链接统一不写扩展名；子页标签与图标可用 `directions.<key>.section_labels`（`{board, news, digest, board_icon, news_icon, digest_icon}`，可只写部分键）覆盖，模板仍不写死方向名。
+- 2026-10-22(榜单行业化重构)：榜单改按各领域公认标准呈现——Harness 用 Stars/npm/商店排名（Stars 优先，无仓库的按下载量或商店名次列后）、FM 用 AA Intelligence Index、NV 用 MLPerf 单卡离线吞吐 + 规格；理由是跨领域统一「热度分」既不可比也不可解释。**删除**热度分/7D/动量/覆盖率/AI 分析分/观察区，口径只保留可外部核验的指标。榜单页 intro 后新增「本周要点」卡承载本周结论与周总结入口，但**不设默认落地页**（各榜仍是首屏）。KPI 固定「收录 22 / 入榜 13」，与 AI 摘要统计口径必须同源一致——两处数字对不上比不显示更有害。

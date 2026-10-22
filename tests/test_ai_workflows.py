@@ -24,9 +24,11 @@ def seed(db_mod):
         db_mod.ensure_ai_tables(c)
         for pid, slug, name in ((1, "alpha", "Alpha 智能体"), (2, "beta", "Beta 框架")):
             c.execute(
-                "INSERT INTO products (id, slug, name, vendor, category, created_at,"
-                " updated_at) VALUES (?,?,?,?,?,?,?)",
-                (pid, slug, name, "Vendor", "coding", "2026-10-01", "2026-10-01"))
+                "INSERT INTO products (id, slug, name, vendor, category, tier,"
+                " board_tags, created_at, updated_at)"
+                " VALUES (?,?,?,?,?,'core','[\"coding\"]',?,?)",
+                (pid, slug, name, "Vendor", "coding",
+                 "2026-10-01", "2026-10-01"))
             c.execute(
                 "INSERT INTO rankings (board, snapshot_date, rank, product_id,"
                 " heat_score, momentum_score, delta_7d, coverage, methodology_version)"

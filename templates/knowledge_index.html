@@ -7,7 +7,7 @@
   <div class="kb-config-row">
     <input type="url" id="kb-repo-input" placeholder="https://github.com/用户名/仓库名(留空使用默认)" maxlength="200">
     <button id="kb-repo-save" type="button">保存</button>
-    <button id="kb-sync-mine" type="button" title="同步我配置的仓库并生成页面">⟳ 同步我的知识库</button>
+    <button id="kb-sync-mine" type="button" title="同步我配置的仓库并生成页面"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> 同步我的知识库</button>
   </div>
   <div class="dim" id="kb-config-msg" style="font-size:0.8em;margin-top:6px"></div>
 </div>
@@ -15,7 +15,7 @@
   <div class="dim">INFER TECH NOTE</div>
   <h1>个人知识库</h1>
   <p>Agent、推理服务与基础设施的工程笔记。从业务探索到可复用的知识。</p>
-  <div class="dim">{{ kb.count }} 篇文档 · 保留仓库目录与原文内容 · <a href="{{ kb.url }}">GitHub 仓库 ↗</a></div>
+  <div class="dim">{{ kb.count }} 篇文档 · 保留仓库目录与原文内容 · <a href="{{ kb.url }}">GitHub 仓库 <svg class="ic" aria-hidden="true"><use href="#i-external"/></svg></a></div>
 </section>
 {{ m.ai_summary_card(ai_knowledge) }}
 {% if not kb.available %}<div class="warn-box">知识库快照尚未同步。</div>{% endif %}

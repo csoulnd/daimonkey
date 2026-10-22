@@ -3,11 +3,6 @@
    移动端（≤720px）纵向堆叠，会话列表收纳为抽屉。
    样式：/assets/assistant.css；逻辑：/assets/assistant.js。
    说明：本文件由 base.html 通过 include 引入，不再在 base.html 内维护助手 DOM。 #}
-<svg class="asst-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-  <!-- 头像可选「戴帽子」时需要一张同款宠物脸；base.html 的表情集里没有 i-monkey-hat，这里用 i-monkey 复用补一个 -->
-  <symbol id="i-monkey-hat" viewBox="0 0 640 520"><use href="#i-monkey"/><path fill="currentColor" d="M215 100 C215 52 268 30 320 30 C372 30 425 52 425 100 Z"/><rect x="203" y="96" width="234" height="16" rx="8" fill="currentColor"/><circle cx="320" cy="40" r="12" fill="currentColor"/></symbol>
-</svg>
-
 <div class="asst-pet" id="asst-pet" role="button" tabindex="0" aria-label="打开智能助手" aria-controls="asst-panel" aria-expanded="false" title="智能助手 daimonkey"><svg class="pet-icon" aria-hidden="true"><use href="#i-monkey"/></svg></div>
 
 <section class="asst-panel" id="asst-panel" hidden aria-label="智能助手">
@@ -22,9 +17,9 @@
       <button id="asst-logout" type="button" title="退出登录：清除本浏览器的登录态（公用电脑时用）" hidden>退出</button>
       <button id="asst-font-minus" class="icon" type="button" title="字号缩小">A-</button>
       <button id="asst-font-plus" class="icon" type="button" title="字号放大">A+</button>
-      <button id="asst-reset" class="icon" type="button" title="恢复默认尺寸（双击左上角拖拽点同效）">⟲</button>
-      <button id="asst-max" class="icon" type="button" title="大窗 / 小窗切换" aria-pressed="false">⛶</button>
-      <button id="asst-min" class="icon" type="button" title="最小化（变回宠物，Esc 同效）">─</button>
+      <button id="asst-reset" class="icon" type="button" title="恢复默认尺寸（双击左上角拖拽点同效）" aria-label="恢复默认尺寸"><svg class="ic" aria-hidden="true"><use href="#i-restore"/></svg></button>
+      <button id="asst-max" class="icon" type="button" title="大窗 / 小窗切换" aria-pressed="false" aria-label="切换大窗 / 小窗"><svg class="ic" aria-hidden="true"><use href="#i-maximize"/></svg></button>
+      <button id="asst-min" class="icon" type="button" title="最小化（变回宠物，Esc 同效）" aria-label="最小化"><svg class="ic" aria-hidden="true"><use href="#i-minimize"/></svg></button>
     </div>
   </header>
 
@@ -32,10 +27,10 @@
     <!-- 功能区 2/3：对话 / 运维模式切换（分段控件；整条固定 40px，切换不跳动） -->
     <div class="asst-mode" id="asst-mode" role="group" aria-label="会话模式" hidden>
       <button type="button" data-mode="chat" aria-pressed="false">对话</button>
-      <button type="button" data-mode="ops" aria-pressed="false">⚙ 运维</button>
+      <button type="button" data-mode="ops" aria-pressed="false">运维</button>
     </div>
     <span class="asst-mode-hint" id="asst-mode-hint">对话模式</span>
-    <button id="asst-mobile-sessions" class="asst-mobile-sessions" type="button" aria-controls="asst-side-col" aria-expanded="false" title="展开会话列表">☰ 会话</button>
+    <button id="asst-mobile-sessions" class="asst-mobile-sessions" type="button" aria-controls="asst-side-col" aria-expanded="false" title="展开会话列表" aria-label="展开会话列表"><svg class="ic" aria-hidden="true"><use href="#i-menu"/></svg> 会话</button>
   </div>
 
   <div class="asst-body">
@@ -43,7 +38,7 @@
       <!-- 功能区 1/3：会话管理（列表 + 新建 / 重命名 / 删除）；移动端收纳为抽屉 -->
       <div class="asst-side-head">
         <span class="asst-side-cap">会话</span>
-        <button id="asst-new" type="button" title="新建会话">＋ 新会话</button>
+        <button id="asst-new" type="button" title="新建会话" aria-label="新建会话"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> 新会话</button>
       </div>
       <ul id="asst-session-list" class="asst-session-list"></ul>
       <div class="asst-usage" id="asst-usage"></div>
@@ -64,7 +59,7 @@
       <div id="asst-messages" class="asst-messages" aria-live="polite"></div>
 
       <div class="asst-approval" id="asst-approval" hidden role="alert">
-        <div class="asst-approval-head">⚠ 助手请求执行<span id="asst-approval-title"></span></div>
+        <div class="asst-approval-head"><svg class="ic" aria-hidden="true"><use href="#i-warning"/></svg> 助手请求执行<span id="asst-approval-title"></span></div>
         <code class="asst-approval-cmd" id="asst-approval-cmd"></code>
         <div class="asst-approval-acts">
           <button id="asst-approval-allow" type="button" class="allow">允许</button>

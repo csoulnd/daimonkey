@@ -103,7 +103,7 @@ class AiNumberTests(unittest.TestCase):
         task = self.workflows.get("page_summary").build_task({"page": "home"})
         self.assertIn("榜单口径：harness_core（核心产品榜）", task)
         self.assertIn("快照 2026-10-20", task)
-        self.assertIn("共 3 条（不含其他板块）", task)
+        self.assertIn("收录 4 个、入榜 3 条（不含其他板块）", task)
         self.assertNotIn("共收录", task)
         self.assertNotIn("21 条", task)      # 全站 products 数不得出现
         # 最新快照的 3 条都在，旧快照/诱饵不在
@@ -114,9 +114,9 @@ class AiNumberTests(unittest.TestCase):
     def test_each_board_has_its_own_scope(self):
         task = lambda b: self.workflows.get("page_summary").build_task(
             {"page": "board", "board": b})
-        self.assertIn("共 2 条（不含其他板块）", task("harness_eco"))
-        self.assertIn("共 4 条（不含其他板块）", task("model"))
-        self.assertIn("共 2 条（不含其他板块）", task("nv_infer"))
+        self.assertIn("收录 2 个、入榜 2 条（不含其他板块）", task("harness_eco"))
+        self.assertIn("收录 4 个、入榜 4 条（不含其他板块）", task("model"))
+        self.assertIn("收录 2 个、入榜 2 条（不含其他板块）", task("nv_infer"))
         self.assertIn("榜单口径：model（模型评测）", task("model"))
 
     def test_unknown_board_rejected(self):
@@ -141,33 +141,33 @@ class AiNumberTests(unittest.TestCase):
     def test_store_blocks_hallucinated_total_and_falls_back(self):
         store = self.workflows.get("page_summary").store
         with self.assertLogs("daimonkey.ai", level="WARNING") as logs:
-            store({"page": "home", "signature": "2026-10-20:3"},
+            store({"page": "home",
+                   "signature": f"{self.ai.SUMMARY_PROMPT_VERSION}:2026-10-20:3"},
                   "本板块汇总本站收录的119个核心产品，前 10 名竞争激烈。")
         self.assertTrue(any("119" in line for line in logs.output))
         with self.db.conn() as c:
             got = self.ai.summary_of(c, "home")
         self.assertNotIn("119", got["content"])
-        self.assertIn("共 3 条（不含其他板块）", got["content"])
-        self.assertEqual(got["data_signature"], "2026-10-20:3")
+        self.assertIn("收录 4 个、入榜 3 条（不含其他板块）", got["content"])
+        self.assertEqual(got["data_signature"],
+                         f"{self.ai.SUMMARY_PROMPT_VERSION}:2026-10-20:3")
 
     def test_store_accepts_scoped_numbers(self):
         store = self.workflows.get("page_summary").store
-        reply = ("核心产品榜快照 2026-10-20 共 3 条（不含其他板块），"
+        reply = ("核心产品榜快照 2026-10-20 收录 4 个、入榜 3 条（不含其他板块），"
                  "观察区 0 个，第 2 名由 Beta 智能体领跑。")
         store({"page": "home", "signature": "s"}, reply)
         with self.db.conn() as c:
             got = self.ai.summary_of(c, "home")
         self.assertEqual(got["content"], reply)
 
-    def test_zero_observation_is_not_flagged(self):
-        """回归：观察区计数非 0 时，"观察区 0 个"仍合法，不得误降级。"""
+    def test_zero_count_is_not_flagged(self):
+        """回归：0 在数量语境下仍合法，不得误降级。"""
         with self.db.conn() as c:
-            scope = self.workflows._board_scope(c, "harness_core")
             ctx = self.workflows._page_summary_data(c, "home")
-        self.assertGreater(scope["observation"], 0)  # 0 只能来自公共允许集合
         self.assertIn(0, ctx["allowed"])
-        reply = ("核心产品榜快照 2026-10-20 共 3 条（不含其他板块）；"
-                 "本次列出前 10 名，观察区 0 个。")
+        reply = ("核心产品榜快照 2026-10-20 收录 4 个、入榜 3 条（不含其他板块）；"
+                 "本次列出前 10 名，0 个条目待补。")
         with self.assertNoLogs("daimonkey.ai", level="WARNING"):
             self.workflows.get("page_summary").store(
                 {"page": "home", "signature": "s"}, reply)
@@ -182,7 +182,7 @@ class AiNumberTests(unittest.TestCase):
         store = self.workflows.get("page_summary").store
         with self.assertLogs("daimonkey.ai", level="WARNING") as logs:
             store({"page": "home", "signature": "s"},
-                  "核心产品榜快照 2026-10-13 共 3 条（不含其他板块）。")
+                  "核心产品榜快照 2026-10-13 收录 4 个、入榜 3 条（不含其他板块）。")
         self.assertTrue(any("2026-10-13" in line for line in logs.output))
         with self.db.conn() as c:
             got = self.ai.summary_of(c, "home")
@@ -203,7 +203,7 @@ class AiNumberTests(unittest.TestCase):
         with self.db.conn() as c:
             got = self.ai.summary_of(c, "home")
         self.assertNotIn("第 99", got["content"])
-        self.assertIn("共 3 条（不含其他板块）", got["content"])
+        self.assertIn("收录 4 个、入榜 3 条（不含其他板块）", got["content"])
 
     def test_store_survives_reconcile_failure(self):
         """对账自身异常不得吞掉摘要（也不得阻断管线）。"""

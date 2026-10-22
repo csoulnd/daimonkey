@@ -27,7 +27,7 @@
     runId: null, runSeq: 0, runToken: 0, opsTimer: null,
     streamEl: null, toolsEl: null, bubbleEl: null, toolList: [],
     pendingApproval: null, approvalBusy: false, doneReply: "",
-    /* 头像（平静/开心/生气/戴帽子）与「大窗」前的尺寸 */
+    /* 头像（平静/开心/生气）与「大窗」前的尺寸 */
     avatar: "monkey", preMax: null, petBound: false
   };
 
@@ -60,16 +60,11 @@
   }
 
   /* ======================================================================
-     头像：纯函数 nextAvatar() + 三处联动 applyAvatar()
+     头像：三张脸（平静 / 开心 / 生气）选择 + 三处联动 applyAvatar()
      ====================================================================== */
-  var AVATARS = ["monkey", "happy", "angry", "hat"];
-  var AVATAR_LABELS = { monkey: "平静", happy: "开心", angry: "生气", hat: "戴帽子" };
+  var AVATARS = ["monkey", "happy", "angry"];
+  var AVATAR_LABELS = { monkey: "平静", happy: "开心", angry: "生气" };
 
-  /* 纯函数（不依赖 DOM / localStorage）：未知值按第一个处理，保证永远有返回值 */
-  function nextAvatar(cur) {
-    var i = AVATARS.indexOf(cur);
-    return AVATARS[(i + 1) % AVATARS.length];
-  }
   function getAvatar() {
     try {
       var v = localStorage.getItem(AVATAR_KEY);
@@ -110,13 +105,35 @@
     petFace(null);
     var label = $("asst-avatar-face");
     if (label) label.textContent = AVATAR_LABELS[face] || "";
+    syncFacePicker(face);
   }
-  function cycleAvatar() {
-    var next = nextAvatar(getAvatar());
-    saveAvatar(next);
-    applyAvatar(next);
-    msg("表情：" + (AVATAR_LABELS[next] || next));
-    return next;
+
+  /* 短促 scale 动画：让「顶栏 + 宠物 + 面板标题」的变化被看见。
+     prefers-reduced-motion 由 CSS 媒体查询关掉。 */
+  function pulseAvatar() {
+    [
+      document.querySelector("#account-box .avatar svg"),
+      document.querySelector("#asst-pet .pet-icon"),
+      document.querySelector("#asst-panel-title .pet-icon")
+    ].forEach(function (node) {
+      if (!node) return;
+      node.classList.remove("avatar-pop");
+      void node.getBoundingClientRect();   // 强制回流，保证连续选择时动画可重播
+      node.classList.add("avatar-pop");
+      node.addEventListener("animationend", function () {
+        node.classList.remove("avatar-pop");
+      }, { once: true });
+    });
+  }
+
+  /* 选中一张脸：持久化 + 三处联动 + 动画 + 状态提示；菜单保持打开便于连续试 */
+  function selectAvatar(face) {
+    if (AVATARS.indexOf(face) < 0) return getAvatar();
+    saveAvatar(face);
+    applyAvatar(face);
+    pulseAvatar();
+    msg("表情：" + (AVATAR_LABELS[face] || face));
+    return face;
   }
 
   /* ======================================================================
@@ -178,6 +195,62 @@
     } catch (e) { /* 隐私模式 */ }
   }
 
+  /* 三张脸的 radiogroup：44px 圆形缩略图 + 中文名，当前项高亮环 + aria-pressed/checked */
+  function syncFacePicker(face) {
+    var btns = document.querySelectorAll(".avatar-face-picker .avatar-face");
+    Array.prototype.forEach.call(btns, function (btn) {
+      var on = btn.getAttribute("data-face") === face;
+      btn.classList.toggle("on", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      btn.setAttribute("aria-checked", on ? "true" : "false");
+      var item = btn.parentNode;
+      if (item && item.classList) item.classList.toggle("on", on);
+    });
+  }
+
+  function buildFacePicker() {
+    var picker = el("div", "avatar-face-picker");
+    picker.setAttribute("role", "radiogroup");
+    picker.setAttribute("aria-label", "换个表情");
+    picker.appendChild(el("div", "avatar-face-cap", "换个表情"));
+    var row = el("div", "avatar-face-row");
+    AVATARS.forEach(function (face) {
+      var item = el("div", "avatar-face-item");
+      var btn = el("button", "avatar-face");
+      btn.type = "button";
+      btn.setAttribute("data-face", face);
+      btn.setAttribute("role", "radio");
+      btn.setAttribute("aria-label", AVATAR_LABELS[face]);
+      btn.title = AVATAR_LABELS[face];
+      btn.innerHTML = '<svg aria-hidden="true"><use href="#i-ava-' + face + '"/></svg>';
+      btn.addEventListener("click", function (ev) {
+        ev.stopPropagation();          // 保持菜单打开，方便连续试三张脸
+        selectAvatar(face);
+      });
+      /* radiogroup 方向键：移动焦点并立即选中（Tab / Enter 仍由原生 button 提供） */
+      btn.addEventListener("keydown", function (ev) {
+        if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].indexOf(ev.key) < 0) return;
+        ev.preventDefault();
+        var dir = (ev.key === "ArrowRight" || ev.key === "ArrowDown") ? 1 : -1;
+        var idx = AVATARS.indexOf(face);
+        var next = AVATARS[(idx + dir + AVATARS.length) % AVATARS.length];
+        var nb = picker.querySelector('.avatar-face[data-face="' + next + '"]');
+        if (nb) { nb.focus(); selectAvatar(next); }
+      });
+      item.appendChild(btn);
+      item.appendChild(el("span", "avatar-face-name", AVATAR_LABELS[face]));
+      /* 点中文名也能选中；圆圈按钮自身已 stopPropagation，不会重复触发 */
+      item.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        selectAvatar(face);
+      });
+      row.appendChild(item);
+    });
+    picker.appendChild(row);
+    syncFacePicker(getAvatar());
+    return picker;
+  }
+
   /* 顶栏账号区：只在 showUser() 时重建一次；document 级「点外面关闭」监听
      由 init() 统一安装一次，不再在 renderAccount 内重复 addEventListener。 */
   function renderAccount(name) {
@@ -201,9 +274,7 @@
     var menu = el("div", "avatar-menu");
     menu.hidden = true;
     var mi1 = el("div", "avatar-name", name);
-    var mi2 = el("button", "avatar-out", "换个表情");
-    mi2.type = "button";
-    mi2.title = "当前：" + (AVATAR_LABELS[getAvatar()] || "");
+    var mi2 = buildFacePicker();
     var mi3 = el("button", "avatar-out", "退出登录");
     mi3.type = "button";
 
@@ -211,13 +282,6 @@
       ev.stopPropagation();
       menu.hidden = !menu.hidden;
       avatar.setAttribute("aria-expanded", menu.hidden ? "false" : "true");
-    });
-    mi2.addEventListener("click", function (ev) {
-      ev.stopPropagation();       // 不让同一次点击冒泡到 document 把菜单提前关掉
-      var next = cycleAvatar();   // 顶栏 + 宠物 + 面板标题 + localStorage 一起变
-      mi2.title = "当前：" + (AVATAR_LABELS[next] || "");
-      menu.hidden = true;         // 选完主动收起，避免「菜单卡住」
-      avatar.setAttribute("aria-expanded", "false");
     });
     mi3.addEventListener("click", function (ev) {
       ev.stopPropagation();
@@ -375,6 +439,11 @@
     var r = panel.getBoundingClientRect();
     var w = (r && r.width) || 0;
     panel.classList.toggle("compact", w > 0 && w < 380);
+    var maxBtn = $("asst-max");
+    if (maxBtn) {
+      var maxUse = maxBtn.querySelector("use");
+      if (maxUse) maxUse.setAttribute("href", panel.classList.contains("max") ? "#i-restore" : "#i-maximize");
+    }
   }
   function currentPanelSize() {
     var panel = $("asst-panel");
@@ -627,18 +696,22 @@
         title.title = s.title || "";
         li.appendChild(title);
         if (s.mode === "ops") {  // 运维会话标记
-          var modeTag = el("span", "asst-s-mode", "⚙");
+          var modeTag = el("span", "asst-s-mode", "运");
           modeTag.title = "运维会话";
           li.appendChild(modeTag);
         }
         var acts = el("span", "asst-s-acts");
-        var btnRename = el("button", null, "✎");
+        var btnRename = el("button");
         btnRename.type = "button";
         btnRename.title = "重命名";
+        btnRename.setAttribute("aria-label", "重命名");
+        btnRename.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-edit"/></svg>';
         btnRename.onclick = function (ev) { ev.stopPropagation(); openRename(s); };
-        var btnDel = el("button", null, "🗑");
+        var btnDel = el("button");
         btnDel.type = "button";
         btnDel.title = "删除";
+        btnDel.setAttribute("aria-label", "删除");
+        btnDel.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-trash"/></svg>';
         btnDel.onclick = function (ev) { ev.stopPropagation(); openDelete(s); };
         acts.appendChild(btnRename);
         acts.appendChild(btnDel);
@@ -783,7 +856,12 @@
     }
     items.forEach(function (m) {
       var div = el("div", "asst-bubble " + (m.role === "user" ? "u" : "a"));
-      if (m.workflow) div.appendChild(el("div", "asst-wf-tag", "⚙ " + m.workflow));
+      if (m.workflow) {
+        var wfTag = el("div", "asst-wf-tag");
+        wfTag.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-method"/></svg> ';
+        wfTag.appendChild(document.createTextNode(m.workflow));
+        div.appendChild(wfTag);
+      }
       div.appendChild(el("div", "asst-bubble-body", m.content == null ? "" : m.content));
       box.appendChild(div);
     });
@@ -882,7 +960,7 @@
       state.bubbleEl.parentNode.removeChild(state.bubbleEl);
     }
     state.bubbleEl = null;
-    petFaceThen("error", 2000);
+    petFaceThen("angry", 2000);
     if (state.rollback) {
       try { state.rollback(); } catch (e) { /* 忽略 */ }
       state.rollback = null;
@@ -899,7 +977,7 @@
           // 网络错误:连续 10 次(约 20 秒)后放弃,避免按钮永久卡死
           if (++failures >= 10) {
             finishRun();
-            petFaceThen("error", 2000);
+            petFaceThen("angry", 2000);
             msg("网络中断，任务状态未知；网络恢复后可重新打开面板查看", true);
           }
           return;
@@ -913,7 +991,10 @@
           if (res.body.workflow && res.body.reply) {
             var box = $("asst-messages");
             var bubble = el("div", "asst-bubble a");
-            bubble.appendChild(el("div", "asst-wf-tag", "⚙ " + res.body.workflow));
+            var wfTag = el("div", "asst-wf-tag");
+            wfTag.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-method"/></svg> ';
+            wfTag.appendChild(document.createTextNode(res.body.workflow));
+            bubble.appendChild(wfTag);
             bubble.appendChild(el("div", "asst-bubble-body", res.body.reply));
             box.appendChild(bubble);
             box.scrollTop = box.scrollHeight;
@@ -921,7 +1002,7 @@
             selectSession(state.sessionId);
           }
         } else {
-          petFaceThen("error", 2000);
+          petFaceThen("angry", 2000);
           msg(res.body.error || "执行失败", true);
         }
         refreshUsage();
@@ -1141,10 +1222,10 @@
     hideApproval();
     var err = body && body.error;
     if (err) {
-      petFaceThen("error", 2000);
+      petFaceThen("angry", 2000);
       msg(err, true);
     } else if (body && body.aborted) {
-      petFaceThen("calm", 1600);
+      petFace(null);
       msg("已停止");
     } else {
       petFaceThen("happy", 1600);
@@ -1278,7 +1359,7 @@
     on("asst-approval-allow", "click", function () { resolveApproval(true); });
     on("asst-approval-deny", "click", function () { resolveApproval(false); });
 
-    /* 行内重命名 / 删除确认（会话栏每项的 ✎/🗑 触发 openRename/openDelete） */
+    /* 行内重命名 / 删除确认（会话栏每项的重命名/删除按钮触发 openRename/openDelete） */
     on("asst-rename-ok", "click", submitRename);
     on("asst-rename-cancel", "click", function () {
       var row = $("asst-rename-row"); if (row) row.hidden = true;
@@ -1403,7 +1484,7 @@
   /* 纯函数暴露给测试（不影响运行时） */
   try {
     window.__dmAssistant = {
-      nextAvatar: nextAvatar,
+      selectAvatar: selectAvatar,
       avatars: AVATARS.slice(),
       labels: AVATAR_LABELS,
       getAvatar: getAvatar,
