@@ -14,7 +14,7 @@
 <header class="sc-head">
   <h1>{{ sc_title }}</h1>
   {% if sc_subtitle %}<p class="sc-subtitle">{{ sc_subtitle }}</p>{% endif %}
-  <button id="sc-present" class="sc-btn" type="button" title="全屏演示模式（Esc 退出）">⛶ 演示模式</button>
+  <button id="sc-present" class="sc-btn" type="button" title="全屏演示模式（Esc 退出）"><svg class="ic" aria-hidden="true"><use href="#i-maximize"/></svg> 演示模式</button>
 </header>
 
 {% macro sc_section_body(s) %}
@@ -38,10 +38,10 @@
             <div class="sc-diagram-bar">
               <span class="dim">{{ s.diagram.caption }}</span>
               <span class="sc-zoom">
-                <button class="sc-btn" type="button" data-zoom="out" title="缩小">－</button>
+                <button class="sc-btn" type="button" data-zoom="out" title="缩小" aria-label="缩小">－</button>
                 <button class="sc-btn" type="button" data-zoom="reset" title="复位">复位</button>
-                <button class="sc-btn" type="button" data-zoom="in" title="放大">＋</button>
-                <button class="sc-btn" type="button" data-zoom="full" title="全屏查看">⛶</button>
+                <button class="sc-btn" type="button" data-zoom="in" title="放大" aria-label="放大"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
+                <button class="sc-btn" type="button" data-zoom="full" title="全屏查看" aria-label="全屏查看"><svg class="ic" aria-hidden="true"><use href="#i-maximize"/></svg></button>
               </span>
             </div>
             <div class="sc-viewport"><div class="sc-inner">{{ s.diagram.svg | safe }}</div></div>
@@ -51,11 +51,11 @@
             {% if s.steps %}
             <div class="sc-steps">
               <div class="sc-steps-nav">
-                <button class="sc-btn" type="button" data-step-prev title="上一步">‹</button>
+                <button class="sc-btn" type="button" data-step-prev title="上一步" aria-label="上一步"><svg class="ic" aria-hidden="true"><use href="#i-arrow-left"/></svg></button>
                 <span class="sc-steps-dots">
                   {% for i in range(s.steps | length) %}<button class="sc-dot" type="button" data-step="{{ loop.index0 }}" title="第 {{ loop.index }} 步">{{ loop.index }}</button>{% endfor %}
                 </span>
-                <button class="sc-btn" type="button" data-step-next title="下一步">›</button>
+                <button class="sc-btn" type="button" data-step-next title="下一步" aria-label="下一步"><svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
               </div>
               <div class="sc-step-bodies">
                 {% for body in s.steps %}<div class="sc-step-body{% if not loop.first %} hidden{% endif %}" data-step-body="{{ loop.index0 }}">{{ body | safe }}</div>{% endfor %}
@@ -106,13 +106,13 @@
       <h3 class="sc-sec-title">{{ slides.title }}</h3>
       <div class="sc-slides" data-slides>
         <div class="sc-slides-bar">
-          <button class="sc-btn" type="button" data-slide-prev title="上一页">‹</button>
+          <button class="sc-btn" type="button" data-slide-prev title="上一页" aria-label="上一页"><svg class="ic" aria-hidden="true"><use href="#i-arrow-left"/></svg></button>
           <span class="sc-slides-pos"><b>1</b> / {{ slides.count }}</span>
           <span class="sc-slides-dots">
             {% for s in slides['items'] %}<button class="sc-dot" type="button" data-slide="{{ loop.index0 }}" title="第 {{ loop.index }} 页">{{ loop.index }}</button>{% endfor %}
           </span>
-          <button class="sc-btn" type="button" data-slide-next title="下一页">›</button>
-          <button class="sc-btn sc-slide-full" type="button" title="全屏演示（←/→ 翻页）">⛶ 全屏</button>
+          <button class="sc-btn" type="button" data-slide-next title="下一页" aria-label="下一页"><svg class="ic" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
+          <button class="sc-btn sc-slide-full" type="button" title="全屏演示（左右键翻页）" aria-label="全屏演示（左右键翻页）"><svg class="ic" aria-hidden="true"><use href="#i-maximize"/></svg> 全屏</button>
           <a class="sc-btn" href="{{ slides.download_url }}" download title="下载 PPTX 原件">下载原件</a>
         </div>
         <div class="sc-slide-bodies">
@@ -170,7 +170,7 @@
         <div class="sc-secline dim">
           {% set ext = s.src.kb_url.startswith('http') %}
           {% if s.src.kb_url %}<a href="{{ s.src.kb_url }}{% if s.src.anchor %}#{{ s.src.anchor }}{% endif %}"{% if ext %} target="_blank" rel="noopener"{% endif %}>{{ s.src.label or '知识库原文' }}</a>{% endif %}
-          {% if s.src.gh_url %}<a href="{{ s.src.gh_url }}" target="_blank" rel="noopener">GitHub ↗</a>{% endif %}
+          {% if s.src.gh_url %}<a href="{{ s.src.gh_url }}" target="_blank" rel="noopener" title="在新窗口打开 GitHub">GitHub <svg class="ic" aria-hidden="true"><use href="#i-external"/></svg></a>{% endif %}
         </div>
       </section>
       {% endfor %}
@@ -187,7 +187,7 @@
       <p class="dim">原始调研文档（页面内容构建时导入，随知识库同步更新）：</p>
       <ul class="sc-src-list dim">
         {% for l in sources.links %}
-        <li>{{ l.label }} · {% if l.kb_url %}<a href="{{ l.kb_url }}"{% if l.link_label == '官方原文' %} target="_blank" rel="noopener"{% endif %}>{{ l.link_label or '知识库' }}</a>{% endif %}{% if l.gh_url %} · <a href="{{ l.gh_url }}" target="_blank" rel="noopener">GitHub ↗</a>{% endif %}</li>
+        <li>{{ l.label }} · {% if l.kb_url %}<a href="{{ l.kb_url }}"{% if l.link_label == '官方原文' %} target="_blank" rel="noopener"{% endif %}>{{ l.link_label or '知识库' }}</a>{% endif %}{% if l.gh_url %} · <a href="{{ l.gh_url }}" target="_blank" rel="noopener" title="在新窗口打开 GitHub">GitHub <svg class="ic" aria-hidden="true"><use href="#i-external"/></svg></a>{% endif %}</li>
         {% endfor %}
       </ul>
       {% for f in sources.folds %}

@@ -15,7 +15,7 @@
 {% elif r.kind == 'html' %}
 <div class="report-frame-bar dim">
   <span>原样网页报告</span>
-  <a href="{{ r.frame_url }}" target="_blank" rel="noopener">新窗口打开 ↗</a>
+  <a href="{{ r.frame_url }}" target="_blank" rel="noopener" title="在新窗口打开原样网页报告">新窗口打开 <svg class="ic" aria-hidden="true"><use href="#i-external"/></svg></a>
 </div>
 <iframe class="report-frame" src="{{ r.frame_url }}" title="{{ r.title }}" loading="lazy"></iframe>
 {% else %}

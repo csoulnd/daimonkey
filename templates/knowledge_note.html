@@ -2,7 +2,7 @@
 {% block title %}{{ note.title }} · 个人知识库{% endblock %}
 {% block content %}
 <div class="kb-breadcrumb"><a href="/knowledge">个人知识库</a> / {{ note.group_name }} / <span>{{ note.path }}</span></div>
-<div class="kb-note-meta"><span class="dim">修改于 {{ note.updated[:10] }}{% if note.status %} · {{ note.status }}{% endif %}</span><a href="{{ note.source_url }}">GitHub 原文 ↗</a></div>
+<div class="kb-note-meta"><span class="dim">修改于 {{ note.updated[:10] }}{% if note.status %} · {{ note.status }}{% endif %}</span><a href="{{ note.source_url }}" title="打开 GitHub 原文">GitHub 原文 <svg class="ic" aria-hidden="true"><use href="#i-external"/></svg></a></div>
 <div class="kb-reading">
   <article class="markdown-body">{{ article_html | safe }}</article>
   <aside class="kb-toc"><details open><summary>本文目录</summary>{{ article_toc | safe }}</details></aside>

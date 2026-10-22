@@ -91,6 +91,11 @@ GLYPH_FILES = [
     TEMPLATES / "login.html",
     TEMPLATES / "knowledge_index.html",
     TEMPLATES / "404.html",
+    # v2 close-out: the private report / knowledge pages lost their last
+    # text glyphs (⛶ / ＋ / ↗ / ‹ ›) in favour of sprite references.
+    TEMPLATES / "report_showcase.html",
+    TEMPLATES / "report_detail.html",
+    TEMPLATES / "knowledge_note.html",
     ASSETS / "assistant.js",
     ASSETS / "search.js",
     ASSETS / "app.js",
@@ -134,6 +139,28 @@ class IconSpriteTest(unittest.TestCase):
             for rid in sorted(refs - SYMBOL_IDS):
                 missing.append(f"{path}: #{rid}")
         self.assertEqual(missing, [], "literal icon refs missing from base sprite")
+
+    def test_report_and_knowledge_pages_iconized(self) -> None:
+        """v2 close-out: the three private pages take their controls from the
+        base sprite, and every ``#i-*`` they add resolves in that sprite."""
+        expected = {
+            "report_showcase.html": {
+                "i-maximize", "i-plus", "i-external",
+                "i-arrow-left", "i-arrow-right",
+            },
+            "report_detail.html": {"i-external"},
+            "knowledge_note.html": {"i-external"},
+        }
+        refs_by_file = literal_refs()
+        problems: list[str] = []
+        for name, ids in expected.items():
+            key = f"templates/{name}"
+            found = refs_by_file.get(key, set())
+            for rid in sorted(ids - found):
+                problems.append(f"{key}: missing #{rid}")
+            for rid in sorted(found - SYMBOL_IDS):
+                problems.append(f"{key}: unresolved #{rid}")
+        self.assertEqual(problems, [], "report/knowledge icon refs")
 
     def test_dynamic_references_are_whitelisted(self) -> None:
         assistant_js = read(ASSETS / "assistant.js")
