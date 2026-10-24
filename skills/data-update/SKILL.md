@@ -7,7 +7,7 @@ description: 本站数据更新操作与排障。适用场景：热度/新闻数
 
 ## 更新方式（四选一）
 
-1. **网页按钮**（推荐）：任意页面右上角「⟳ 更新」（全量）、新闻页「⟳ 仅更新新闻」（轻量，约 1 分钟）、知识库页「⟳ 同步知识库」（从 GitHub 同步代码仓，约 10~60 秒）。
+1. **网页按钮**（推荐）：公开页面的更新入口统一在**首页右上角**——「⟳ 全量更新」（采集→评分→导出→建站）与「⟳ 仅更新新闻」（轻量，约 1 分钟）；知识库页保留「⟳ 同步知识库」（从 GitHub 同步代码仓，约 10~60 秒）。其它公开页面不再放更新按钮。
    - 权限：已登录账号（Cookie 7 天有效）直接执行；未登录点按钮弹账号框（用户名+密码），登录一次本浏览器后续免密。账号用 `userctl add <用户名>` 在服务器任意目录创建。
 2. **CLI**（服务器上）：`cd <仓库根目录> && .venv/bin/python -m collector --update`（或 `--collect-news` 仅新闻；`scripts/sync_knowledge.py` 仅知识库）。
 3. **API**：`POST /api/v1/update`（或 `/update/news`、`/update/knowledge`），需账号登录 Cookie（`X-Update-Password` 头已移除）；状态查询 `GET /api/v1/update/status`（公开，含 `kind` 字段区分 full/news/knowledge）。
@@ -44,3 +44,4 @@ description: 本站数据更新操作与排障。适用场景：热度/新闻数
 - 2026-10-21(原始响应窗口化)：`/api/v1/raw` 只导出 `retention.raw_api_days`（默认 14 天）窗口内的响应体，`raw/index.json` 保留全量清单（id/来源/时间/大小/是否导出），`dist/raw/*.html` 溯源页不删——既控 API 与 dist 体积，又不破坏已发布的外链。
 - 2026-10-21(AI 摘要数字对账)：摘要里的统计数字以「板块最新快照」为唯一口径，生成后校验；对不上时降级为模板文案，不让模型给出的数字直接进页面。
 - 2026-10-22(AI 摘要口径 v2.1)：摘要统一说「收录 N 个 / 入榜 M 条」，与榜单 KPI 同源；榜单评分 prompt 中「热度」改「公开采纳指标」。摘要 signature 的版本盐改为 `summary-v2.1-adoption-scope`，旧摘要因签名不匹配自然重生成，避免新口径下沿用旧文案。
+- 2026-10-23(更新入口归一 + 过期横幅可关闭)：需求方要求公开页面（知识库除外）的数据更新按钮统一归到首页。实现：`sitegen.build()` 只给首页传 `home_page=True`，`base.html` 的 `btn-update`/`btn-news-update` 放进 `{% if home_page %}`；方向页、榜单页、产品页只保留「数据截至」文字，知识库页保留「同步知识库」。同时过期横幅增加右上角关闭按钮，关闭状态按 `meta.last_collected_at` 记入 `localStorage["dm-stale-dismissed"]`，同一份数据内跨页不再弹出，数据更新后自动重新评估。验证：`tests/test_base_layout.py` 新增入口归一与横幅可关闭用例，`scripts/verify.py` 改为断言首页有按钮、其它公开页无按钮。

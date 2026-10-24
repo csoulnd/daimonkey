@@ -25,6 +25,7 @@
 <script>try{if(localStorage.getItem("side")==="closed")document.documentElement.classList.add("no-side")}catch(e){}</script>
 <script>try{if(localStorage.getItem("authed")==="1")document.documentElement.classList.add("authed")}catch(e){}</script>
 <script>try{var t=localStorage.getItem("theme");if(t==="light"||(!t&&matchMedia("(prefers-color-scheme: light)").matches))document.documentElement.dataset.theme="light"}catch(e){}</script>
+{% if stale %}<script>try{if(localStorage.getItem("dm-stale-dismissed")==={{ meta.last_collected_at | tojson }})document.documentElement.classList.add("stale-dismissed")}catch(e){}</script>{% endif %}
 <link rel="stylesheet" href="/assets/style.css?v={{ assets_v }}">
 <link rel="stylesheet" href="/assets/assistant.css?v={{ assets_v }}">
 <link rel="stylesheet" href="/assets/charts.css?v={{ assets_v }}">
@@ -36,7 +37,7 @@
 </style>
 {% block head_extra %}{% endblock %}
 </head>
-<body{% if knowledge_page %} class="knowledge-page"{% endif %}>
+<body{% if knowledge_page %} class="knowledge-page"{% elif learn_page %} class="learn-page"{% endif %}>
 <!-- 内联 SVG 图标系统:symbol 复用,currentColor 继承,无外部依赖。
      容器必须是 0×0 但「参与渲染」：display:none 会让 Chromium 丢弃
      #i-ava-* 里 fill="url(#dm-ava)" 的渐变引用，头像退化成纯黑圆。
@@ -57,6 +58,11 @@
   <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 6.5C10 4.9 6.8 4.4 3.5 5.3v13.4c3.3-.9 6.5-.4 8.5 1.2 2-1.6 5.2-2.1 8.5-1.2V5.3c-3.3-.9-6.5-.4-8.5 1.2Z"/>
     <path d="M12 6.5v13.4"/>
+  </symbol>
+  <symbol id="i-learn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 4 3 8.2l9 4.2 9-4.2L12 4Z"/>
+    <path d="M6.5 10.5v5.2c0 1.6 2.5 2.8 5.5 2.8s5.5-1.2 5.5-2.8v-5.2"/>
+    <path d="M21 8.2v5"/>
   </symbol>
   <symbol id="i-method" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M9 3.5h6M10.5 3.5v6.2L5.4 17.9A2 2 0 0 0 7.2 20.5h9.6a2 2 0 0 0 1.8-2.6L13.5 9.7V3.5"/>
@@ -152,24 +158,29 @@
   <symbol id="i-ava-happy" viewBox="0 0 100 100"><g transform="translate(0,9.375) scale(0.15625)"><path fill="url(#dm-ava-happy)" fill-rule="evenodd" d="M142 206 C159 145 207 103 267 86 C298 67 334 39 363 43 C389 47 387 69 367 87 C441 91 486 133 502 206 C548 194 591 224 591 269 C591 314 556 343 512 338 C500 409 449 454 377 454 H267 C194 454 141 409 128 338 C85 344 49 314 49 269 C49 226 91 195 142 206 Z M320 237 C291 198 247 187 207 207 C168 226 158 264 158 311 C158 366 178 397 227 402 C247 404 266 404 282 402 C291 401 294 393 294 384 V339 C294 316 304 303 320 303 C336 303 346 316 346 339 V384 C346 393 349 401 358 402 C374 404 393 404 413 402 C462 397 482 366 482 311 C482 264 472 226 433 207 C393 187 349 198 320 237 Z"/><path d="M220 302 Q240 280 260 302" fill="none" stroke="#f6f2ff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><path d="M380 302 Q400 280 420 302" fill="none" stroke="#f6f2ff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><path d="M296 334 Q320 362 344 334" fill="none" stroke="#f6f2ff" stroke-width="13" stroke-linecap="round"/></g></symbol>
   <symbol id="i-ava-angry" viewBox="0 0 100 100"><g transform="translate(0,9.375) scale(0.15625)"><path fill="url(#dm-ava-angry)" fill-rule="evenodd" d="M142 206 C159 145 207 103 267 86 C298 67 334 39 363 43 C389 47 387 69 367 87 C441 91 486 133 502 206 C548 194 591 224 591 269 C591 314 556 343 512 338 C500 409 449 454 377 454 H267 C194 454 141 409 128 338 C85 344 49 314 49 269 C49 226 91 195 142 206 Z M320 237 C291 198 247 187 207 207 C168 226 158 264 158 311 C158 366 178 397 227 402 C247 404 266 404 282 402 C291 401 294 393 294 384 V339 C294 316 304 303 320 303 C336 303 346 316 346 339 V384 C346 393 349 401 358 402 C374 404 393 404 413 402 C462 397 482 366 482 311 C482 264 472 226 433 207 C393 187 349 198 320 237 Z"/><path d="M210 260 L270 284" fill="none" stroke="#f6f2ff" stroke-width="13" stroke-linecap="round"/><path d="M430 260 L370 284" fill="none" stroke="#f6f2ff" stroke-width="13" stroke-linecap="round"/><circle cx="243" cy="308" r="14" fill="#f6f2ff"/><circle cx="397" cy="308" r="14" fill="#f6f2ff"/><path d="M300 362 Q320 346 340 362" fill="none" stroke="#f6f2ff" stroke-width="12" stroke-linecap="round"/></g></symbol>
 </svg>
-{% if stale and not knowledge_page and not news_page and not reports_page and not clipboard_page %}<div class="stale-banner"><svg class="ic stale-mk" aria-hidden="true"><use href="#i-warning"/></svg>数据超过 48 小时未更新（{{ meta.last_collected_at | dt }}），点击右上「更新」刷新</div>{% endif %}
+{% if stale and not knowledge_page and not news_page and not reports_page and not clipboard_page %}<div class="stale-banner" id="stale-banner" data-stale-at="{{ meta.last_collected_at }}"><svg class="ic stale-mk" aria-hidden="true"><use href="#i-warning"/></svg>数据超过 48 小时未更新（{{ meta.last_collected_at | dt }}），可到首页点「全量更新」刷新<button class="stale-close" id="stale-close" type="button" title="关闭提示" aria-label="关闭数据过期提示"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button></div>{% endif %}
 <div class="layout">
   <aside class="side" id="sidebar">
     <div class="side-brand">
       <a class="brand-mark" href="/" aria-label="返回首页" title="{{ site.name }} · 返回首页"><svg aria-hidden="true"><use href="#i-monkey"/></svg></a>
       <button class="stg" id="side-close" type="button" title="收起侧栏" aria-label="收起侧栏"><svg class="ic" aria-hidden="true"><use href="#i-arrow-left"/></svg></button>
     </div>
+    {% if learn_page %}<details class="site-nav-fold" id="site-nav-fold"><summary><svg class="ic chev" aria-hidden="true"><use href="#i-arrow-right"/></svg>站点导航</summary>{% endif %}
     <nav class="tree">
       {% for d in nav_directions %}
       <a href="{{ d.href }}" data-path="{{ d.href }}"><svg class="ti" aria-hidden="true"><use href="#{{ d.icon }}"/></svg>{{ d.name }}</a>
       {% endfor %}
+      <a href="/learn" data-path="/learn"><svg class="ti" aria-hidden="true"><use href="#i-learn"/></svg>推理基础</a>
       <div class="tree-group auth-only">个人工作台</div>
       <a href="/reports" data-path="/reports" class="auth-only"><svg class="ti" aria-hidden="true"><use href="#i-report"/></svg>报告厅</a>
       <a href="/knowledge" data-path="/knowledge" class="auth-only"><svg class="ti" aria-hidden="true"><use href="#i-book"/></svg>个人知识库</a>
       <a href="/clipboard" data-path="/clipboard" class="auth-only"><svg class="ti" aria-hidden="true"><use href="#i-clip"/></svg>剪贴板</a>
     </nav>
+    {% if learn_page %}</details>{% endif %}
     {% if knowledge_page %}
     <div class="kb-side-nav"><a class="kb-search-link" href="/knowledge#kb-search"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg> 搜索全部文档</a><div class="kb-tree">{% include "_knowledge_tree.html" %}</div></div>
+    {% elif learn_page %}
+    <div class="kb-side-nav"><a class="kb-search-link" href="/learn"><svg class="ic" aria-hidden="true"><use href="#i-index"/></svg> 学习地图</a><div class="kb-tree">{% include "_learn_tree.html" %}</div></div>
     {% endif %}
     <div class="side-foot dim"><a href="/sources" class="dim">数据源</a> · <a href="/api" class="dim">API</a><br>{{ meta.methodology_version }} · 手动更新</div>
   </aside>
@@ -184,17 +195,20 @@
           {% if knowledge_page %}
           <span class="asof">仓库快照 {{ kb.updated[:10] if kb.updated else '尚未同步' }} · {{ kb.short_commit }}</span>
           <button id="btn-kb-update" type="button" class="auth-only" title="从 GitHub 同步知识库代码仓（约 10~60 秒），不重采榜单数据"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> 同步知识库</button>
+          {% elif learn_page %}
+          <span class="asof">{{ learn_meta.count }}/{{ learn_meta.total }} 篇 · 更新于 {{ learn_meta.updated[:10] if learn_meta.updated else '—' }}</span>
           {% elif reports_page %}
           <span class="asof">共 {{ reports_total }} 份报告</span>
           {% elif clipboard_page %}
           <span class="asof">两台设备间同步 · 文本与文件</span>
           {% elif news_page or direction_page %}
           <span class="asof" title="新闻与数据的最后采集时间">新闻截至 {{ news_meta.last_fetched_at | dt if news_meta.last_fetched_at else '暂无' }} · 数据截至 {{ meta.last_collected_at | dt if meta.last_collected_at else '暂无数据' }}</span>
-          <button id="btn-news-update" type="button" class="auth-only" title="仅采集新闻（约 1 分钟），不重采榜单数据"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> 仅更新新闻</button>
-          <button id="btn-update" type="button" class="auth-only"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> 全量更新</button>
           {% else %}
           <span class="asof" id="asof" title="数据截至（最后采集时间）">截至 {{ meta.last_collected_at | dt if meta.last_collected_at else '暂无数据' }}</span>
-          <button id="btn-update" type="button" class="auth-only"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> 更新</button>
+          {% endif %}
+          {% if home_page %}
+          <button id="btn-news-update" type="button" class="auth-only" title="仅采集新闻（约 1 分钟），不重采榜单数据"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> 仅更新新闻</button>
+          <button id="btn-update" type="button" class="auth-only" title="采集→评分→导出→建站，全量刷新站点数据"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> 全量更新</button>
           {% endif %}
           <button id="btn-theme" type="button" title="切换明暗主题" aria-label="切换明暗主题"><svg class="ic" aria-hidden="true"><use href="#i-theme"/></svg></button>
           <button id="search-open" type="button" class="stg" title="搜索（Ctrl+K）" aria-label="站内搜索" aria-haspopup="dialog" aria-controls="search-root" aria-expanded="false"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></button>
@@ -208,6 +222,8 @@
       <footer class="footer">
         {% if knowledge_page %}
         <p class="dim">内容来自 <a href="{{ kb.url }}">csoulnd / InferTechNote</a>，以 GitHub 仓库为准；本站提供只读快照。外部子模块通过原仓库链接访问。</p>
+        {% elif learn_page %}
+        <p class="dim">学习内容与站点同仓版本化（<code>content/learn/</code>）；知识库中的副本为只读归档备份。</p>
         {% elif reports_page %}
         <p class="dim">报告内容与代码同仓版本化（<code>reports/</code>）；素材来自知识库、站内数据与外部资料。HTML 报告为作者自备内容。</p>
         {% elif clipboard_page %}
@@ -227,7 +243,7 @@
 <script src="/assets/search.js?v={{ assets_v }}" defer></script>
 
 <script src="/assets/app.js?v={{ assets_v }}"></script>
-{% if knowledge_page %}<script src="/assets/knowledge.js?v={{ assets_v }}" defer></script>{% endif %}
+{% if knowledge_page or learn_page %}<script src="/assets/knowledge.js?v={{ assets_v }}" defer></script>{% endif %}
 {% if clipboard_page %}<script src="/assets/clipboard.js?v={{ assets_v }}" defer></script>{% endif %}
 {% if news_page %}<script src="/assets/news.js?v={{ assets_v }}" defer></script>{% endif %}
 <script src="/assets/assistant.js?v={{ assets_v }}" defer></script>

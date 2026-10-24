@@ -210,13 +210,42 @@ class BaseLayoutTest(unittest.TestCase):
     def test_update_buttons_carry_auth_only_for_anonymous(self) -> None:
         cases = {
             "btn-kb-update": PRIVATE_CONTEXTS["knowledge"],
-            "btn-news-update": {"news_page": True, "news_meta": {}},
-            "btn-update": {},
+            "btn-news-update": {"home_page": True},
+            "btn-update": {"home_page": True},
         }
         for btn_id, ctx in cases.items():
             with self.subTest(button=btn_id):
                 html = self.render(**ctx)
                 self.assertRegex(html, rf'<button id="{btn_id}"[^>]*class="auth-only"')
+
+    def test_data_update_buttons_live_only_on_home(self) -> None:
+        home = self.render(home_page=True)
+        self.assertIn('id="btn-update"', home)
+        self.assertIn('id="btn-news-update"', home)
+        for label, ctx in {
+            "方向新闻": {"direction_page": True, "news_meta": {}},
+            "全站新闻": {"news_page": True, "news_meta": {}},
+            "榜单/产品/普通页": {},
+        }.items():
+            with self.subTest(page=label):
+                html = self.render(**ctx)
+                self.assertNotIn('id="btn-update"', html)
+                self.assertNotIn('id="btn-news-update"', html)
+
+    def test_stale_banner_is_dismissible(self) -> None:
+        html = self.render(stale=True)
+        self.assertIn('id="stale-banner"', html)
+        self.assertIn(f'data-stale-at="{_ctx()["meta"]["last_collected_at"]}"', html)
+        self.assertIn('id="stale-close"', html)
+        self.assertIn('aria-label="关闭数据过期提示"', html)
+        # 首帧前按「最后采集时间」恢复关闭状态，避免每页重复出现。
+        head = self.head(html)
+        self.assertIn('localStorage.getItem("dm-stale-dismissed")', head)
+        self.assertIn(_ctx()["meta"]["last_collected_at"], head)
+        # 数据未过期时不渲染横幅与恢复脚本。
+        fresh = self.render(stale=False)
+        self.assertNotIn('id="stale-banner"', fresh)
+        self.assertNotIn('dm-stale-dismissed', fresh)
 
     def test_auth_only_uses_css_default_hidden_then_authed_reveal(self) -> None:
         html = self.render()

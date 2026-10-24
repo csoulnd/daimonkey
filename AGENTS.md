@@ -41,6 +41,7 @@ InferTech 观察站(原智能体热度指数):以推理技术为重心,采集 Ag
 | 模型评测专家 | [skills/model-eval/SKILL.md](skills/model-eval/SKILL.md) | 模型 benchmark 榜单:数据源接入/评分设计/官方链接 |
 | 硬件评测专家 | [skills/nv-hardware/SKILL.md](skills/nv-hardware/SKILL.md) | NV 方向 MLPerf 接入、加速卡归一、单卡吞吐口径、换季升级 |
 | 三方向频道专家 | [skills/directions/SKILL.md](skills/directions/SKILL.md) | 方向频道页/registry directions/门户入口/Harness 收录分层/方向周总结 |
+| 学习内容专家 | [skills/learn-atlas/SKILL.md](skills/learn-atlas/SKILL.md) | `/learn` 学习内容、章节骨架与渲染、登录编辑、知识库归档 |
 | 个人工作台专家 | [skills/workspace/SKILL.md](skills/workspace/SKILL.md) | 工作台分区/用户隔离/自配知识库仓库 |
 | 部署交付专家 | [skills/deployment/SKILL.md](skills/deployment/SKILL.md) | 新机安装、换机/迁移、备份恢复、systemd 托管、依赖版本与部署自检 |
 | 站内运维 agent 专家 | [skills/ops-agent/SKILL.md](skills/ops-agent/SKILL.md) | pi RPC 运行时、工具策略/审批/审计、运维会话、服务降权与 wrapper/sudoers |
@@ -58,6 +59,7 @@ InferTech 观察站(原智能体热度指数):以推理技术为重心,采集 Ag
 | `templates/` `static/assets/` | 页面模板 / 样式与 JS | ui-polish |
 | `skills/` | 专家文档(本约定的主体) | 全部 |
 | `reports/` | 报告内容(进 git) | report-writing、product-showcase |
+| `content/learn/` | 学习内容(进 git，`/learn` 主存储) | learn-atlas |
 | `tests/` | 单元测试(unittest + node) | 被测模块的专家 |
 | `data/` | SQLite / 密钥 / 快照(**不入库**) | — |
 | `dist/` | 构建产物(**不手改**,重建生成) | — |

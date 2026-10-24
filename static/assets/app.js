@@ -22,6 +22,17 @@
     if (on) a.classList.add("on");
   });
 
+  /* ---- 学习页：全局导航收起，展开状态本地记忆 ---- */
+  var siteFold = document.getElementById("site-nav-fold");
+  if (siteFold) {
+    try {
+      if (localStorage.getItem("learn-nav") === "open") siteFold.open = true;
+    } catch (e) { /* 隐私模式 */ }
+    siteFold.addEventListener("toggle", function () {
+      try { localStorage.setItem("learn-nav", siteFold.open ? "open" : "closed"); } catch (e) { /* 隐私模式 */ }
+    });
+  }
+
   /* ---- 榜单页视图切换 ---- */
   document.querySelectorAll(".view-toggle .tg").forEach(function (btn) {
     btn.addEventListener("click", function () {
@@ -46,6 +57,19 @@
       if (toLight) root.dataset.theme = "light";
       else delete root.dataset.theme;
       try { localStorage.setItem("theme", toLight ? "light" : "dark"); } catch (e) { }
+    });
+  }
+
+  /* ---- 数据过期横幅：关闭后按「最后采集时间」记住，本次数据不再打扰 ---- */
+  var btnStaleClose = document.getElementById("stale-close");
+  if (btnStaleClose) {
+    btnStaleClose.addEventListener("click", function () {
+      var banner = document.getElementById("stale-banner");
+      document.documentElement.classList.add("stale-dismissed");
+      try {
+        var staleAt = banner && banner.getAttribute("data-stale-at");
+        if (staleAt) localStorage.setItem("dm-stale-dismissed", staleAt);
+      } catch (e) { /* 隐私模式 */ }
     });
   }
 

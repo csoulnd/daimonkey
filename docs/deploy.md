@@ -141,7 +141,7 @@ scripts/update.sh                  # 全量：采集→评分→LRU→导出→�
 .venv/bin/python scripts/sync_knowledge.py
 ```
 
-网页右上角「⟳ 更新」等价于全量更新（需登录账号）。**默认安装不启用 cron/定时器**，更新仍可手动触发；如需自动调度，用 `deploy/install-timers.sh` 安装分级 systemd timer（见 §12）。LRU 窗口见 `collector/registry.yaml → retention`。
+网页首页右上角「⟳ 全量更新」等价于全量更新（需登录账号）；「⟳ 仅更新新闻」只采集新闻。**默认安装不启用 cron/定时器**，更新仍可手动触发；如需自动调度，用 `deploy/install-timers.sh` 安装分级 systemd timer（见 §12）。LRU 窗口见 `collector/registry.yaml → retention`。
 
 ## 6. 备份策略
 

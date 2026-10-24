@@ -172,9 +172,11 @@ def main() -> int:
     for name, pat in [
         ("方向新闻区", r'id="dir-news"'),
         ("新闻条目", r'class="news-item"'),
-        ("轻量更新按钮", r'id="btn-news-update"'),
     ]:
         check(name, bool(re.search(pat, harness_news_html)))
+    check("方向新闻页不再放更新按钮",
+          'id="btn-update"' not in harness_news_html
+          and 'id="btn-news-update"' not in harness_news_html)
     check("导航无全站新闻入口", 'href="/news"' not in harness_news_html)
     check("全站新闻页已下线(301)", news_redirect_ok(base))
     try:
@@ -196,7 +198,8 @@ def main() -> int:
     nv_page = page(base + "/rankings/nv_infer")
     harness_page = page(base + "/rankings/harness_core")
     for name, pat, html in [
-        ("更新按钮", r'id="btn-update"', home),
+        ("首页全量更新按钮", r'id="btn-update"', home),
+        ("首页仅更新新闻按钮", r'id="btn-news-update"', home),
         ("数据截至时间", r'id="asof"', home),
         ("来源标签", r'class="src-tag s-', uni),
         ("原始指标溯源", r'class="sv-v"', uni),
@@ -204,6 +207,12 @@ def main() -> int:
         ("本周要点卡", r'class="ai-summary weekly-points"', harness_page),
     ]:
         check(name, bool(re.search(pat, html)))
+    # 数据更新入口只保留在首页：其它公开页不得再渲染更新按钮。
+    for label, html in [("方向榜单页", uni), ("榜单页", model_page),
+                        ("产品页", prod_html)]:
+        check(f"{label}无更新按钮",
+              'id="btn-update"' not in html
+              and 'id="btn-news-update"' not in html)
     check("旧热度/动量视图已移除",
           'data-view="mom"' not in harness_page
           and "热度视图" not in harness_page

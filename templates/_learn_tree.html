@@ -1,0 +1,11 @@
+{% for part in learn_nav.parts %}
+<details open><summary>{{ part.title }}</summary><div class="kb-tree-children">
+{% for ch in part.chapters %}
+{% if ch.planned %}
+<span class="learn-tree-pending" title="待发布">{{ ch.title }} <span class="dim">待发布</span></span>
+{% else %}
+<a href="{{ ch.url }}"{% if article is defined and article.slug == ch.slug and article.part_id == part.id %} class="on" aria-current="page"{% endif %}>{{ ch.title }}</a>
+{% endif %}
+{% endfor %}
+</div></details>
+{% endfor %}

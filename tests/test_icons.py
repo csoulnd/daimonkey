@@ -5,7 +5,7 @@ Guards the single inline sprite in ``templates/base.html``:
 * every literal ``#i-*`` reference in templates / JS resolves in the sprite;
 * the documented dynamic references (avatar / pet-face concatenation and the
   navigation registry) stay whitelisted;
-* no orphan symbol — 33 symbols only;
+* no orphan symbol — 34 symbols only;
 * 24x24 / 1.6 stroke / round caps / currentColor conformance for functional
   icons, with the four brand monkey faces and three avatars exempted;
 * retired symbols and the old text glyphs never come back.
@@ -53,6 +53,7 @@ SYMBOL_IDS = set(SYMBOLS)
 
 NAV_ICONS = {
     "i-index", "i-news", "i-report", "i-book", "i-method", "i-chip", "i-clip",
+    "i-learn",
 }
 ACTION_ICONS = {
     "i-search", "i-theme", "i-refresh", "i-minimize", "i-maximize",
@@ -64,7 +65,7 @@ FACE_ICONS = {
     "i-monkey", "i-monkey-thinking", "i-monkey-happy", "i-monkey-angry",
 }
 AVATAR_ICONS = {"i-ava-monkey", "i-ava-happy", "i-ava-angry"}
-# 26 icons on the 24x24 functional grid (7 nav + 19 action)
+# 27 icons on the 24x24 functional grid (8 nav + 19 action)
 FUNCTIONAL_ICONS = NAV_ICONS | ACTION_ICONS
 
 # Icons that ship for the documented next-use surfaces (clipboard download /
@@ -121,14 +122,14 @@ def literal_refs() -> dict[str, set[str]]:
 
 class IconSpriteTest(unittest.TestCase):
     def test_expected_symbol_set(self) -> None:
-        self.assertEqual(len(SYMBOL_IDS), 33, sorted(SYMBOL_IDS))
-        self.assertEqual(len(NAV_ICONS), 7)
+        self.assertEqual(len(SYMBOL_IDS), 34, sorted(SYMBOL_IDS))
+        self.assertEqual(len(NAV_ICONS), 8)
         self.assertEqual(len(ACTION_ICONS), 19, sorted(ACTION_ICONS))
         self.assertEqual(len(NAV_ICONS - SYMBOL_IDS), 0, NAV_ICONS - SYMBOL_IDS)
         self.assertEqual(len(ACTION_ICONS - SYMBOL_IDS), 0, ACTION_ICONS - SYMBOL_IDS)
         self.assertEqual(len(FACE_ICONS), 4)
         self.assertEqual(len(AVATAR_ICONS), 3)
-        self.assertEqual(len(FUNCTIONAL_ICONS), 26)
+        self.assertEqual(len(FUNCTIONAL_ICONS), 27)
         self.assertEqual(
             NAV_ICONS | ACTION_ICONS | FACE_ICONS | AVATAR_ICONS, SYMBOL_IDS
         )

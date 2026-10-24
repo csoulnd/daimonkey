@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}LLM 推理技术基础 · {{ site.name }}{% endblock %}
+{% block content %}
+{% for s in learn_series %}
+<section class="learn-hero">
+  <div class="dim learn-kicker">LEARN · LLM INFERENCE</div>
+  <h1>{{ s.title }}</h1>
+  <p>{{ s.description }}</p>
+  <div class="learn-meta dim">{{ s.count }}/{{ s.total }} 篇已发布 · {{ s.parts|length }} 卷{% if s.updated %} · 更新于 {{ s.updated[:10] }}{% endif %}</div>
+</section>
+{% for part in s.parts %}
+<section class="learn-part" id="part-{{ part.id }}">
+  <div class="learn-part-head"><h2>{{ part.title }}</h2>{% if part.description %}<span class="dim">{{ part.description }}</span>{% endif %}</div>
+  <div class="learn-cards">
+  {% for ch in part.chapters %}
+    {% if ch.planned %}
+    <div class="learn-card is-planned">
+      <div class="learn-card-meta"><span>待发布</span></div>
+      <h3>{{ ch.title }}</h3>
+    </div>
+    {% else %}
+    <a class="learn-card" href="{{ ch.url }}">
+      <h3>{{ ch.title }}</h3>
+      <p>{{ ch.one_liner }}</p>
+      <span class="learn-card-more">阅读 →</span>
+    </a>
+    {% endif %}
+  {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endfor %}
+<section class="learn-how">
+  <h2>怎么读</h2>
+  <ol>
+    <li><strong>第一次</strong>：从《导读》开始，按卷序读；先建立“一次请求的生命周期”这条主线。</li>
+    <li><strong>带着问题</strong>：先看左侧目录，定位到调度、显存、量化、投机、并行或框架，再回补前置。</li>
+    <li><strong>动手</strong>：每篇末尾的自测先答一遍；实践卷会给出可运行的最小实验。</li>
+  </ol>
+</section>
+{% endblock %}

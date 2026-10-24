@@ -868,6 +868,15 @@ def write_sitemap(dist_dir: str | Path, base_url: str | None = None, *,
             lastmod = ""
         entries.append((loc, lastmod, url_path))
 
+    # 同一路径可能由「目录 index.html」与「同名 .html」各产生一条（如 /learn 与
+    # /learn/index.html）；按 URL 路径去重，保留最新的 lastmod。
+    unique: dict[str, tuple[str, str, str]] = {}
+    for entry in entries:
+        prev = unique.get(entry[2])
+        if prev is None or entry[1] > prev[1]:
+            unique[entry[2]] = entry
+    entries = list(unique.values())
+
     # 首页优先，其余按 URL 字典序，输出稳定可 diff。
     entries.sort(key=lambda e: (e[2] != "/", e[2]))
     lines = [

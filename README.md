@@ -10,6 +10,7 @@
 | 智能体(Harness) | `/dir/harness` | 核心产品榜+生态项目榜分层不混排;新闻与方向周总结 |
 | 模型(FM) | `/dir/fm` | Artificial Analysis(海外智能指数)+ SuperCLUE(中文)双口径;新闻与方向周总结 |
 | 硬件(NV) | `/dir/nv` | 占位页(规划中:MLPerf/规格/云定价),后续逐步填充 |
+| 推理基础 | `/learn` | LLM 推理技术基础:从基础模型架构到算子执行的推理加速知识地图;登录后可编辑 |
 | 个人工作台 | 登录后侧栏 | 报告厅(`/reports`)、个人知识库(`/knowledge`,每个账号可配自己的 GitHub 仓库)、全站悬浮智能助手 |
 
 匿名可浏览公开板块;工作台内容登录后可见。
@@ -39,7 +40,7 @@ python3 -m venv .venv
 .venv/bin/python scripts/serve.py --host 0.0.0.0   # http://<IP>:8080
 ```
 
-无任何自动调度:全站手动更新(页面「⟳ 更新」按钮或 CLI),页面显著展示数据截至时间。对外访问需在云安全组放行 TCP 8080；未绑定域名、未启用 HTTPS。
+无任何自动调度:全站手动更新(首页「⟳ 全量更新」按钮或 CLI),页面显著展示数据截至时间。对外访问需在云安全组放行 TCP 8080；未绑定域名、未启用 HTTPS。
 
 ## 账号与权限
 
@@ -76,6 +77,7 @@ deploy/       bootstrap.sh 安装 / backup.sh 备份 / smoke.sh 演练 / daimonk
 templates/    页面模板   static/assets/  样式与前端 JS
 skills/       专家文档   AGENTS.md  开发工作流铁律   PLAN.md  迭代计划
 reports/      报告内容(进 git)
+content/learn/ 学习内容(进 git,`/learn` 主存储)
 data/         SQLite/密钥/快照(不入库)   dist/  构建产物(不手改)
 ```
 
@@ -84,6 +86,7 @@ data/         SQLite/密钥/快照(不入库)   dist/  构建产物(不手改)
 - **开发约定与专家体系**:根 [AGENTS.md](AGENTS.md)——任何开发任务先选专家、结束沉淀回专家文档;专家索引在 `skills/`(负载优化/UI 美化/数据更新/新闻汇总/模型评测/个人工作台/报告撰写/部署交付)
 - **部署与换机**:[docs/deploy.md](docs/deploy.md)——依赖矩阵、一条命令安装、备份恢复、GitHub SSH key 迁移、搬迁/重启演练
 - **当前迭代计划**:[PLAN.md](PLAN.md)
+- **学习内容设计**:[docs/DESIGN-learn.md](docs/DESIGN-learn.md)——内容模型、`/learn` 渲染、登录编辑、知识库归档与图表规划
 - **评分口径**:站内各榜页面「评分说明」折叠块;AI 参与的环节在页面均有标注
 - **助手运行时**:PIAgent 一次性进程(pi.dev),无常驻内存;配额与护栏见 `registry.yaml → assistant`
 - **站内运维 agent(管理员)**:对话/运维双模式,pi RPC + 工具白名单 + 前端审批 + 工具级审计;必须先降权再开启,见 [docs/OPS-AGENT.md](docs/OPS-AGENT.md) 与 [docs/deploy.md §11](docs/deploy.md)

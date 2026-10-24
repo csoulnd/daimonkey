@@ -165,6 +165,15 @@ html.no-side .tophead .brand { display: inline !important; }
   stroke: var(--glyph); fill: none; stroke-width: 1.6;
   stroke-linecap: round; stroke-linejoin: round; }
 .tree a.on svg.ti, .tree a:hover svg.ti { stroke: currentColor; }
+
+/* 学习页：全局导航收起为「站点导航」，把侧栏空间留给课程目录 */
+.site-nav-fold { margin: 4px 0 0; padding: 0 8px 0 20px; }
+.site-nav-fold > summary { display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--dim); font-size: 0.78em; letter-spacing: 0.08em; padding: 4px 0; list-style: none; user-select: none; }
+.site-nav-fold > summary::-webkit-details-marker { display: none; }
+.site-nav-fold > summary .chev { width: 13px; height: 13px; transition: transform 0.18s; }
+.site-nav-fold[open] > summary .chev { transform: rotate(90deg); }
+.site-nav-fold > summary:hover { color: var(--ink); }
+.site-nav-fold .tree { padding: 2px 0 0; }
 .side-foot { margin-top: auto; font-size: 0.76em; padding: 0 20px; }
 
 /* ---- A 方向新增组件:侧栏品牌块 / Hero / KPI 条 / 元信息胶囊 ---- */
@@ -215,7 +224,21 @@ html.no-side .tophead .brand { display: inline !important; }
 }
 #btn-update:hover { filter: brightness(1.1); text-decoration: none; }
 #btn-update:disabled { background: var(--panel2); color: var(--dim); cursor: wait; filter: none; }
-.stale-banner { background: var(--stale-bg); color: var(--hue-yellow); padding: 7px 20px; text-align: center; font-size: 0.88em; }
+.stale-banner {
+  position: relative; background: var(--stale-bg); color: var(--hue-yellow);
+  padding: 7px 44px; text-align: center; font-size: 0.88em; line-height: 1.5;
+}
+.stale-banner .stale-close {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 24px; height: 24px; padding: 0; display: inline-flex;
+  align-items: center; justify-content: center;
+  background: none; border: 1px solid transparent; border-radius: var(--r-s);
+  color: inherit; cursor: pointer; opacity: .75;
+}
+.stale-banner .stale-close:hover { opacity: 1; border-color: var(--hue-yellow-line); }
+.stale-banner .stale-close:focus-visible { outline: 2px solid var(--hue-yellow); outline-offset: 1px; }
+.stale-banner .stale-close .ic { width: 14px; height: 14px; }
+html.stale-dismissed .stale-banner { display: none; }
 
 /* ---- 版式（极简标题）---- */
 h1 { font-size: 1.15em; margin: 0; font-weight: 600; letter-spacing: 0.02em; }
@@ -390,6 +413,38 @@ h3 { font-size: 0.96em; margin: 0.7em 0 0.35em; font-weight: 600; }
 .markdown-body summary { cursor: pointer; color: var(--dim); }
 .kb-diagram { overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px; }
 .kb-diagram svg { display: block; margin: auto; height: auto; }
+
+/* ---- 学习内容 /learn ---- */
+.learn-page .side { width: 280px; }
+.learn-page .page { max-width: 1320px; }
+.learn-hero { padding: 22px 0 26px; border-bottom: 1px solid var(--line); }
+.learn-kicker { font-size: 0.72em; letter-spacing: 0.16em; }
+.learn-hero h1 { font-size: 2.05em; line-height: 1.35; margin: 8px 0 10px; }
+.learn-hero p { color: var(--dim); font-size: 1.02em; max-width: 760px; line-height: 1.8; margin: 0 0 12px; }
+.learn-meta { font-size: 0.82em; }
+.learn-part { margin: 30px 0; scroll-margin-top: 20px; }
+.learn-part-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.learn-part-head h2 { font-size: 1.2em; margin: 0; }
+.learn-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.learn-card { display: flex; flex-direction: column; padding: 16px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; color: var(--ink); text-decoration: none; transition: border-color 0.18s, transform 0.18s; }
+.learn-card:hover { border-color: var(--acc); text-decoration: none; transform: translateY(-1px); }
+.learn-card-meta { font-size: 0.76em; color: var(--dim); }
+.learn-card h3 { margin: 8px 0; font-size: 1.02em; line-height: 1.5; }
+.learn-card p { margin: 0; color: var(--dim); font-size: 0.88em; line-height: 1.7; flex: 1; }
+.learn-card-more { margin-top: 12px; font-size: 0.8em; color: var(--acc); }
+.learn-card.is-planned { opacity: 0.55; }
+.learn-card.is-planned:hover { border-color: var(--line); transform: none; }
+.learn-tree-pending { display: block; padding: 5px 8px; color: var(--dim); opacity: 0.6; line-height: 1.5; overflow-wrap: anywhere; }
+.learn-tree-pending .dim { font-size: 0.9em; }
+.learn-how { margin: 40px 0 10px; padding: 20px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.learn-how h2 { font-size: 1.1em; margin: 0 0 10px; }
+.learn-how ol { margin: 0; padding-left: 20px; color: var(--dim); line-height: 1.9; font-size: 0.92em; }
+.learn-related { margin: 34px 0 0; padding-top: 18px; border-top: 1px solid var(--line); }
+.learn-related h2 { font-size: 1.05em; }
+.learn-related ul { padding-left: 18px; color: var(--dim); line-height: 1.8; font-size: 0.9em; }
+.learn-pager { display: flex; justify-content: space-between; gap: 16px; margin: 40px 0 10px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 0.9em; }
+.learn-pager a { color: var(--dim); }
+.learn-pager a:hover { color: var(--ink); }
 @media (max-width: 1150px) {
   .kb-reading { grid-template-columns: minmax(0, 1fr); }
   .kb-toc { position: static; grid-row: 1; max-height: 240px; }
@@ -453,12 +508,14 @@ h3 { font-size: 0.96em; margin: 0.7em 0 0.35em; font-weight: 600; }
   .tree a.on::after { content: ""; margin: 0; }
   .tree a.on { border-bottom: 2px solid var(--acc); border-radius: 0; }
   .side-foot { display: none; }
-  .knowledge-page .side { width: auto; flex-wrap: wrap; }
-  .knowledge-page .kb-side-nav { width: 100%; flex-basis: 100%; max-height: 240px; padding: 0; margin: 6px 0 0; }
+  .site-nav-fold { padding: 0; }
+  .site-nav-fold > summary { padding: 4px 6px; }
+  .knowledge-page .side, .learn-page .side { width: auto; flex-wrap: wrap; }
+  .knowledge-page .kb-side-nav, .learn-page .kb-side-nav { width: 100%; flex-basis: 100%; max-height: 240px; padding: 0; margin: 6px 0 0; }
   .kb-search-row { flex-wrap: wrap; }
   .kb-search input { flex-basis: 100%; }
   .kb-intro h1 { font-size: 1.6em; }
-  .knowledge-page .asof { white-space: normal; }
+  .knowledge-page .asof, .learn-page .asof { white-space: normal; }
 }
 
 /* ---- 超窄屏（≤420）：顶栏/侧栏不撑宽 ----

@@ -18,11 +18,11 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 from . import ai as ai_mod
-from . import db, hw, queries, searchindex, seo, svgchart, knowledge
+from . import db, hw, queries, searchindex, seo, svgchart, knowledge, learn
 from . import news as newslib
 from . import reports as reportslib
-from .config import (DB_PATH, DIST_DIR, STATIC_DIR, TEMPLATES_DIR, ensure_dirs,
-                     now_iso, registry, today_utc)
+from .config import (DATA_DIR, DB_PATH, DIST_DIR, STATIC_DIR, TEMPLATES_DIR,
+                     ensure_dirs, now_iso, registry, today_utc)
 from .scoring import load_latest_metrics
 from .compression import compress_site
 
@@ -672,6 +672,7 @@ def build() -> None:
         render("index.html", "index.html",
                seo_kind="home",
                seo_ctx={"path": "/", "counts": meta.get("counts") or {}},
+               home_page=True,
                direction_cards=direction_cards,
                unified_total=len(board_blocks.get("harness_core", {}).get("rows", [])),
                eco_total=len(board_blocks.get("harness_eco", {}).get("rows", [])),
@@ -744,6 +745,20 @@ def build() -> None:
                clip_limits={"max_file_mb": clipboard_mod.cfg()["max_file_bytes"] // 1048576,
                             "quota_mb": clipboard_mod.cfg()["quota_mb"]})
         knowledge.build(env, common, kb_notes)
+        try:
+            learn_meta = learn.build(env, common, kb_notes)
+            if learn_meta.get("articles"):
+                log.info("[sitegen] 学习内容: %d 系列 / %d 篇",
+                         learn_meta["series"], learn_meta["articles"])
+        except Exception as exc:  # 学习内容失败不阻断榜单页；保留旧输出
+            log.exception("[sitegen] 学习内容构建失败（保留旧页面）")
+            try:
+                (DATA_DIR / "learn-build-error.json").write_text(
+                    json.dumps({"time": now_iso(),
+                                "error": f"{type(exc).__name__}: {exc}"},
+                               ensure_ascii=False, indent=2), encoding="utf-8")
+            except OSError:
+                pass
 
         # ---- AI 新闻:不再有全站页面,仅按方向聚合(频道页 + 方向周报) ----
         ncfg = reg.get("news", {})

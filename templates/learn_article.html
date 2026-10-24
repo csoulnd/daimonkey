@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ article.title }} · LLM 推理技术基础{% endblock %}
+{% block content %}
+<div class="kb-breadcrumb"><a href="/learn">LLM 推理技术基础</a>{% if article.part_title and article.part_title != article.title %} / {{ article.part_title }}{% endif %} / <span>{{ article.title }}</span></div>
+<div class="kb-note-meta">
+  <span class="dim">{% if article.version %}{{ article.version }}{% endif %}</span>
+  <span class="dim">更新于 {{ article.updated[:10] }}</span>
+</div>
+<div class="kb-reading">
+  <article class="markdown-body">{{ article_html | safe }}</article>
+  <aside class="kb-toc"><details open><summary>本文目录</summary>{{ article_toc | safe }}</details></aside>
+</div>
+{% if related_notes %}
+<section class="learn-related">
+  <h2>相关笔记</h2>
+  <ul>{% for n in related_notes %}<li><a href="{{ n.url }}">{{ n.title }}</a>{% if n.one_liner %}<span class="dim"> — {{ n.one_liner }}</span>{% endif %}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+<nav class="learn-pager" aria-label="章节导航">
+  {% if prev %}<a href="{{ prev.url }}">← {{ prev.title }}</a>{% else %}<span class="dim">已经是第一篇</span>{% endif %}
+  {% if next %}<a href="{{ next.url }}">{{ next.title }} →</a>{% else %}<span class="dim">已读完本卷</span>{% endif %}
+</nav>
+{% endblock %}
