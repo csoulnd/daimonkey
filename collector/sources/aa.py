@@ -12,6 +12,9 @@
    FM 榜 heat 使用 aa_intelligence，其他指数只作展示列；
 6. 免费层限额 1000 次：`data/cache/aa_models.json` 七天有效，有效期内直接复用缓存，
    不发起任何请求（实际约每 7 天 4 次调用）；缓存行带 raw_id，重放指标不重复插行。
+7. 拉取有整源时间预算（默认 240s，`fetch_budget_s` 可调）：超时/断网时降级用旧缓存
+   快照，不让跨境慢链路拖到 25 分钟看门狗；该缓存文件不受 retention 的 GitHub
+   缓存清理影响（cache_hours 只删 32 位哈希命名的响应缓存）。
 
 密钥只从 data/model_eval.env（AA_API_KEY，600）或环境变量读取，禁止入库/日志。
 """
@@ -20,11 +23,13 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from .. import db
 from ..config import CACHE_DIR, DATA_DIR, now_iso, registry
+from ..http import FetchError
 from .base import BaseSource, Ctx, MetricOut
 
 ENV_FILE = DATA_DIR / "model_eval.env"
@@ -34,6 +39,7 @@ PARSER_VERSION = "aa-v2-free-2"
 DEFAULT_CACHE_DAYS = 7
 DEFAULT_TOP_N = 40
 REQUEST_TIMEOUT = 75
+DEFAULT_FETCH_BUDGET_S = 240   # 整源预算：超时降级旧缓存，不让慢链路拖垮整轮更新
 MAX_PAGES = 20
 
 AA_METRIC_MAP = {
@@ -281,6 +287,12 @@ def _rows_from_cache(cache: dict) -> list[AARow]:
     return out
 
 
+def _stale_rows(cache: dict | None) -> list[AARow] | None:
+    """旧缓存里的可用行；没有则 None（拉取失败时降级用，不覆盖缓存文件）。"""
+    rows = _rows_from_cache(cache) if cache else []
+    return rows or None
+
+
 def _source_conf() -> dict:
     for src in registry()["sources"]:
         if src.get("key") == "aa":
@@ -288,8 +300,15 @@ def _source_conf() -> dict:
     raise AAError("registry.yaml 缺少 sources.aa 配置")
 
 
-def _fetch_all(ctx: Ctx, key: str, url: str) -> tuple[list[AARow], float | None, list[str]]:
-    """逐页拉取并归档 raw；任何一页失败整源失败（不产出半套指标）。"""
+def _fetch_all(ctx: Ctx, key: str, url: str,
+               budget_s: float | None = DEFAULT_FETCH_BUDGET_S
+               ) -> tuple[list[AARow], float | None, list[str]]:
+    """逐页拉取并归档 raw；任何一页失败整源失败（不产出半套指标）。
+
+    budget_s 是整源时间预算：跨境链路上单页可能被慢速滴流拖到几分钟，
+    超出预算即放弃，由 collect() 决定是否降级到旧缓存快照。
+    """
+    deadline = time.monotonic() + budget_s if budget_s and budget_s > 0 else None
     rows: list[AARow] = []
     raw_ids: list[int] = []
     pages: list[dict] = []
@@ -298,7 +317,7 @@ def _fetch_all(ctx: Ctx, key: str, url: str) -> tuple[list[AARow], float | None,
     while page <= total_pages and page <= MAX_PAGES:
         page_url = f"{url}{'&' if '?' in url else '?'}page={page}"
         resp = ctx.http.fetch(page_url, headers={"x-api-key": key},
-                              timeout=REQUEST_TIMEOUT)
+                              timeout=REQUEST_TIMEOUT, deadline=deadline)
         if resp.status_code != 200:
             raise AAError(f"AA API HTTP {resp.status_code}（page {page}）")
         error = None
@@ -350,9 +369,22 @@ class AASource(BaseSource):
             key = _env_key()
             if not key:
                 raise AAError("未配置 AA_API_KEY（data/model_eval.env，600；禁止入库）")
-            rows, version, notes = _fetch_all(ctx, key, conf["base_url"])
-            _save_cache(rows, version)
-            collected_at = ctx.now
+            budget = float(conf.get("fetch_budget_s", DEFAULT_FETCH_BUDGET_S))
+            try:
+                rows, version, notes = _fetch_all(ctx, key, conf["base_url"], budget)
+                _save_cache(rows, version)
+                collected_at = ctx.now
+            except FetchError as e:
+                # 网络/预算失败：有旧缓存就降级复用（AA 周更，旧快照仍可展示），
+                # 不让一个慢源拖垮整轮更新；旧缓存保留，下次再试拉新。
+                rows = _stale_rows(cache)
+                if not rows:
+                    raise AAError(
+                        f"AA 拉取失败（{e}），且没有可复用的缓存快照") from e
+                version = cache.get("index_version")
+                collected_at = str(cache.get("fetched_at") or now_iso())
+                notes = [f"AA 拉取失败（{e}），降级使用 {collected_at}"
+                         f" 的旧缓存快照（{len(rows)} 个模型）"]
         selected = select_universe(rows, top_n)
         if not selected:
             raise AAError("AA 数据中没有可用的 Intelligence Index，无法建立模型池")

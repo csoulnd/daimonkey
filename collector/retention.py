@@ -4,14 +4,19 @@
 - raw_body_days  原始响应体文件：删文件、保留元数据行与 sha256（溯源链不断，页面显示"已清理"）
 - metrics_days   指标时序行
 - rankings_days  榜单快照行
-- cache_hours    GitHub 采集缓存文件
+- cache_hours    GitHub 采集缓存文件（只清 32 位哈希命名的响应缓存；
+                 aa_models.json / mlperf_summary.json 等源级缓存由各源 TTL 自行管理）
 """
 from __future__ import annotations
 
+import re
 import time
 
 from .config import (CACHE_DIR, DATA_DIR, date_days_ago, days_ago, now_iso,
                      registry, resolve_data_path)
+
+# GitHub 源的缓存文件命名：sha256(url)[:32] + ".json"（见 sources/github.py）。
+_GITHUB_CACHE_RE = re.compile(r"^[0-9a-f]{32}\.json$")
 
 
 def apply(c) -> dict:
@@ -56,7 +61,12 @@ def apply(c) -> dict:
 
     if cfg.get("cache_hours"):
         max_age = int(cfg["cache_hours"]) * 3600
+        # 只清 GitHub 的响应缓存（32 位哈希）；aa_models.json / mlperf_summary.json
+        # 是七天有效的源级缓存，按 48h 兜底删除会让每周全量更新都冷启动重拉
+        # （2026-10-26 实测：AA 四页跨境慢链路多花约 3 分钟，且可能拖到看门狗）。
         for f in CACHE_DIR.glob("*.json"):
+            if not _GITHUB_CACHE_RE.match(f.name):
+                continue
             try:
                 if time.time() - f.stat().st_mtime > max_age:
                     f.unlink()

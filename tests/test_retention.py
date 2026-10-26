@@ -57,12 +57,17 @@ class TestRetention(unittest.TestCase):
                 "INSERT INTO rankings(board,snapshot_date,rank,product_id,"
                 " methodology_version) VALUES('coding','2025-08-01',1,?, 'v1.0')",
                 (pid,))                     # 超过 rankings_days=365 -> 删
-            # 过期缓存文件（100h > 48h）
-            cf = retention.CACHE_DIR / "stale.json"
-            cf.write_text("{}")
+            # 过期缓存文件（100h > 48h）：GitHub 用 32 位哈希命名
+            stale = retention.CACHE_DIR / ("a" * 32 + ".json")
+            stale.write_text("{}")
             old = time.time() - 100 * 3600
-            os.utime(cf, (old, old))
-            (retention.CACHE_DIR / "fresh.json").write_text("{}")
+            os.utime(stale, (old, old))
+            (retention.CACHE_DIR / ("b" * 32 + ".json")).write_text("{}")
+            # 源级缓存（七天 TTL）即使超过 48h 也不能被删（2026-10-26 回归）
+            for name in ("aa_models.json", "mlperf_summary.json"):
+                src = retention.CACHE_DIR / name
+                src.write_text("{}")
+                os.utime(src, (old, old))
         self.counts = retention.apply(self.c)
 
     def tearDown(self):
@@ -101,8 +106,14 @@ class TestRetention(unittest.TestCase):
         self.assertEqual(n, 0)
 
     def test_cache_files(self):
-        self.assertFalse((retention.CACHE_DIR / "stale.json").exists())
-        self.assertTrue((retention.CACHE_DIR / "fresh.json").exists())
+        self.assertFalse((retention.CACHE_DIR / ("a" * 32 + ".json")).exists())
+        self.assertTrue((retention.CACHE_DIR / ("b" * 32 + ".json")).exists())
+
+    def test_source_level_caches_survive_github_cleanup(self):
+        """AA/mlperf 的七天缓存不能被 48h 的 GitHub 缓存清理误删。"""
+        for name in ("aa_models.json", "mlperf_summary.json"):
+            self.assertTrue((retention.CACHE_DIR / name).exists(), name)
+        self.assertEqual(self.counts["cache_files_deleted"], 1)
 
 
 if __name__ == "__main__":

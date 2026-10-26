@@ -384,6 +384,7 @@ sources:
     auth: required
     rate_limit: 免费层 1000 次；源内七天缓存，首次/过期才拉 4 页（周更）
     cache_days: 7
+    fetch_budget_s: 240          # 整源预算；超时降级旧缓存，避免慢链路拖垮整轮
     top_n: 40                     # 同系列去重后按 Intelligence Index 取前 N 自动入池
     enabled: true
     notes: >-
@@ -397,6 +398,7 @@ sources:
     rate_limit: 单一静态文件；源内七天缓存
     cache_days: 7
     cache_file: mlperf_summary.json
+    fetch_budget_s: 120          # 整源预算；超时降级旧缓存
     enabled: true
     notes: >-
       取 closed/datacenter/Offline 的 LLM 结果，Result/total_accelerators 折算单卡 Tokens/s；

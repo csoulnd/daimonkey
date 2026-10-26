@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from collector import db
+from collector.http import FetchError
 from collector.sources import aa
 from collector.sources.aa import AARow, AASource
 
@@ -190,6 +191,21 @@ class AaDbTest(unittest.TestCase):
         with patch.object(aa, "_env_key", return_value=None):
             with self.assertRaises(aa.AAError):
                 AASource().collect(self._ctx())
+
+    def test_fetch_failure_falls_back_to_stale_cache(self):
+        """预算耗尽/断网时用旧缓存降级，不让一个慢源拖垮整轮更新。"""
+        self._fresh_cache()
+        data = json.loads(self.cache.read_text(encoding="utf-8"))
+        data["fetched_at"] = "2020-01-01T00:00:00Z"
+        self.cache.write_text(json.dumps(data), encoding="utf-8")
+        with patch.object(aa, "_env_key", return_value="test-key"), \
+                patch.object(aa, "_fetch_all",
+                             side_effect=FetchError("预算耗尽")):
+            metrics, notes = AASource().collect(self._ctx())
+        self.assertTrue(metrics)
+        self.assertTrue(any("降级" in n for n in notes), notes)
+        # 失败不得覆盖/删除旧缓存，下次还能继续兜底
+        self.assertIsNotNone(aa._load_cache())
 
 
 class TestAaRegistry(unittest.TestCase):

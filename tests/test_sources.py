@@ -1,5 +1,7 @@
 """各源解析函数测试（固化样本，不发真实请求）。"""
+import time
 import unittest
+from types import SimpleNamespace
 
 import httpx
 
@@ -38,6 +40,51 @@ class TestHttpTimeout(unittest.TestCase):
         h = self._http()
         h.fetch("https://example.com/x", timeout=45)
         self.assertEqual(self.seen["timeout"], 45)
+
+    def _fake_stream(self, h, chunks):
+        def fake_stream(method, url, **kw):
+            req = httpx.Request(method, url)
+
+            class _Ctx:
+                def __enter__(self):
+                    return SimpleNamespace(
+                        status_code=200,
+                        headers=httpx.Headers({"content-type": "application/json"}),
+                        iter_bytes=lambda: iter(chunks),
+                        request=req)
+
+                def __exit__(self, *exc):
+                    return False
+
+            return _Ctx()
+
+        h._client.stream = fake_stream
+        return h
+
+    def test_deadline_in_past_skips_request(self):
+        from collector.http import DeadlineExceeded
+        h = self._http()
+        with self.assertRaises(DeadlineExceeded):
+            h.fetch("https://example.com/x", deadline=time.monotonic() - 1)
+
+    def test_deadline_stream_returns_full_body(self):
+        h = self._fake_stream(self._http(), [b'{"a": ', b"1}"])
+        r = h.fetch("https://example.com/x", deadline=time.monotonic() + 5)
+        self.assertEqual(r.json(), {"a": 1})
+
+    def test_deadline_mid_stream_aborts(self):
+        """慢速滴流不会触发单次读超时，必须靠整体预算中断。"""
+        from collector.http import DeadlineExceeded
+
+        def slow():
+            yield b"{"
+            time.sleep(0.05)
+            yield b"}"
+
+        h = self._fake_stream(self._http(), slow())
+        with self.assertRaises(DeadlineExceeded):
+            h.fetch("https://example.com/x",
+                    deadline=time.monotonic() + 0.01)
 
 
 class TestNpm(unittest.TestCase):

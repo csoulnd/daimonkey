@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from collector import db
+from collector.http import FetchError
 from collector.sources import mlperf
 from collector.sources.mlperf import (
     MlperfError, MlperfSource, parse_summary, normalize_accel, slugify)
@@ -174,6 +175,25 @@ class TestDb(unittest.TestCase):
                               now=NOW, http=http)
         with self.assertRaises(MlperfError):
             MlperfSource().collect(ctx)
+
+    def test_fetch_failure_falls_back_to_stale_cache(self):
+        """拉取失败（预算耗尽/断网）时用旧快照降级，整轮更新不失败。"""
+        self._seed_cache()
+        path = self.cache_dir / "mlperf_summary.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["fetched_at"] = "2020-01-01T00:00:00Z"
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+        def boom(*a, **k):
+            raise FetchError("预算耗尽")
+
+        http = SimpleNamespace(fetch=boom)
+        ctx = SimpleNamespace(conn=self.c, products=[], source_ids={"mlperf": 1},
+                              now=NOW, http=http)
+        metrics, notes = MlperfSource().collect(ctx)
+        self.assertTrue(metrics)
+        self.assertTrue(any("降级" in n for n in notes), notes)
+        self.assertTrue(path.exists())   # 失败不删除旧缓存
 
 
 if __name__ == "__main__":

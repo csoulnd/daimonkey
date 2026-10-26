@@ -210,7 +210,7 @@ def status_payload() -> dict:
         kind = _proc.get("kind")
         note = {"knowledge": "知识库同步中，通常需要 10~60 秒",
                 "news": "新闻采集中，通常需要约 1 分钟"}.get(
-                    kind, "采集进行中，通常需要 1-5 分钟")
+                    kind, "全量采集中，通常 5-10 分钟（含评分、AI 摘要与建站）")
         return {"state": "running", "kind": kind, "note": note}
     if STATUS_FILE.exists():
         try:

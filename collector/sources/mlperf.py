@@ -18,16 +18,19 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from .. import db
 from ..config import CACHE_DIR, now_iso, registry
+from ..http import FetchError
 from .base import BaseSource, Ctx, MetricOut
 
 PARSER_VERSION = "mlperf-summary-v1"
 DEFAULT_CACHE_DAYS = 7
 REQUEST_TIMEOUT = 90
+DEFAULT_FETCH_BUDGET_S = 120   # 整源预算：超时降级旧缓存
 MAX_BYTES = 8 * 1024 * 1024
 
 # MLPerf 模型名 -> 站点指标键（只取 LLM 推理，避免把 resnet/bert 等旧基准混进同一口径）
@@ -277,27 +280,21 @@ class MlperfSource(BaseSource):
             notes = [f"MLPerf 缓存有效（{collected_at}，{days:g} 天内不重复请求）"]
         else:
             url = str(conf["base_url"])
-            resp = ctx.http.fetch(url, timeout=REQUEST_TIMEOUT)
-            if resp.status_code != 200:
-                raise MlperfError(f"MLPerf summary HTTP {resp.status_code}")
-            body = resp.content
-            if len(body) > MAX_BYTES:
-                raise MlperfError(f"MLPerf summary 体积异常（{len(body)} 字节）")
+            budget = float(conf.get("fetch_budget_s", DEFAULT_FETCH_BUDGET_S))
             try:
-                payload = resp.json()
-            except ValueError as e:
-                db.save_raw(ctx.conn, ctx.source_ids["mlperf"], "mlperf", None,
-                            url, resp.status_code, body, "application/json", False,
-                            parse_error=f"JSON 解析失败: {e}",
-                            parser_version=PARSER_VERSION)
-                raise MlperfError(f"MLPerf summary JSON 解析失败: {e}") from e
-            raw_id = db.save_raw(ctx.conn, ctx.source_ids["mlperf"], "mlperf", None,
-                                 url, resp.status_code, body, "application/json",
-                                 True, parser_version=PARSER_VERSION)
-            rows = parse_summary(payload, raw_id, aliases=aliases)
-            _save_cache(rows, raw_id)
-            collected_at = ctx.now
-            notes = [f"MLPerf summary 已归档 {len(rows)} 张加速卡（raw #{raw_id}）"]
+                rows, raw_id, collected_at, notes = self._fetch_rows(
+                    ctx, url, aliases, budget)
+            except FetchError as e:
+                # 网络/预算失败：有旧缓存就降级复用，整轮更新不因单源失败。
+                rows = _rows_from_cache(cache) if cache else []
+                if not rows:
+                    raise MlperfError(
+                        f"MLPerf 拉取失败（{e}），且没有可复用的缓存快照") from e
+                raw_id = int(cache.get("raw_id") or 0)
+                collected_at = str(cache.get("fetched_at") or now_iso())
+                notes = [f"MLPerf 拉取失败（{e}），降级使用 {collected_at}"
+                         f" 的旧缓存快照（{len(rows)} 张加速卡）"]
+
         if not rows:
             raise MlperfError("MLPerf 数据中没有可入榜的加速卡")
         ids, synced = sync_products(ctx.conn, rows)
@@ -308,3 +305,29 @@ class MlperfSource(BaseSource):
         notes.append(f"NV 推理榜：{len(rows)} 张加速卡入池（{primary} 张有主指标"
                      f" gpt-oss-120b Offline 单卡吞吐）")
         return metrics, notes
+
+    def _fetch_rows(self, ctx: Ctx, url: str, aliases: dict,
+                    budget_s: float) -> tuple[list[AccelRow], int, str, list[str]]:
+        """拉取并解析 summary.json；网络/预算异常向上抛，由 collect 决定降级。"""
+        deadline = time.monotonic() + budget_s if budget_s > 0 else None
+        resp = ctx.http.fetch(url, timeout=REQUEST_TIMEOUT, deadline=deadline)
+        if resp.status_code != 200:
+            raise MlperfError(f"MLPerf summary HTTP {resp.status_code}")
+        body = resp.content
+        if len(body) > MAX_BYTES:
+            raise MlperfError(f"MLPerf summary 体积异常（{len(body)} 字节）")
+        try:
+            payload = resp.json()
+        except ValueError as e:
+            db.save_raw(ctx.conn, ctx.source_ids["mlperf"], "mlperf", None,
+                        url, resp.status_code, body, "application/json", False,
+                        parse_error=f"JSON 解析失败: {e}",
+                        parser_version=PARSER_VERSION)
+            raise MlperfError(f"MLPerf summary JSON 解析失败: {e}") from e
+        raw_id = db.save_raw(ctx.conn, ctx.source_ids["mlperf"], "mlperf", None,
+                             url, resp.status_code, body, "application/json",
+                             True, parser_version=PARSER_VERSION)
+        rows = parse_summary(payload, raw_id, aliases=aliases)
+        _save_cache(rows, raw_id)
+        return rows, raw_id, ctx.now, [
+            f"MLPerf summary 已归档 {len(rows)} 张加速卡（raw #{raw_id}）"]
