@@ -1,0 +1,28 @@
+<figure class="learn-stack" aria-label="大模型推理软硬件架构">
+  <div class="learn-stack-layers">
+    <div class="learn-stack-layer learn-stack-model">
+      <div class="learn-stack-label"><strong>模型定义与资源</strong></div>
+      <div class="learn-stack-detail"><strong>模型结构 · 权重 · 配置</strong><span>包含 Tokenizer 等配套资源，供推理框架加载</span></div>
+    </div>
+    <div class="learn-stack-layer learn-stack-engine">
+      <div class="learn-stack-label"><strong>推理框架与引擎</strong></div>
+      <div class="learn-stack-detail"><strong>请求调度 · KV 管理 · 执行与采样</strong><small>例如 vLLM / SGLang / MindIE</small></div>
+    </div>
+    <div class="learn-stack-layer">
+      <div class="learn-stack-label"><strong>模型执行与适配</strong></div>
+      <div class="learn-stack-detail"><strong>张量计算 · 计算图 · 设备后端</strong><small>例如 PyTorch / MindSpore / JAX 及设备适配</small></div>
+    </div>
+    <div class="learn-stack-layer learn-stack-enabling">
+      <div class="learn-stack-label"><strong>硬件使能</strong></div>
+      <div class="learn-stack-detail"><strong>运行时 · 编译器 · 算子库 · 通信库</strong><small>例如 CUDA / CANN / XLA 及配套组件，职责覆盖各有不同</small></div>
+    </div>
+    <div class="learn-stack-layer">
+      <div class="learn-stack-label"><strong>操作系统与驱动</strong></div>
+      <div class="learn-stack-detail"><strong>Linux：Ubuntu / openEuler 等</strong><span>系统管理资源，驱动连接设备</span></div>
+    </div>
+    <div class="learn-stack-layer learn-stack-hardware">
+      <div class="learn-stack-label"><strong>计算硬件</strong></div>
+      <div class="learn-stack-detail"><div class="learn-stack-chips"><span>CPU</span><span>GPU</span><span>NPU</span><span>TPU</span></div><span>计算单元 · 内存 / 显存 · 设备互联</span></div>
+    </div>
+  </div>
+</figure>

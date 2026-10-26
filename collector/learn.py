@@ -1,7 +1,7 @@
 """学习内容（/learn）加载、校验与渲染。
 
 内容主存储：``content/learn/<series>/``，与站点同仓版本化。
-知识库不参与渲染；归档由 scripts/archive_learn.py 单向完成。
+知识库不参与渲染；单向自动归档尚在规划中。
 
 对外函数：
     load_all()                  -> list[series dict]
@@ -305,7 +305,7 @@ class _Rewriter(HTMLParser):
 def _render_markdown(body: str, series_id: str, slug: str,
                      slugs: set[str], kb_known: set[str]) -> tuple[str, str]:
     md = markdown.Markdown(
-        extensions=["fenced_code", "tables", "toc", "sane_lists", "footnotes"],
+        extensions=["fenced_code", "tables", "toc", "sane_lists", "footnotes", "attr_list"],
         extension_configs={"toc": {"permalink": False, "slugify": slugify_unicode,
                                   "toc_depth": "2-3"}})
     fragment = md.convert(body)
@@ -328,6 +328,15 @@ def _note_one_liner(note: dict) -> str:
     if not match:
         return ""
     return re.sub(r"\s+", " ", match.group(1)).strip()[:120]
+
+
+def _render_diagrams(fragment: str, env) -> str:
+    """仅替换已清洗的固定图表标记；文章不能指定模板路径或注入 HTML。"""
+    marker = '<pre><code class="language-learn-diagram">inference-stack\n</code></pre>'
+    if marker in fragment:
+        fragment = fragment.replace(
+            marker, env.get_template("_learn_inference_stack.html").render())
+    return fragment
 
 
 def _related_notes(paths: list[str], notes: list[dict]) -> list[dict]:
@@ -393,6 +402,24 @@ def _copy_assets(series_list: list[dict]) -> None:
             shutil.copyfile(src, dst)
 
 
+def _build_introduction_review(env, series_list: list[dict], assets_v: str = "") -> list[tuple[str, str]]:
+    """独立评审快照，不加入课程目录或覆盖正式导读。"""
+    source = ROOT / "docs" / "reviews" / "learn-introduction-20261024"
+    if not source.is_dir():
+        return []
+    slugs = {a["slug"] for s in series_list for a in s["articles"]}
+    versions = []
+    for name, title in (("minimal-change", "A · 只改图与路线"),
+                        ("previous-rewrite", "B · 上一轮重写版")):
+        _, body = knowledge.split_frontmatter((source / f"{name}.md").read_text(encoding="utf-8"))
+        fragment, _ = _render_markdown(body, "inference", "introduction", slugs, set())
+        versions.append({"id": name, "title": title,
+                         "html": _render_diagrams(fragment, env)})
+    original = (source / "original.md").read_text(encoding="utf-8")
+    return [("design/learn-introduction.html", env.get_template("learn_review.html").render(
+        versions=versions, original=original, assets_v=assets_v))]
+
+
 def build(env, common: dict, notes: list[dict] | None = None) -> dict:
     """渲染 /learn；先把所有页面渲染到内存，再落盘，避免半成品。"""
     series_list = load_all()
@@ -410,6 +437,7 @@ def build(env, common: dict, notes: list[dict] | None = None) -> dict:
         slugs = {a["slug"] for a in series["articles"]}
         for i, art in enumerate(series["articles"]):
             fragment, toc = _render_markdown(art["body"], sid, art["slug"], slugs, kb_known)
+            fragment = _render_diagrams(fragment, env)
             art["article_html"] = fragment
             art["article_toc"] = toc
             art["related_notes"] = _related_notes(art["related"], notes)
@@ -434,13 +462,15 @@ def build(env, common: dict, notes: list[dict] | None = None) -> dict:
     pages.append(("learn/index.html", _page(
         env, common, "learn_index.html",
         title="LLM 推理技术基础 · 学习",
-        description="从一次 decode 请求到推理系统的技术地图：基础、模型、系统、实践。",
+        description="从数学与计算基础、模型结构到推理过程、算子与系统优化的学习地图。",
         path="/learn", learn_page=True, learn_series=series_list,
         learn_nav=series_list[0],
         learn_meta={"count": total,
                     "total": sum(s["total"] for s in series_list),
                     "updated": latest,
                     "series_count": len(series_list)})))
+
+    pages.extend(_build_introduction_review(env, series_list, common.get("assets_v", "")))
 
     for rel, text in pages:
         target = DIST_DIR / rel

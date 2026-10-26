@@ -9,6 +9,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from jinja2 import Environment, FileSystemLoader
+
 from collector import learn
 
 
@@ -21,7 +23,7 @@ class LearnContentTest(unittest.TestCase):
         inference = next(s for s in series if s["id"] == "inference")
         self.assertEqual(inference["title"], "LLM 推理技术基础")
         self.assertTrue(inference["parts"])
-        self.assertEqual(inference["total"], 44)
+        self.assertEqual(inference["total"], 48)
         self.assertGreater(inference["total"], inference["count"])
         planned = [c for p in inference["parts"] for c in p["chapters"] if c.get("planned")]
         self.assertTrue(planned)
@@ -36,6 +38,27 @@ class LearnContentTest(unittest.TestCase):
         self.assertEqual(art["url"], "/learn/inference/introduction")
         self.assertTrue(art["one_liner"])
         self.assertGreaterEqual(art["read_time"], 1)
+
+    def test_introduction_diagram_is_static_and_unknown_markers_stay_text(self) -> None:
+        articles = {a["slug"]: a for s in learn.load_all() for a in s["articles"]}
+        env = Environment(loader=FileSystemLoader(learn.ROOT / "templates"), autoescape=True)
+        fragment, _ = learn._render_markdown(
+            articles["introduction"]["body"], "inference", "introduction", set(articles), set())
+        rendered = learn._render_diagrams(fragment, env)
+        self.assertIn('<figure class="learn-stack"', rendered)
+        self.assertIn("openEuler", rendered)
+        self.assertNotIn("language-mermaid", rendered)
+        self.assertNotIn("language-learn-diagram", rendered)
+        diagram = rendered.split('<figure class="learn-stack"', 1)[1].split('</figure>', 1)[0]
+        self.assertNotIn('<a ', diagram)
+        self.assertIn('模型定义与资源', diagram)
+        self.assertEqual(rendered.count('class="learn-contact"'), 3)
+        self.assertIn('href="mailto:daidaicurry@foxmail.com"', rendered)
+        unknown, _ = learn._render_markdown(
+            '```learn-diagram\n../../secret\n```\n\n<script>alert(1)</script>',
+            "inference", "introduction", set(), set())
+        self.assertEqual(learn._render_diagrams(unknown, env), unknown)
+        self.assertNotIn("<script>", unknown)
 
     def test_knowledge_base_article(self) -> None:
         series = learn.load_all()

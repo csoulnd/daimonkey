@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>导读修改对照 · InferTech</title>
+<script>try{var t=localStorage.getItem("theme");if(t==="light"||(!t&&matchMedia("(prefers-color-scheme: light)").matches))document.documentElement.dataset.theme="light"}catch(e){}</script>
+<link rel="stylesheet" href="/assets/style.css?v={{ assets_v }}">
+</head>
+<body>
+<main class="learn-review">
+  <header>
+    <p class="learn-kicker dim">导读 · 修改对照</p>
+    <h1>卷表组织内容，架构图辅助理解</h1>
+    <p>默认展示只替换图与路线的版本。教程目标、卷表、章节标题、结尾与历史记录均保留原文。</p>
+    <p class="dim">正式导读已在 A 版基础上按后续意见继续调整，并同步八卷目录。下方保留当时的 A/B 正文快照（含原七卷表述），图示使用当前展示样式。</p>
+    <p><a href="/learn/inference/introduction">查看当前正式导读</a> · <a href="/learn">查看课程目录</a></p>
+    <button type="button" id="review-theme">切换明暗主题</button>
+  </header>
+  <div class="learn-review-switch">
+    <input type="radio" name="review-version" id="review-a" checked><label for="review-a">A · 只改图与路线</label>
+    <input type="radio" name="review-version" id="review-b"><label for="review-b">B · 上一轮重写版</label>
+    {% for version in versions %}
+    <section class="learn-review-version learn-review-{{ loop.index }}" aria-label="{{ version.title }}">
+      <article class="markdown-body">{{ version.html | safe }}</article>
+    </section>
+    {% endfor %}
+  </div>
+  <details class="learn-review-original"><summary>查看修改前的原始 Markdown（含原四张图源码）</summary><pre>{{ original }}</pre></details>
+</main>
+<script>
+document.getElementById("review-theme").addEventListener("click", function () {
+  var theme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem("theme", theme); } catch (e) {}
+});
+</script>
+</body>
+</html>

@@ -445,6 +445,35 @@ h3 { font-size: 0.96em; margin: 0.7em 0 0.35em; font-weight: 600; }
 .learn-pager { display: flex; justify-content: space-between; gap: 16px; margin: 40px 0 10px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 0.9em; }
 .learn-pager a { color: var(--dim); }
 .learn-pager a:hover { color: var(--ink); }
+/* 构建时生成的架构图：无需客户端图表引擎。 */
+.markdown-body .learn-stack { margin: var(--sp-6) 0; padding: 0; border: 0; background: transparent; font-size: var(--fs-sm); line-height: 1.6; }
+.learn-stack-layers { display: grid; gap: var(--sp-3); }
+.learn-stack-layer { --stack-accent: var(--line-strong); display: grid; grid-template-columns: 10em minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-m); background: var(--panel); }
+.learn-stack-model { --stack-accent: var(--hue-violet); }
+.learn-stack-engine { --stack-accent: var(--acc); }
+.learn-stack-enabling { --stack-accent: var(--acc2); }
+.learn-stack-hardware { --stack-accent: var(--heat); }
+.markdown-body .learn-stack-label { display: flex; align-items: center; justify-content: center; padding: var(--sp-4) var(--sp-3); border-left: 3px solid var(--stack-accent); background: var(--panel2); color: var(--ink); text-align: center; text-decoration: none; }
+.learn-stack-detail { display: flex; flex-direction: column; justify-content: center; gap: var(--sp-2); min-width: 0; padding: var(--sp-4) var(--sp-5); overflow-wrap: anywhere; }
+.learn-stack-detail > strong { font-weight: 600; color: var(--ink); }
+.learn-stack-detail > span, .learn-stack-detail small { color: var(--dim); font-size: var(--fs-xs); }
+.learn-stack-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-2); }
+.learn-stack-chips > span { padding: var(--sp-1) var(--sp-2); border: 1px solid var(--line); border-radius: var(--r-s); background: var(--panel2); font-family: var(--mono); text-align: center; }
+@media (max-width: 600px) {
+  .learn-stack-layer { grid-template-columns: minmax(0, 1fr); }
+  .markdown-body .learn-stack-label { justify-content: flex-start; padding: var(--sp-2) var(--sp-3); text-align: left; }
+  .learn-stack-detail { padding: var(--sp-3); }
+}
+
+/* 联系方式保留 Markdown 链接，构建时通过 attr_list 标记为卡片组。 */
+.markdown-body ul:has(> li > .learn-contact) { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--sp-3); list-style: none; padding: 0; margin: var(--sp-5) 0; }
+.markdown-body ul:has(> li > .learn-contact) > li { margin: 0; min-width: 0; }
+.markdown-body ul:has(> li > .learn-contact) > li > a { display: flex; flex-direction: column; gap: var(--sp-2); height: 100%; padding: var(--sp-4); border: 1px solid var(--line-strong); border-radius: var(--r-m); background: var(--panel); color: var(--dim); font-size: var(--fs-sm); line-height: 1.6; text-decoration: none; overflow-wrap: anywhere; }
+.markdown-body ul:has(> li > .learn-contact) strong { color: var(--ink); font-size: var(--fs-base); }
+.markdown-body ul:has(> li > .learn-contact) em { font-style: normal; color: var(--acc); font-size: var(--fs-xs); }
+.markdown-body ul:has(> li > .learn-contact) a:hover { border-color: var(--acc); background: var(--panel2); }
+.markdown-body ul:has(> li > .learn-contact) a:focus-visible { outline: 2px solid var(--acc); outline-offset: var(--sp-1); }
+
 @media (max-width: 1150px) {
   .kb-reading { grid-template-columns: minmax(0, 1fr); }
   .kb-toc { position: static; grid-row: 1; max-height: 240px; }
@@ -1267,3 +1296,19 @@ html.authed #nav-login { display: none; }
 .clip-progress-track { flex: 1; height: 6px; border-radius: var(--r-full);
   background: var(--panel2); overflow: hidden; }
 .clip-progress-bar { height: 100%; width: 0; background: var(--acc); transition: width .2s; }
+
+/* 导读独立评审：原文保留，版本切换不依赖 JavaScript。 */
+.learn-review { max-width: var(--measure); margin: 0 auto; padding: var(--sp-6) var(--sp-5); }
+.learn-review > header { margin-bottom: var(--sp-6); }
+.learn-review > header h1 { font-size: var(--fs-lg); }
+.learn-review > header p { margin: var(--sp-3) 0; }
+.learn-review-switch { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.learn-review-switch > input { accent-color: var(--acc); }
+.learn-review-switch > label { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-s); cursor: pointer; color: var(--dim); }
+.learn-review-switch > input:checked + label { color: var(--acc); border-color: var(--acc); background: var(--panel2); }
+.learn-review-switch > input:focus-visible + label { outline: 2px solid var(--acc); outline-offset: var(--sp-1); }
+.learn-review-version { display: none; flex-basis: 100%; min-width: 0; margin-top: var(--sp-5); padding-top: var(--sp-5); border-top: 1px solid var(--line); }
+#review-a:checked ~ .learn-review-1, #review-b:checked ~ .learn-review-2 { display: block; }
+.learn-review-original { margin-top: var(--sp-6); border-top: 1px solid var(--line); padding-top: var(--sp-4); }
+.learn-review-original summary { cursor: pointer; color: var(--dim); }
+.learn-review-original pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-sm); }
