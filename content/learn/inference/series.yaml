@@ -1,76 +1,84 @@
 id: inference
 title: LLM 推理技术基础
-description: LLM 大模型入门基础教程：从基础模型架构到最终的算子执行，逐步构建推理加速知识地图。每个层次都用尽量直观的可视化拆解，从基础公式入手，配合源码食用更佳。
+description: 从必要的数学与计算基础出发，理解模型结构、推理过程与算子执行，再进入框架优化和实践。用图示、公式与源码，建立可验证的推理知识体系。
 parts:
   - id: guide
     title: 导读
-    description: 通用前置：读法、知识库思路、概率与信息论、硬件、benchmark
+    description: 软硬件全景、学习路线与知识组织
     chapters:
       - introduction
       - knowledge-base-method
-      - {slug: probability, title: "概率论基础", planned: true}
-      - {slug: information-theory, title: "信息论基础", planned: true}
-      - {slug: hardware-basics, title: "硬件基础：GPU / NPU 执行模型", planned: true}
-      - {slug: inference-benchmark, title: "推理 Benchmark：性能与精度", planned: true}
-  - id: foundations
-    title: 推理基础
-    description: 一次推理的账本：请求生命周期、代价模型、KV Cache、数值格式
+  - id: prerequisites
+    title: 数学与计算基础
+    description: 向量与矩阵、张量、概率与信息论，以及推理依赖的计算环境
     chapters:
-      - {slug: request-lifecycle, title: "推理全景：一次请求的一生", planned: true}
-      - {slug: cost-model, title: "推理的代价模型：FLOPs、显存与 Roofline", planned: true}
-      - {slug: kv-cache-basics, title: "KV Cache 基础：形状与显存账本", planned: true}
+      - linear-algebra
+      - tensor-layout
+      - {slug: probability, title: "概率基础：条件概率、分布与采样", planned: true}
+      - {slug: information-theory, title: "信息论基础：熵、交叉熵与 KL 散度", planned: true}
       - {slug: numeric-formats, title: "数值格式：FP16 / BF16 / FP8 / INT", planned: true}
-  - id: families
-    title: 基础模型
-    description: 主流模型家族的结构与推理影响
-    chapters:
-      - {slug: model-families-intro, title: "本章导读：怎么读一个模型家族", planned: true}
-      - {slug: glm-family, title: "GLM 系列：结构、变体与推理影响", planned: true}
-      - {slug: deepseek-family, title: "DeepSeek 系列：MLA、MoE 与 MTP", planned: true}
-      - {slug: qwen-family, title: "Qwen 系列：dense/MoE 与长上下文", planned: true}
-      - {slug: kimi-family, title: "Kimi 系列：结构、长上下文与推理影响", planned: true}
+      - {slug: hardware-basics, title: "硬件基础：CPU 与 GPU / NPU / TPU", planned: true}
+      - {slug: inference-stack, title: "推理软件栈：OS、驱动、运行时与框架", planned: true}
   - id: architecture
     title: 模型结构
     description: 从 token 到 logits 的结构地图
     chapters:
       - {slug: architecture-intro, title: "本章导读：从 token 到 logits", planned: true}
-      - {slug: embedding, title: "词嵌入与输出头", planned: true}
       - {slug: tokenizer, title: "Tokenizer 与 Chat Template", planned: true}
+      - {slug: embedding, title: "词嵌入与输出头", planned: true}
       - {slug: positional-encoding, title: "位置编码：RoPE、mRoPE 与长度外推", planned: true}
       - {slug: attention-variants, title: "注意力及其变体：MHA/MQA/GQA/MLA", planned: true}
-      - {slug: moe, title: "MoE：路由、专家与推理影响", planned: true}
       - {slug: ffn-norm, title: "FFN、Norm 与残差", planned: true}
+      - {slug: moe, title: "MoE：路由、专家与推理影响", planned: true}
       - {slug: long-context-structure, title: "长上下文结构：外推、压缩与稀疏注意力", planned: true}
+  - id: families
+    title: 模型家族概览
+    description: 认识代表型号、参数规模与常见结构，连接模型原理与推理过程
+    chapters:
+      - {slug: model-families-intro, title: "模型家族总览：参数规模与结构对照", planned: true}
+      - {slug: glm-family, title: "GLM 系列：代表型号、参数规模与结构", planned: true}
+      - {slug: deepseek-family, title: "DeepSeek 系列：代表型号、参数规模与结构", planned: true}
+      - {slug: qwen-family, title: "Qwen 系列：代表型号、参数规模与结构", planned: true}
+      - {slug: kimi-family, title: "Kimi 系列：代表型号、参数规模与结构", planned: true}
+  - id: foundations
+    title: 推理基础
+    description: 在模型结构之上理解生成过程、计算代价与 KV Cache
+    chapters:
+      - {slug: request-lifecycle, title: "从前向计算到生成：Prefill、Decode 与采样", planned: true}
+      - {slug: cost-model, title: "推理的代价模型：FLOPs、显存与 Roofline", planned: true}
+      - {slug: kv-cache-basics, title: "KV Cache 基础：形状与显存账本", planned: true}
   - id: operators
     title: 算子加速
     description: 结构如何落到设备：GEMM、attention、MoE 与量化算子
     chapters:
       - {slug: operators-intro, title: "本章导读：从模型结构到算子", planned: true}
-      - {slug: matmul, title: "MatMul / GEMM：tiling 与 Tensor Core", planned: true}
+      - {slug: matmul, title: "MatMul / GEMM：分块、数据搬运与矩阵计算单元", planned: true}
       - {slug: grouped-matmul, title: "Grouped MatMul：MoE 的分组计算", planned: true}
       - {slug: flash-attention, title: "FlashAttention：online softmax 与 IO 优化", planned: true}
       - {slug: paged-attention, title: "PagedAttention：分页 KV 与 decode attention", planned: true}
-      - {slug: mrope-cache, title: "mRoPE with Cache：多模态位置编码的缓存实现", planned: true}
-      - {slug: mega-moe, title: "MegaMoE：MoE 全流程融合与通信掩盖", planned: true}
+      - {slug: mrope-cache, title: "进阶案例：mRoPE 的缓存实现", planned: true}
+      - {slug: mega-moe, title: "进阶案例：MegaMoE 融合与通信重叠", planned: true}
       - {slug: quantization-kernels, title: "量化算子：W8A8 / FP8 GEMM 与反量化融合", planned: true}
   - id: systems
-    title: 加速特性
+    title: 推理系统与优化
     description: 调度、显存、量化、投机、并行通信与框架
     chapters:
       - {slug: system-intro, title: "本章导读：系统加速地图", planned: true}
+      - {slug: compilation-execution, title: "编译与执行：融合、图重放与异步执行", planned: true}
       - {slug: batching-scheduling, title: "批处理与调度", planned: true}
       - {slug: kv-memory-management, title: "显存与 KV 管理", planned: true}
       - {slug: quantization-memory, title: "量化与显存", planned: true}
       - {slug: speculative-decoding, title: "投机解码", planned: true}
       - {slug: parallel-communication, title: "并行与通信", planned: true}
       - {slug: long-context-serving, title: "长上下文推理", planned: true}
-      - {slug: framework-lifecycle, title: "框架解剖：一次推理请求的生命周期", planned: true}
+      - {slug: framework-lifecycle, title: "框架解剖：请求如何经过调度器与执行器", planned: true}
       - {slug: performance-engineering, title: "性能工程：指标、瓶颈与容量", planned: true}
   - id: practice
     title: 实践
     description: 性能调优、精度定位与最小实现
     chapters:
       - {slug: practice-intro, title: "本章导读：从知识到调优", planned: true}
+      - {slug: inference-benchmark, title: "推理 Benchmark：性能与精度", planned: true}
       - {slug: performance-tuning, title: "性能调优实战", planned: true}
       - {slug: accuracy-debugging, title: "精度问题定位", planned: true}
       - {slug: nano-projects, title: "nano 项目地图", planned: true}
